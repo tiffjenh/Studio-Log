@@ -3,7 +3,7 @@ import { useStoreContext } from "@/context/StoreContext";
 import {
   formatCurrency,
   earnedThisWeek,
-  potentialThisWeek,
+  getMonthBounds,
   getStudentsForDay,
   getLessonForStudentOnDate,
   toDateKey,
@@ -52,10 +52,22 @@ export default function Dashboard() {
   const dateKey = toDateKey(today);
   const dayOfWeek = today.getDay();
   const earned = earnedThisWeek(data.lessons, today);
-  const potential = potentialThisWeek(data.students, today);
-  const todaysStudents = getStudentsForDay(data.students, dayOfWeek);
   const firstName = data.user?.name?.split(" ")[0] ?? "there";
-  const pct = potential > 0 ? Math.round((earned / potential) * 100) : 0;
+
+  const { start: monthStart, end: monthEnd } = getMonthBounds(today);
+  const monthStartKey = toDateKey(monthStart);
+  const monthEndKey = toDateKey(monthEnd);
+  const earningsThisMonth = data.lessons
+    .filter((l) => l.completed && l.date >= monthStartKey && l.date <= monthEndKey)
+    .reduce((sum, l) => sum + l.amountCents, 0);
+
+  const year = today.getFullYear();
+  const ytdEndKey = toDateKey(today);
+  const earningsYTD = data.lessons
+    .filter((l) => l.completed && l.date >= `${year}-01-01` && l.date <= ytdEndKey)
+    .reduce((sum, l) => sum + l.amountCents, 0);
+
+  const todaysStudents = getStudentsForDay(data.students, dayOfWeek);
 
   const handleToggle = (studentId: string, completed: boolean) => {
     const existing = getLessonForStudentOnDate(data.lessons, studentId, dateKey);
@@ -86,14 +98,19 @@ export default function Dashboard() {
         <div className="card">
           <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Earned This Week</div>
           <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(earned)}</div>
-          <div style={{ fontSize: 13, color: "var(--success)", marginTop: 2 }}>+{pct}%</div>
         </div>
         <div className="card">
-          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Potential This Week</div>
-          <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(potential)}</div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Earnings This Month</div>
+          <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(earningsThisMonth)}</div>
+        </div>
+        <div className="card" style={{ gridColumn: "1 / -1" }}>
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Earnings YTD</div>
+          <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(earningsYTD)}</div>
         </div>
       </div>
-      <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Today&apos;s Lessons ({DAY_NAMES[dayOfWeek]})</h3>
+      <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
+        Today&apos;s lessons ({DAY_NAMES[dayOfWeek]}, {today.toLocaleDateString("en-US", { month: "short", day: "numeric" })})
+      </h3>
       {todaysStudents.length === 0 ? (
         <p style={{ color: "var(--text-muted)", padding: 24 }}>No lessons scheduled for today</p>
       ) : (
