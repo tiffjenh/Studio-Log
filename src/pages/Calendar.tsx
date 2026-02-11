@@ -13,26 +13,16 @@ function addDays(d: Date, n: number): Date {
   return x;
 }
 
-/** Thursday of the week containing d (matches existing 7-day strip: Thu–Wed) */
-function getStripStart(d: Date): Date {
-  const x = new Date(d);
-  const day = x.getDay();
-  const sunDate = x.getDate() - day;
-  x.setDate(sunDate + 4);
-  return x;
-}
-
-function getWeekDatesFromStripStart(stripStart: Date): Date[] {
-  const dates: Date[] = [];
-  for (let i = 0; i < 7; i++) dates.push(addDays(stripStart, i));
-  return dates;
+/** 5 days: 2 before center, center, 2 after */
+function getFiveDays(center: Date): Date[] {
+  return [-2, -1, 0, 1, 2].map((i) => addDays(center, i));
 }
 
 export default function Calendar() {
   const navigate = useNavigate();
   const { data, addLesson, updateLesson } = useStoreContext();
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [viewWeekStart, setViewWeekStart] = useState(() => getStripStart(new Date()));
+  const [viewCenter, setViewCenter] = useState(new Date());
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [monthPickerView, setMonthPickerView] = useState(new Date());
   const monthPickerRef = useRef<HTMLDivElement>(null);
@@ -41,15 +31,11 @@ export default function Calendar() {
   const dayOfWeek = selectedDate.getDay();
   const todaysStudents = getStudentsForDay(data.students, dayOfWeek);
   const todayEarnings = data.lessons.filter((l) => l.date === dateKey && l.completed).reduce((s, l) => s + l.amountCents, 0);
-  const weekDates = getWeekDatesFromStripStart(viewWeekStart);
+  const stripDates = getFiveDays(viewCenter);
 
-  // Keep view week in sync when selected date changes (e.g. from dropdown)
+  // Always center the 5-day strip on the selected date when it changes
   useEffect(() => {
-    setViewWeekStart((prev) => {
-      const selStart = getStripStart(selectedDate);
-      const prevStart = getStripStart(prev);
-      return toDateKey(selStart) === toDateKey(prevStart) ? prev : selStart;
-    });
+    setViewCenter(selectedDate);
   }, [selectedDate]);
 
   // Click outside to close month picker
@@ -147,13 +133,13 @@ export default function Calendar() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
             type="button"
-            onClick={() => setViewWeekStart((prev) => addDays(prev, -7))}
+            onClick={() => setViewCenter((prev) => addDays(prev, -5))}
             style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}
           >
             ‹
           </button>
           <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
-            {weekDates.map((d) => {
+            {stripDates.map((d) => {
               const isSelected = toDateKey(d) === dateKey;
               return (
                 <button
@@ -170,7 +156,7 @@ export default function Calendar() {
           </div>
           <button
             type="button"
-            onClick={() => setViewWeekStart((prev) => addDays(prev, 7))}
+            onClick={() => setViewCenter((prev) => addDays(prev, 5))}
             style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}
           >
             ›

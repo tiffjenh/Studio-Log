@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import {
@@ -45,12 +46,20 @@ function LessonRow({
   );
 }
 
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { data, addLesson, updateLesson } = useStoreContext();
   const today = new Date();
-  const dateKey = toDateKey(today);
-  const dayOfWeek = today.getDay();
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+
+  const dateKey = toDateKey(selectedDate);
+  const dayOfWeek = selectedDate.getDay();
   const earned = earnedThisWeek(data.lessons, today);
   const firstName = data.user?.name?.split(" ")[0] ?? "there";
 
@@ -68,6 +77,7 @@ export default function Dashboard() {
     .reduce((sum, l) => sum + l.amountCents, 0);
 
   const todaysStudents = getStudentsForDay(data.students, dayOfWeek);
+  const isToday = toDateKey(selectedDate) === toDateKey(today);
 
   const handleToggle = (studentId: string, completed: boolean) => {
     const existing = getLessonForStudentOnDate(data.lessons, studentId, dateKey);
@@ -108,11 +118,32 @@ export default function Dashboard() {
           <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(earningsYTD)}</div>
         </div>
       </div>
-      <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
-        Today&apos;s lessons ({DAY_NAMES[dayOfWeek]}, {today.toLocaleDateString("en-US", { month: "short", day: "numeric" })})
+      <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        {isToday ? "Today's lessons" : "Lessons"}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <button
+            type="button"
+            onClick={() => setSelectedDate((d) => addDays(d, -1))}
+            style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 16 }}
+            aria-label="Previous day"
+          >
+            ‹
+          </button>
+          <span style={{ minWidth: 120 }}>
+            ({DAY_NAMES[dayOfWeek]}, {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })})
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedDate((d) => addDays(d, 1))}
+            style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 16 }}
+            aria-label="Next day"
+          >
+            ›
+          </button>
+        </span>
       </h3>
       {todaysStudents.length === 0 ? (
-        <p style={{ color: "var(--text-muted)", padding: 24 }}>No lessons scheduled for today</p>
+        <p style={{ color: "var(--text-muted)", padding: 24 }}>No lessons scheduled for this day</p>
       ) : (
         todaysStudents.map((student) => {
           const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);

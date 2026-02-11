@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { hasSupabase } from "@/lib/supabase";
 import { parseLessonCSV, parseLessonMatrixCSV, rowToLesson, type ImportResult } from "@/utils/csvImport";
+import { getLessonForStudentOnDate } from "@/utils/earnings";
 import type { Student } from "@/types";
 
 export default function Settings() {
-  const { data, setUser, updateUserProfile, reload, addLesson } = useStoreContext();
+  const { data, setUser, updateUserProfile, reload, addLesson, updateLesson } = useStoreContext();
   const navigate = useNavigate();
   const [refreshing, setRefreshing] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -73,18 +74,29 @@ export default function Settings() {
         }
 
         try {
-          const id = await addLesson({
-            studentId: student.id,
-            date: lessonData.date,
-            durationMinutes: lessonData.duration_minutes,
-            amountCents: lessonData.amount_cents,
-            completed: lessonData.completed,
-            note: lessonData.note,
-          });
-          if (id) imported++;
-          else {
-            skipped++;
-            errors.push(`Row ${i + 2}: Failed to save`);
+          const existing = getLessonForStudentOnDate(data.lessons, student.id, lessonData.date);
+          if (existing) {
+            await updateLesson(existing.id, {
+              completed: true,
+              durationMinutes: lessonData.duration_minutes,
+              amountCents: lessonData.amount_cents,
+              note: lessonData.note,
+            });
+            imported++;
+          } else {
+            const id = await addLesson({
+              studentId: student.id,
+              date: lessonData.date,
+              durationMinutes: lessonData.duration_minutes,
+              amountCents: lessonData.amount_cents,
+              completed: true,
+              note: lessonData.note,
+            });
+            if (id) imported++;
+            else {
+              skipped++;
+              errors.push(`Row ${i + 2}: Failed to save`);
+            }
           }
         } catch {
           skipped++;
@@ -158,15 +170,21 @@ export default function Settings() {
         }
 
         try {
-          const id = await addLesson({
-            studentId: student.id,
-            date,
-            durationMinutes: student.durationMinutes,
-            amountCents: student.rateCents,
-            completed: true,
-          });
-          if (id) imported++;
-          else { skipped++; errors.push(`Failed: ${name} on ${date}`); }
+          const existing = getLessonForStudentOnDate(data.lessons, student.id, date);
+          if (existing) {
+            await updateLesson(existing.id, { completed: true });
+            imported++;
+          } else {
+            const id = await addLesson({
+              studentId: student.id,
+              date,
+              durationMinutes: student.durationMinutes,
+              amountCents: student.rateCents,
+              completed: true,
+            });
+            if (id) imported++;
+            else { skipped++; errors.push(`Failed: ${name} on ${date}`); }
+          }
         } catch {
           skipped++;
           errors.push(`Failed: ${name} on ${date}`);
