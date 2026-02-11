@@ -8,6 +8,55 @@ const DURATIONS = [30, 45, 60, 90, 120];
 const DAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+function formatDuration(mins: number): string {
+  return mins === 60 ? "1 hour" : mins === 90 ? "1.5 hours" : mins === 120 ? "2 hours" : `${mins} min`;
+}
+
+/** Parse "5:00pm" / "5:00 PM" style to minutes from midnight; return null if unparseable. */
+function parseTimeToMinutes(t: string): number | null {
+  if (!t || t.trim() === "" || t === "—") return null;
+  const s = t.trim().toLowerCase();
+  const match = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+  if (!match) return null;
+  let hours = parseInt(match[1]!, 10);
+  const minutes = match[2] ? parseInt(match[2], 10) : 0;
+  const period = match[3];
+  if (period === "pm" && hours !== 12) hours += 12;
+  if (period === "am" && hours === 12) hours = 0;
+  if (!period && hours < 12) hours += 12;
+  return hours * 60 + minutes;
+}
+
+function formatMinutesToTime(totalMinutes: number): string {
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  const period = h >= 12 ? "pm" : "am";
+  const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return m > 0 ? `${hour}:${String(m).padStart(2, "0")}${period}` : `${hour}${period}`;
+}
+
+function formatTimeRange(startTimeStr: string, durationMinutes: number): string {
+  const startMins = parseTimeToMinutes(startTimeStr);
+  if (startMins == null) return startTimeStr;
+  const endMins = startMins + durationMinutes;
+  return `${formatMinutesToTime(startMins)} - ${formatMinutesToTime(endMins)}`;
+}
+
+/** Count how many times a given day of week (0–6) appears between start and end (inclusive). */
+function countDaysWithDayOfWeek(start: Date, end: Date, dayOfWeek: number): number {
+  const startCopy = new Date(start);
+  startCopy.setHours(0, 0, 0, 0);
+  const endCopy = new Date(end);
+  endCopy.setHours(23, 59, 59, 999);
+  let count = 0;
+  const d = new Date(startCopy);
+  while (d <= endCopy) {
+    if (d.getDay() === dayOfWeek) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
 export default function StudentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -19,7 +68,20 @@ export default function StudentDetail() {
   const thisMonthPrefix = `${thisYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const thisYearLessons = studentLessons.filter((l) => l.date.startsWith(String(thisYear)));
   const thisMonthLessons = studentLessons.filter((l) => l.date.startsWith(thisMonthPrefix));
-  const totalEarnings = studentLessons.reduce((sum, l) => sum + l.amountCents, 0);
+  const earningsThisMonth = thisMonthLessons.reduce((sum, l) => sum + l.amountCents, 0);
+  const earningsYTD = studentLessons.reduce((sum, l) => sum + l.amountCents, 0);
+  const monthLabel = now.toLocaleDateString("en-US", { month: "short" });
+  const ytdLabel = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " YTD";
+  const availableThisMonth =
+    student != null
+      ? countDaysWithDayOfWeek(
+          new Date(now.getFullYear(), now.getMonth(), 1),
+          new Date(now.getFullYear(), now.getMonth() + 1, 0),
+          student.dayOfWeek
+        )
+      : 0;
+  const availableThisYear =
+    student != null ? countDaysWithDayOfWeek(new Date(thisYear, 0, 1), now, student.dayOfWeek) : 0;
 
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -162,25 +224,49 @@ export default function StudentDetail() {
         </form>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
-            <div className="card">
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{thisYearLessons.length}</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Lessons this year</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className="card">
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{thisMonthLessons.length}/{availableThisMonth}</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{thisMonthLessons.length} of {availableThisMonth} lessons for {monthLabel}</div>
+              </div>
+              <div className="card">
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{formatCurrency(earningsThisMonth)}</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Total earnings this month</div>
+              </div>
             </div>
-            <div className="card">
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{thisMonthLessons.length}</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Lessons this month</div>
-            </div>
-            <div className="card">
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{formatCurrency(totalEarnings)}</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Total earnings</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className="card">
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{thisYearLessons.length}/{availableThisYear}</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{thisYearLessons.length} lessons out of {availableThisYear} ({ytdLabel})</div>
+              </div>
+              <div className="card">
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{formatCurrency(earningsYTD)}</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Total earnings YTD</div>
+              </div>
             </div>
           </div>
-          <div className="card" style={{ marginBottom: 24 }}>
-            <div style={{ marginBottom: 4 }}>{student.durationMinutes === 60 ? "1 hour" : `${student.durationMinutes} min`} / {formatCurrency(student.rateCents)}</div>
-            <div style={{ marginBottom: 4 }}>{DAYS_SHORT[student.dayOfWeek]} at {student.timeOfDay}</div>
-            {student.location && <div>{student.location}</div>}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
+            <div className="card">
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{formatDuration(student.durationMinutes)}</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Lesson time</div>
+            </div>
+            <div className="card">
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{formatCurrency(student.rateCents)}</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Rate per lesson</div>
+            </div>
+            <div className="card">
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{DAYS_FULL[student.dayOfWeek]}</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Day</div>
+            </div>
+            <div className="card">
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{student.timeOfDay && student.timeOfDay !== "—" ? formatTimeRange(student.timeOfDay, student.durationMinutes) : "—"}</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Scheduled time</div>
+            </div>
           </div>
+          {student.location && (
+            <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 24 }}>Location: {student.location}</div>
+          )}
         </>
       )}
 
