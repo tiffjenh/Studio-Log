@@ -156,8 +156,6 @@ export default function Earnings() {
   const maxWeekly = Math.max(...weeklyData.map((w) => w.total), 1);
   const maxDaily = Math.max(...dailyData.map((d) => d.total), 1);
 
-  const ytdEarnings = monthlyTotals.reduce((a, b) => a + b, 0);
-
   return (
     <>
       <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 12 }}>Earnings</h1>
