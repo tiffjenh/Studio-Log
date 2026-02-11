@@ -239,13 +239,13 @@ export default function StudentDetail() {
               </div>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 24, minWidth: 0 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1.4fr", gap: 8, marginBottom: 24, minWidth: 0 }}>
             <div className="card" style={{ minWidth: 0, padding: 10 }}>
               <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatDuration(student.durationMinutes)}</div>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Lesson time</div>
             </div>
             <div className="card" style={{ minWidth: 0, padding: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatCurrency(student.rateCents)}</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{formatCurrency(student.rateCents)}</div>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Rate</div>
             </div>
             <div className="card" style={{ minWidth: 0, padding: 10 }}>
@@ -253,7 +253,7 @@ export default function StudentDetail() {
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Day</div>
             </div>
             <div className="card" style={{ minWidth: 0, padding: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{student.timeOfDay && student.timeOfDay !== "—" ? formatTimeRange(student.timeOfDay, student.durationMinutes) : "—"}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, wordBreak: "break-word", lineHeight: 1.3 }}>{student.timeOfDay && student.timeOfDay !== "—" ? formatTimeRange(student.timeOfDay, student.durationMinutes) : "—"}</div>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Time</div>
             </div>
           </div>
