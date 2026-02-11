@@ -14,7 +14,7 @@ const DURATIONS = [
 export default function EditLesson() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { data, updateLesson, updateStudent } = useStoreContext();
+  const { data, updateLesson } = useStoreContext();
   const lesson = data.lessons.find((l) => l.id === id);
   const student = lesson ? data.students.find((s) => s.id === lesson.studentId) : null;
   const [durationMinutes, setDurationMinutes] = useState(lesson?.durationMinutes ?? 60);
