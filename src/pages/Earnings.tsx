@@ -21,17 +21,22 @@ function BarChart({
   xLabels,
   xSubLabels,
   maxVal,
+  dateKeys,
+  onBarClick,
 }: {
   data: number[];
   xLabels: string[];
   xSubLabels?: string[];
   maxVal: number;
+  dateKeys?: string[];
+  onBarClick?: (dateKey: string) => void;
 }) {
   const isEmpty = maxVal <= 0 || data.every((v) => v === 0);
   const ticks = isEmpty ? EMPTY_TICKS : getYAxisTicks(maxVal);
   const topTick = Math.max(...ticks, 10000);
   const chartMax = isEmpty ? 20000 : topTick * 1.15;
   const showSubLabels = xSubLabels && xSubLabels.length === data.length;
+  const isClickable = Boolean(dateKeys?.length && onBarClick && dateKeys.length === data.length);
 
   return (
     <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
@@ -64,10 +69,21 @@ function BarChart({
             {data.map((v, i) => {
               const heightPct = chartMax > 0 ? (v / chartMax) * 100 : 0;
               const barHeight = Math.max(v > 0 ? 6 : 0, (heightPct / 100) * CHART_HEIGHT);
+              const dateKey = dateKeys?.[i];
               return (
                 <div
                   key={i}
-                  style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", maxWidth: 40, cursor: "default" }}
+                  role={isClickable ? "button" : undefined}
+                  onClick={isClickable && dateKey ? () => onBarClick?.(dateKey) : undefined}
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    maxWidth: 40,
+                    cursor: isClickable ? "pointer" : "default",
+                  }}
                 >
                   <span style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>{v > 0 ? formatCurrency(v) : ""}</span>
                   <div
@@ -102,6 +118,7 @@ export default function Earnings() {
   const { data } = useStoreContext();
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Daily");
   const [dailyWeekOffset, setDailyWeekOffset] = useState(0);
+  const [selectedDayDateKey, setSelectedDayDateKey] = useState<string | null>(null);
   const now = new Date();
   const completedLessons = data.lessons.filter((l) => l.completed);
   const thisYear = now.getFullYear();
@@ -235,14 +252,66 @@ export default function Earnings() {
               xLabels={dailyData.map((d) => d.label)}
               xSubLabels={dailyData.map((d) => d.dayOfWeek)}
               maxVal={maxDaily}
+              dateKeys={dailyData.map((d) => d.dateKey)}
+              onBarClick={(dateKey) => setSelectedDayDateKey((prev) => (prev === dateKey ? null : dateKey))}
             />
           </div>
-          <div className="card">
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0" }}>
-              <span>YTD Earnings</span>
-              <span style={{ fontWeight: 600 }}>{formatCurrency(ytdEarnings)}</span>
-            </div>
-          </div>
+          {selectedDayDateKey && (() => {
+            const dayLessons = completedLessons.filter((l) => l.date === selectedDayDateKey);
+            const numStudents = dayLessons.length;
+            const totalMinutes = dayLessons.reduce((s, l) => s + l.durationMinutes, 0);
+            const totalHours = totalMinutes / 60;
+            const totalEarned = dayLessons.reduce((s, l) => s + l.amountCents, 0);
+            const dateStr = selectedDayDateKey;
+            const [y, m, d] = dateStr.split("-").map(Number);
+            const dateFormatted = new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+            const formatDuration = (mins: number) => mins === 60 ? "1 hour" : mins < 60 ? `${mins} min` : `${mins / 60} hr ${mins % 60 ? `${mins % 60} min` : ""}`;
+            return (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <strong>{dateFormatted}</strong>
+                  <button type="button" onClick={() => setSelectedDayDateKey(null)} style={{ fontSize: 12, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div className="card" style={{ padding: 12, textAlign: "center" }}>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Total students</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>{numStudents}</div>
+                  </div>
+                  <div className="card" style={{ padding: 12, textAlign: "center" }}>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Total hours</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>{totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)}</div>
+                  </div>
+                  <div className="card" style={{ padding: 12, textAlign: "center" }}>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Total earnings</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>{formatCurrency(totalEarned)}</div>
+                  </div>
+                </div>
+                <div className="card">
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                        <th style={{ padding: "10px 12px" }}>Student</th>
+                        <th style={{ padding: "10px 12px" }}>Duration</th>
+                        <th style={{ padding: "10px 12px", textAlign: "right" }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dayLessons.map((l) => {
+                        const student = data.students.find((s) => s.id === l.studentId);
+                        return (
+                          <tr key={l.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                            <td style={{ padding: "10px 12px" }}>{student ? `${student.firstName} ${student.lastName}` : "—"}</td>
+                            <td style={{ padding: "10px 12px" }}>{formatDuration(l.durationMinutes)}</td>
+                            <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>{formatCurrency(l.amountCents)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
         </>
       )}
 
