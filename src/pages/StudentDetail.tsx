@@ -14,8 +14,11 @@ export default function StudentDetail() {
   const { data, updateStudent, deleteStudent } = useStoreContext();
   const student = data.students.find((s) => s.id === id);
   const studentLessons = data.lessons.filter((l) => l.studentId === id && l.completed);
-  const thisYear = new Date().getFullYear();
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const thisMonthPrefix = `${thisYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const thisYearLessons = studentLessons.filter((l) => l.date.startsWith(String(thisYear)));
+  const thisMonthLessons = studentLessons.filter((l) => l.date.startsWith(thisMonthPrefix));
   const totalEarnings = studentLessons.reduce((sum, l) => sum + l.amountCents, 0);
 
   const [editing, setEditing] = useState(false);
@@ -159,10 +162,14 @@ export default function StudentDetail() {
         </form>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
             <div className="card">
               <div style={{ fontSize: 20, fontWeight: 700 }}>{thisYearLessons.length}</div>
               <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Lessons this year</div>
+            </div>
+            <div className="card">
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{thisMonthLessons.length}</div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Lessons this month</div>
             </div>
             <div className="card">
               <div style={{ fontSize: 20, fontWeight: 700 }}>{formatCurrency(totalEarnings)}</div>

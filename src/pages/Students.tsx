@@ -7,6 +7,31 @@ import { parseStudentCSV, rowToStudent } from "@/utils/csvImport";
 import type { Student } from "@/types";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** Parse timeOfDay string to minutes from midnight for sorting. Returns 9999 if unparseable (sorts last). */
+function timeOfDayToMinutes(t: string): number {
+  if (!t || t.trim() === "" || t === "—") return 9999;
+  const s = t.trim().toLowerCase();
+  const match = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+  if (!match) return 9999;
+  let hours = parseInt(match[1]!, 10);
+  const mins = match[2] ? parseInt(match[2], 10) : 0;
+  const period = match[3];
+  if (period === "pm" && hours !== 12) hours += 12;
+  if (period === "am" && hours === 12) hours = 0;
+  if (!period && hours < 12) hours += 12; // assume pm if no period and small number
+  return hours * 60 + mins;
+}
+
+function sortStudentsByTime(students: Student[]): Student[] {
+  return [...students].sort((a, b) => {
+    const ta = timeOfDayToMinutes(a.timeOfDay);
+    const tb = timeOfDayToMinutes(b.timeOfDay);
+    if (ta !== tb) return ta - tb;
+    return (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName);
+  });
+}
 
 export default function Students() {
   const { data, reload, addStudent } = useStoreContext();
@@ -16,9 +41,19 @@ export default function Students() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState("");
   const [dayFilter, setDayFilter] = useState<number | null>(null);
-  const sorted = [...data.students].sort((a, b) => (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName));
-  let filtered = dayFilter !== null ? sorted.filter((s) => s.dayOfWeek === dayFilter) : sorted;
-  filtered = search.trim() ? filtered.filter((s) => `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase())) : filtered;
+
+  let filtered = data.students.filter((s) =>
+    (dayFilter === null || s.dayOfWeek === dayFilter) &&
+    (!search.trim() || `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const byDayThenTime: { dayIndex: number; students: Student[] }[] =
+    dayFilter === null
+      ? DAY_LABELS.map((_, dayIndex) => ({
+          dayIndex,
+          students: sortStudentsByTime(filtered.filter((s) => s.dayOfWeek === dayIndex)),
+        })).filter((g) => g.students.length > 0)
+      : [{ dayIndex: dayFilter, students: sortStudentsByTime(filtered) }];
 
   const durationStr = (s: Student) =>
     s.durationMinutes === 60 ? "1 hour" : s.durationMinutes === 30 ? "30 min" : s.durationMinutes === 45 ? "45 min" : `${s.durationMinutes / 60} hours`;
@@ -141,21 +176,32 @@ export default function Students() {
           )}
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {filtered.map((s) => (
-            <Link key={s.id} to={`/students/${s.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-              <div className="card" style={{ display: "flex", alignItems: "center" }}>
-                <div style={{ width: 44, height: 44, borderRadius: 22, background: "var(--primary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 12 }}>
-                  {s.firstName[0]}{s.lastName[0]}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
-                  <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{durationStr(s)} / {formatCurrency(s.rateCents)}</div>
-                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{DAY_LABELS[s.dayOfWeek]}{s.timeOfDay && s.timeOfDay !== "—" ? ` at ${s.timeOfDay}` : ""}</div>
-                </div>
-                <span style={{ color: "var(--text-muted)" }}>›</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {byDayThenTime.map(({ dayIndex, students }) => (
+            <div key={dayIndex}>
+              {dayFilter === null && (
+                <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-muted)", margin: "0 0 8px", textTransform: "none" }}>
+                  {DAY_FULL[dayIndex]}
+                </h2>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {students.map((s) => (
+                  <Link key={s.id} to={`/students/${s.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                    <div className="card" style={{ display: "flex", alignItems: "center" }}>
+                      <div style={{ width: 44, height: 44, borderRadius: 22, background: "var(--primary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 12 }}>
+                        {s.firstName[0]}{s.lastName[0]}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
+                        <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{durationStr(s)} / {formatCurrency(s.rateCents)}</div>
+                        <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{DAY_LABELS[s.dayOfWeek]}{s.timeOfDay && s.timeOfDay !== "—" ? ` at ${s.timeOfDay}` : ""}</div>
+                      </div>
+                      <span style={{ color: "var(--text-muted)" }}>›</span>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}
