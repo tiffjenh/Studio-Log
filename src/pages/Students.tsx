@@ -103,7 +103,6 @@ export default function Students() {
             rateCents: studentData.rate_cents,
             dayOfWeek: studentData.day_of_week,
             timeOfDay: studentData.time_of_day,
-            location: studentData.location,
           });
           existing.add(key);
           imported++;
@@ -225,12 +224,12 @@ export default function Students() {
             background: "var(--card)",
             cursor: importing ? "not-allowed" : "pointer",
           }}
-          title="Columns: first_name, last_name, rate, duration_minutes, day_of_week, time_of_day, location"
+          title="Columns: first_name, last_name, rate, duration_minutes, day_of_week, time_of_day"
         >
           {importing ? "Importing…" : "Import students from CSV"}
         </button>
         <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
-          Columns: first_name, last_name, rate, duration_minutes, day_of_week, time_of_day, location (one student per row)
+          Columns: first_name, last_name, rate, duration_minutes, day_of_week, time_of_day (one student per row)
         </p>
         {importResult && (
           <div style={{ fontSize: 14 }}>

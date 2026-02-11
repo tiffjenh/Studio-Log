@@ -180,7 +180,7 @@ export default function Calendar() {
               </div>
               <div style={{ flex: 1 }} onClick={() => handlePressLesson(student)}>
                 <div style={{ fontWeight: 600 }}>{student.firstName} {student.lastName}</div>
-                <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{student.location ? `${student.location} · ${display}` : display}</div>
+                <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{display}</div>
               </div>
               <label className="toggle-wrap">
                 <input type="checkbox" checked={completed} onChange={(e) => handleToggle(student.id, e.target.checked)} />

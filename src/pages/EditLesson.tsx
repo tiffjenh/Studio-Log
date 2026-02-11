@@ -19,12 +19,10 @@ export default function EditLesson() {
   const student = lesson ? data.students.find((s) => s.id === lesson.studentId) : null;
   const [durationMinutes, setDurationMinutes] = useState(lesson?.durationMinutes ?? 60);
   const [note, setNote] = useState(lesson?.note ?? "");
-  const [location, setLocation] = useState(student?.location ?? "");
 
   useEffect(() => {
     if (lesson) setDurationMinutes(lesson.durationMinutes);
     if (lesson) setNote(lesson.note ?? "");
-    if (student) setLocation(student.location ?? "");
   }, [lesson?.id, student?.id]);
 
   if (!lesson || !student) return <p style={{ padding: 24 }}>Lesson not found</p>;
@@ -40,7 +38,6 @@ export default function EditLesson() {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     updateLesson(lesson.id, { durationMinutes, amountCents, note: note.trim() || undefined });
-    if (location.trim() !== (student.location ?? "")) updateStudent(student.id, { location: location.trim() || undefined });
     navigate(-1);
   };
 
@@ -90,11 +87,6 @@ export default function EditLesson() {
         <div className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <span>Lesson Rate</span>
           <span style={{ color: "var(--text-muted)" }}>{formatCurrency(student.rateCents)} &gt;</span>
-        </div>
-        <div className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <span>Location</span>
-          <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Pinehills" style={{ border: "none", background: "none", fontSize: 16, textAlign: "right" }} />
-          <span style={{ color: "var(--text-muted)" }}>&gt;</span>
         </div>
         <button type="submit" className="btn btn-primary" style={{ width: "100%" }}>Save</button>
       </form>

@@ -6,7 +6,6 @@ import type { Student } from "@/types";
 
 const DURATIONS = [30, 45, 60, 90, 120];
 const DAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function formatDuration(mins: number): string {
   return mins === 60 ? "1 hour" : mins === 90 ? "1.5 hours" : mins === 120 ? "2 hours" : `${mins} min`;
@@ -91,7 +90,6 @@ export default function StudentDetail() {
   const [rateDollars, setRateDollars] = useState(student ? String((student.rateCents / 100).toFixed(2)) : "");
   const [dayOfWeek, setDayOfWeek] = useState(student?.dayOfWeek ?? 1);
   const [timeOfDay, setTimeOfDay] = useState(student?.timeOfDay ?? "");
-  const [location, setLocation] = useState(student?.location ?? "");
 
   useEffect(() => {
     if (student) {
@@ -102,7 +100,6 @@ export default function StudentDetail() {
       setRateDollars(String((student.rateCents / 100).toFixed(2)));
       setDayOfWeek(student.dayOfWeek);
       setTimeOfDay(student.timeOfDay);
-      setLocation(student.location ?? "");
     }
   }, [id]);
 
@@ -115,7 +112,6 @@ export default function StudentDetail() {
     setRateDollars(String((student.rateCents / 100).toFixed(2)));
     setDayOfWeek(student.dayOfWeek);
     setTimeOfDay(student.timeOfDay);
-    setLocation(student.location ?? "");
   };
 
   const handleStartEdit = () => {
@@ -145,7 +141,6 @@ export default function StudentDetail() {
       rateCents,
       dayOfWeek,
       timeOfDay: trimmed || "—",
-      location: location.trim() || undefined,
     };
     try {
       await updateStudent(student.id, updates);
@@ -214,8 +209,6 @@ export default function StudentDetail() {
           </div>
           <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Time (e.g. 5:00 PM) – include AM or PM</label>
           <input type="text" value={timeOfDay} onChange={(e) => setTimeOfDay(e.target.value)} placeholder="5:00 PM" style={inputStyle} />
-          <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Location (optional)</label>
-          <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Pinehills" style={inputStyle} />
           {error ? <p style={{ color: "#dc2626", marginBottom: 16 }}>{error}</p> : null}
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
             <button type="submit" className="btn btn-primary">Save</button>
@@ -264,9 +257,6 @@ export default function StudentDetail() {
               <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Scheduled time</div>
             </div>
           </div>
-          {student.location && (
-            <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 24 }}>Location: {student.location}</div>
-          )}
         </>
       )}
 

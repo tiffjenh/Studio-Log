@@ -15,7 +15,6 @@ export default function AddStudent() {
   const [rateDollars, setRateDollars] = useState("");
   const [dayOfWeek, setDayOfWeek] = useState(1);
   const [timeOfDay, setTimeOfDay] = useState("");
-  const [location, setLocation] = useState("");
   const [error, setError] = useState("");
 
   const handleSave = async (e: React.FormEvent) => {
@@ -36,7 +35,6 @@ export default function AddStudent() {
       rateCents,
       dayOfWeek,
       timeOfDay: trimmed || "—",
-      location: location.trim() || undefined,
     };
     try {
       await addStudent(student);
@@ -83,8 +81,6 @@ export default function AddStudent() {
         </div>
         <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Time (e.g. 5:00 PM) – include AM or PM</label>
         <input type="text" value={timeOfDay} onChange={(e) => setTimeOfDay(e.target.value)} placeholder="5:00 PM" style={inputStyle} />
-        <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Location (optional)</label>
-        <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Pinehills" style={inputStyle} />
         {error ? <p style={{ color: "#dc2626", marginBottom: 16 }}>{error}</p> : null}
         <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 24 }}>Save</button>
       </form>
