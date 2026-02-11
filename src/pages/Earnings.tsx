@@ -100,11 +100,20 @@ function BarChart({
             })}
           </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-around", fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-around", gap: 4, padding: "20px 4px 20px", fontSize: 11, color: "var(--text-muted)", minHeight: 52 }}>
           {xLabels.map((l, i) => (
-            <div key={i} style={{ flex: 1, textAlign: "center", maxWidth: 56, minWidth: 0 }}>
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l}</div>
-              {showSubLabels && xSubLabels![i] && <div style={{ fontSize: 10, opacity: 0.85 }}>{xSubLabels![i]}</div>}
+            <div key={i} style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "flex-start", minWidth: 0, maxWidth: 40 }}>
+              <div
+                style={{
+                  whiteSpace: "nowrap",
+                  transform: "rotate(-45deg)",
+                  transformOrigin: "center top",
+                  marginTop: 4,
+                }}
+              >
+                {l}
+                {showSubLabels && xSubLabels?.[i] && <><br /><span style={{ fontSize: 10, opacity: 0.85 }}>{xSubLabels[i]}</span></>}
+              </div>
             </div>
           ))}
         </div>
