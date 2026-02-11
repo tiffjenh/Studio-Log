@@ -215,25 +215,6 @@ export default function Settings() {
   return (
     <>
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Settings</h1>
-      {hasSupabase() && (
-        <div className="card" style={{ marginBottom: 24, padding: 16 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Synced to cloud</div>
-          <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--text-muted)" }}>
-            Logged in as <strong>{user.email}</strong>. Data is shared across devices when you use this account.
-          </p>
-          <p style={{ margin: "0 0 12px", fontSize: 11, color: "var(--text-muted)", fontFamily: "monospace", wordBreak: "break-all" }}>
-            User ID: {user.id}
-          </p>
-          <button
-            type="button"
-            onClick={async () => { setRefreshing(true); await reload(); setRefreshing(false); }}
-            disabled={refreshing}
-            style={{ padding: "8px 16px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: "pointer" }}
-          >
-            {refreshing ? "Refreshing…" : "Refresh data"}
-          </button>
-        </div>
-      )}
       {!hasSupabase() && (
         <p style={{ marginBottom: 24, fontSize: 14, color: "var(--text-muted)" }}>
           Using local storage. Add Supabase to sync across browsers (see SETUP-SUPABASE.md).
@@ -348,6 +329,25 @@ export default function Settings() {
           {importing ? "Importing…" : "Import CSV"}
         </button>
       </div>
+      {hasSupabase() && (
+        <div className="card" style={{ marginBottom: 24, padding: 16 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Synced to cloud</div>
+          <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--text-muted)" }}>
+            Logged in as <strong>{user.email}</strong>. Data is shared across devices when you use this account.
+          </p>
+          <p style={{ margin: "0 0 12px", fontSize: 11, color: "var(--text-muted)", fontFamily: "monospace", wordBreak: "break-all" }}>
+            User ID: {user.id}
+          </p>
+          <button
+            type="button"
+            onClick={async () => { setRefreshing(true); await reload(); setRefreshing(false); }}
+            disabled={refreshing}
+            style={{ padding: "8px 16px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: "pointer" }}
+          >
+            {refreshing ? "Refreshing…" : "Refresh data"}
+          </button>
+        </div>
+      )}
     </>
   );
 }

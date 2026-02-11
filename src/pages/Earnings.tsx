@@ -22,6 +22,7 @@ function BarChart({
   maxVal,
   dateKeys,
   onBarClick,
+  angleXLabels = false,
 }: {
   data: number[];
   xLabels: string[];
@@ -29,6 +30,7 @@ function BarChart({
   maxVal: number;
   dateKeys?: string[];
   onBarClick?: (dateKey: string) => void;
+  angleXLabels?: boolean;
 }) {
   const isEmpty = maxVal <= 0 || data.every((v) => v === 0);
   const ticks = isEmpty ? EMPTY_TICKS : getYAxisTicks(maxVal);
@@ -100,19 +102,45 @@ function BarChart({
             })}
           </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-around", gap: 4, padding: "20px 4px 20px", fontSize: 11, color: "var(--text-muted)", minHeight: 52 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-around",
+            gap: angleXLabels ? 4 : 0,
+            padding: angleXLabels ? "20px 4px 20px" : "8px 4px 0",
+            fontSize: 11,
+            color: "var(--text-muted)",
+            minHeight: angleXLabels ? 52 : undefined,
+          }}
+        >
           {xLabels.map((l, i) => (
-            <div key={i} style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "flex-start", minWidth: 0, maxWidth: 40 }}>
+            <div
+              key={i}
+              style={{
+                flex: 1,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "flex-start",
+                minWidth: 0,
+                maxWidth: angleXLabels ? 40 : 56,
+              }}
+            >
               <div
-                style={{
-                  whiteSpace: "nowrap",
-                  transform: "rotate(-45deg)",
-                  transformOrigin: "center top",
-                  marginTop: 4,
-                }}
+                style={
+                  angleXLabels
+                    ? {
+                        whiteSpace: "nowrap",
+                        transform: "rotate(-45deg)",
+                        transformOrigin: "center top",
+                        marginTop: 4,
+                      }
+                    : { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
+                }
               >
                 {l}
-                {showSubLabels && xSubLabels?.[i] && <><br /><span style={{ fontSize: 10, opacity: 0.85 }}>{xSubLabels[i]}</span></>}
+                {showSubLabels && xSubLabels?.[i] && (
+                  <>{angleXLabels ? <><br /><span style={{ fontSize: 10, opacity: 0.85 }}>{xSubLabels[i]}</span></> : <div style={{ fontSize: 10, opacity: 0.85 }}>{xSubLabels[i]}</div>}</>
+                )}
               </div>
             </div>
           ))}
@@ -220,6 +248,7 @@ export default function Earnings() {
                 maxVal={maxWeekly}
                 dateKeys={weeklyData.map((w) => w.startKey)}
                 onBarClick={(key) => setSelectedWeekStartKey((prev) => (prev === key ? null : key))}
+                angleXLabels
               />
             ) : (
               <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>No weeks in this month</div>
