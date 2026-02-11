@@ -252,7 +252,7 @@ export default function StudentDetail() {
               <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{DAYS_FULL[student.dayOfWeek]}</div>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Day</div>
             </div>
-            <div className="card" style={{ minWidth: 0, padding: 10 }}>
+            <div className="card" style={{ minWidth: 0, padding: 10, textAlign: "center" }}>
               <div style={{ fontSize: 14, fontWeight: 700, wordBreak: "break-word", lineHeight: 1.3 }}>{student.timeOfDay && student.timeOfDay !== "—" ? formatTimeRange(student.timeOfDay, student.durationMinutes) : "—"}</div>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Time</div>
             </div>
@@ -264,13 +264,15 @@ export default function StudentDetail() {
 
       {!editing && (
         <>
-          <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Lessons this year</h3>
-          {thisYearLessons.length === 0 ? (
-            <p style={{ color: "var(--text-muted)" }}>No lessons logged yet</p>
-          ) : (
-            (() => {
+          {(() => {
+            const years = [...new Set(studentLessons.map((l) => l.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
+            if (years.length === 0) {
+              return <p style={{ color: "var(--text-muted)" }}>No lessons logged yet</p>;
+            }
+            return years.map((year) => {
+              const yearLessons = studentLessons.filter((l) => l.date.startsWith(year));
               const byMonth = new Map<string, Lesson[]>();
-              for (const l of thisYearLessons) {
+              for (const l of yearLessons) {
                 const key = l.date.slice(0, 7);
                 if (!byMonth.has(key)) byMonth.set(key, []);
                 byMonth.get(key)!.push(l);
@@ -287,51 +289,58 @@ export default function StudentDetail() {
                 })
                 .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
               return (
-                <div className="card" style={{ overflowX: "auto", padding: 0 }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                    <thead>
-                      <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
-                        <th style={{ padding: "12px 12px 12px 16px", fontWeight: 600 }}>Month</th>
-                        <th style={{ padding: 12, fontWeight: 600 }}>Number of Lessons</th>
-                        <th style={{ padding: "12px 16px 12px 12px", fontWeight: 600 }}>Total Earned</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map(({ monthKey, monthName, lessons, available, totalEarned }) => (
-                        <Fragment key={monthKey}>
-                          <tr
-                            key={monthKey}
-                            onClick={() => setExpandedMonth((prev) => (prev === monthKey ? null : monthKey))}
-                            style={{ borderBottom: "1px solid var(--border)", cursor: "pointer", background: expandedMonth === monthKey ? "var(--bg)" : undefined }}
-                          >
-                            <td style={{ padding: "12px 12px 12px 16px" }}>
-                              {expandedMonth === monthKey ? "▼ " : "▶ "}{monthName}
-                            </td>
-                            <td style={{ padding: 12 }}>{lessons.length}/{available}</td>
-                            <td style={{ padding: "12px 16px 12px 12px", fontWeight: 600 }}>{formatCurrency(totalEarned)}</td>
-                          </tr>
-                          {expandedMonth === monthKey && (
-                            <tr key={`${monthKey}-detail`}>
-                              <td colSpan={3} style={{ padding: "0 16px 12px", background: "var(--bg)", verticalAlign: "top" }}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8 }}>
-                                  {lessons.map((l) => (
-                                    <div key={l.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: 0 }}>
-                                      <span>{l.date}</span>
-                                      <span style={{ fontWeight: 600 }}>{formatCurrency(l.amountCents)}</span>
-                                    </div>
-                                  ))}
-                                </div>
+                <div key={year} style={{ marginBottom: 24 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Lessons Log {year}</h3>
+                  <div className="card" style={{ overflowX: "auto", padding: 0 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, tableLayout: "fixed" }}>
+                      <colgroup>
+                        <col style={{ width: "52%" }} />
+                        <col style={{ width: "22%" }} />
+                        <col style={{ width: "26%" }} />
+                      </colgroup>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                          <th style={{ padding: "12px 12px 12px 16px", fontWeight: 600 }}>Month</th>
+                          <th style={{ padding: 12, fontWeight: 600, textAlign: "center" }}>Number of Lessons</th>
+                          <th style={{ padding: "12px 16px 12px 12px", fontWeight: 600, textAlign: "right" }}>Total Earned</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map(({ monthKey, monthName, lessons, available, totalEarned }) => (
+                          <Fragment key={monthKey}>
+                            <tr
+                              onClick={() => setExpandedMonth((prev) => (prev === monthKey ? null : monthKey))}
+                              style={{ borderBottom: "1px solid var(--border)", cursor: "pointer", background: expandedMonth === monthKey ? "var(--bg)" : undefined }}
+                            >
+                              <td style={{ padding: "12px 12px 12px 16px", whiteSpace: "nowrap" }}>
+                                {expandedMonth === monthKey ? "▼ " : "▶ "}{monthName}
                               </td>
+                              <td style={{ padding: 12, textAlign: "center" }}>{lessons.length}/{available}</td>
+                              <td style={{ padding: "12px 16px 12px 12px", fontWeight: 600, textAlign: "right" }}>{formatCurrency(totalEarned)}</td>
                             </tr>
-                          )}
-                        </Fragment>
-                      ))}
-                    </tbody>
-                  </table>
+                            {expandedMonth === monthKey && (
+                              <tr>
+                                <td colSpan={3} style={{ padding: "0 16px 12px", background: "var(--bg)", verticalAlign: "top" }}>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8 }}>
+                                    {lessons.map((l) => (
+                                      <div key={l.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: 0 }}>
+                                        <span>{l.date}</span>
+                                        <span style={{ fontWeight: 600 }}>{formatCurrency(l.amountCents)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               );
-            })()
-          )}
+            });
+          })()}
         </>
       )}
     </>
