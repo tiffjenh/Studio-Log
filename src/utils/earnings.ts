@@ -56,18 +56,56 @@ export function getLessonForStudentOnDate(lessons: Lesson[], studentId: string, 
 
 const DAY_ABBREV = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function getWeeklyTotals(lessons: Lesson[], numWeeks: number, ref: Date): { label: string; dayOfWeek: string; total: number }[] {
-  const result: { label: string; dayOfWeek: string; total: number }[] = [];
+export function getWeeklyTotals(
+  lessons: Lesson[],
+  numWeeks: number,
+  ref: Date
+): { label: string; dayOfWeek: string; total: number; startKey: string; endKey: string }[] {
+  const result: { label: string; dayOfWeek: string; total: number; startKey: string; endKey: string }[] = [];
   for (let w = numWeeks - 1; w >= 0; w--) {
     const d = new Date(ref);
     d.setDate(d.getDate() - w * 7);
     const { start, end } = getWeekBounds(d);
+    const startKey = toDateKey(start);
+    const endKey = toDateKey(end);
     const total = lessons
-      .filter((l) => l.completed && l.date >= toDateKey(start) && l.date <= toDateKey(end))
+      .filter((l) => l.completed && l.date >= startKey && l.date <= endKey)
       .reduce((s, l) => s + l.amountCents, 0);
     const label = `${start.getMonth() + 1}/${start.getDate()}`;
     const dayOfWeek = DAY_ABBREV[start.getDay()];
-    result.push({ label, dayOfWeek, total });
+    result.push({ label, dayOfWeek, total, startKey, endKey });
+  }
+  return result;
+}
+
+/** Returns weeks that overlap the given calendar month (year, month 0–11). */
+export function getWeeksInMonth(
+  lessons: Lesson[],
+  year: number,
+  month: number
+): { label: string; dayOfWeek: string; total: number; startKey: string; endKey: string }[] {
+  const { start: monthStart, end: monthEnd } = getMonthBounds(new Date(year, month));
+  const monthStartKey = toDateKey(monthStart);
+  const monthEndKey = toDateKey(monthEnd);
+  const result: { label: string; dayOfWeek: string; total: number; startKey: string; endKey: string }[] = [];
+  let current = new Date(monthStart.getTime());
+  while (current <= monthEnd) {
+    const { start, end } = getWeekBounds(current);
+    const startKey = toDateKey(start);
+    const endKey = toDateKey(end);
+    if (startKey <= monthEndKey && endKey >= monthStartKey) {
+      const total = lessons
+        .filter((l) => l.completed && l.date >= startKey && l.date <= endKey)
+        .reduce((s, l) => s + l.amountCents, 0);
+      result.push({
+        label: `${start.getMonth() + 1}/${start.getDate()}`,
+        dayOfWeek: DAY_ABBREV[start.getDay()],
+        total,
+        startKey,
+        endKey,
+      });
+    }
+    current = new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1);
   }
   return result;
 }
