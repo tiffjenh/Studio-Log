@@ -294,14 +294,14 @@ export default function StudentDetail() {
                   <div className="card" style={{ overflowX: "auto", padding: 0 }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, tableLayout: "fixed" }}>
                       <colgroup>
-                        <col style={{ width: "52%" }} />
-                        <col style={{ width: "22%" }} />
-                        <col style={{ width: "26%" }} />
+                        <col style={{ width: "40%" }} />
+                        <col style={{ width: "28%" }} />
+                        <col style={{ width: "32%" }} />
                       </colgroup>
                       <thead>
                         <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
-                          <th style={{ padding: "12px 12px 12px 16px", fontWeight: 600 }}>Month</th>
-                          <th style={{ padding: 12, fontWeight: 600, textAlign: "center" }}>Number of Lessons</th>
+                          <th style={{ padding: "12px 6px 12px 16px", fontWeight: 600 }}>Month</th>
+                          <th style={{ padding: "12px 4px", fontWeight: 600, textAlign: "center" }}># of lessons</th>
                           <th style={{ padding: "12px 16px 12px 12px", fontWeight: 600, textAlign: "right" }}>Total Earned</th>
                         </tr>
                       </thead>
@@ -312,10 +312,10 @@ export default function StudentDetail() {
                               onClick={() => setExpandedMonth((prev) => (prev === monthKey ? null : monthKey))}
                               style={{ borderBottom: "1px solid var(--border)", cursor: "pointer", background: expandedMonth === monthKey ? "var(--bg)" : undefined }}
                             >
-                              <td style={{ padding: "12px 12px 12px 16px", whiteSpace: "nowrap" }}>
+                              <td style={{ padding: "12px 6px 12px 16px", whiteSpace: "nowrap" }}>
                                 {expandedMonth === monthKey ? "▼ " : "▶ "}{monthName}
                               </td>
-                              <td style={{ padding: 12, textAlign: "center" }}>{lessons.length}/{available}</td>
+                              <td style={{ padding: "12px 4px", textAlign: "center" }}>{lessons.length}/{available}</td>
                               <td style={{ padding: "12px 16px 12px 12px", fontWeight: 600, textAlign: "right" }}>{formatCurrency(totalEarned)}</td>
                             </tr>
                             {expandedMonth === monthKey && (
