@@ -94,7 +94,7 @@ export default function Dashboard() {
         <div className="logo-gradient" style={{ width: 48, height: 48, borderRadius: 12, color: "white", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 24, marginBottom: 8 }}>P</div>
         <h2 style={{ fontSize: 22, fontWeight: 700 }}>Welcome back, {firstName}</h2>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
         <div className="card">
           <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Earned This Week</div>
           <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(earned)}</div>
@@ -103,7 +103,7 @@ export default function Dashboard() {
           <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Earnings This Month</div>
           <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(earningsThisMonth)}</div>
         </div>
-        <div className="card" style={{ gridColumn: "1 / -1" }}>
+        <div className="card">
           <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Earnings YTD</div>
           <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(earningsYTD)}</div>
         </div>

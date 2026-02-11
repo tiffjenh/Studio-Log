@@ -1,16 +1,16 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { useStoreContext } from "@/context/StoreContext";
-import Layout from "@/components/Layout";
-import Landing from "@/pages/Landing";
-import ForgotPassword from "@/pages/ForgotPassword";
-import Dashboard from "@/pages/Dashboard";
-import Students from "@/pages/Students";
-import StudentDetail from "@/pages/StudentDetail";
-import AddStudent from "@/pages/AddStudent";
-import Earnings from "@/pages/Earnings";
-import Settings from "@/pages/Settings";
-import Calendar from "@/pages/Calendar";
-import EditLesson from "@/pages/EditLesson";
+import { useStoreContext } from "./context/StoreContext";
+import Layout from "./components/Layout";
+import Landing from "./pages/Landing";
+import ForgotPassword from "./pages/ForgotPassword";
+import Dashboard from "./pages/Dashboard";
+import Students from "./pages/Students";
+import StudentDetail from "./pages/StudentDetail";
+import AddStudent from "./pages/AddStudent";
+import Earnings from "./pages/Earnings";
+import Settings from "./pages/Settings";
+import Calendar from "./pages/Calendar";
+import EditLesson from "./pages/EditLesson";
 
 function AuthGate() {
   const { data, loaded } = useStoreContext();
