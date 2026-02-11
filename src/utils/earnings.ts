@@ -88,6 +88,35 @@ export function getDailyTotals(lessons: Lesson[], numDays: number, ref: Date): {
   return result;
 }
 
+/** Week = Sunday–Saturday. Returns 7 days (Sun–Sat) for the week that is weekOffset back from the week containing ref. */
+export function getDailyTotalsForWeek(
+  lessons: Lesson[],
+  ref: Date,
+  weekOffset: number
+): { label: string; dayOfWeek: string; total: number; dateKey: string }[] {
+  const d = new Date(ref);
+  d.setDate(d.getDate() + weekOffset * 7);
+  const weekStart = new Date(d);
+  weekStart.setDate(d.getDate() - d.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  const result: { label: string; dayOfWeek: string; total: number; dateKey: string }[] = [];
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(weekStart);
+    day.setDate(weekStart.getDate() + i);
+    const dateKey = toDateKey(day);
+    const total = lessons
+      .filter((l) => l.completed && l.date === dateKey)
+      .reduce((s, l) => s + l.amountCents, 0);
+    result.push({
+      label: `${day.getMonth() + 1}/${day.getDate()}`,
+      dayOfWeek: DAY_ABBREV[day.getDay()],
+      total,
+      dateKey,
+    });
+  }
+  return result;
+}
+
 export function getYAxisTicks(maxCents: number): number[] {
   if (maxCents <= 0) return [0, 10000];
   const max = Math.ceil(maxCents / 100) * 100;

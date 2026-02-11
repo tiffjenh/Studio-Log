@@ -6,13 +6,15 @@ import {
   toDateKey,
   earnedThisWeek,
   getWeeklyTotals,
-  getDailyTotals,
+  getDailyTotalsForWeek,
   getYAxisTicks,
 } from "@/utils/earnings";
 
-const TABS = ["Weekly", "Monthly", "Daily", "Students"] as const;
+const TABS = ["Daily", "Weekly", "Monthly", "Students"] as const;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const CHART_HEIGHT = 160;
+
+const EMPTY_TICKS = [0, 5000, 10000, 15000, 20000];
 
 function BarChart({
   data,
@@ -25,21 +27,21 @@ function BarChart({
   xSubLabels?: string[];
   maxVal: number;
 }) {
-  const ticks = getYAxisTicks(maxVal);
+  const isEmpty = maxVal <= 0 || data.every((v) => v === 0);
+  const ticks = isEmpty ? EMPTY_TICKS : getYAxisTicks(maxVal);
   const topTick = Math.max(...ticks, 10000);
+  const chartMax = isEmpty ? 20000 : topTick * 1.15;
   const showSubLabels = xSubLabels && xSubLabels.length === data.length;
 
   return (
-    <div style={{ display: "flex", gap: 0 }}>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingRight: 8, minWidth: 40, fontSize: 11, color: "var(--text-muted)", textAlign: "right", height: CHART_HEIGHT + 56 }}>
+    <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingRight: 8, minWidth: 40, fontSize: 11, color: "var(--text-muted)", textAlign: "right", height: CHART_HEIGHT }}>
         {[...ticks].reverse().map((t) => (
           <span key={t}>{formatCurrency(t)}</span>
         ))}
-        <span>{formatCurrency(0)}</span>
       </div>
       <div style={{ flex: 1, position: "relative" }}>
-        {/* Chart area with gridlines - $0 baseline at bottom */}
-        <div style={{ position: "relative", height: CHART_HEIGHT, borderBottom: "1px solid var(--border)", marginBottom: 8 }}>
+        <div style={{ position: "relative", height: CHART_HEIGHT, borderBottom: "1px solid var(--border)" }}>
           {ticks.slice(1).map((t) => (
             <div
               key={t}
@@ -47,16 +49,20 @@ function BarChart({
                 position: "absolute",
                 left: 0,
                 right: 0,
-                bottom: `${(t / topTick) * 100}%`,
+                bottom: `${(t / chartMax) * 100}%`,
                 height: 1,
                 background: "var(--border)",
               }}
             />
           ))}
-          {/* Bars anchored to bottom */}
+          {isEmpty && (
+            <div style={{ position: "absolute", left: 0, right: 0, top: "37.5%", transform: "translateY(-50%)", display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+              <span style={{ fontSize: 14, color: "var(--text-muted)" }}>No earnings</span>
+            </div>
+          )}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "space-around", gap: 4, alignItems: "flex-end", height: CHART_HEIGHT, padding: "0 4px" }}>
             {data.map((v, i) => {
-              const heightPct = topTick > 0 ? (v / topTick) * 100 : 0;
+              const heightPct = chartMax > 0 ? (v / chartMax) * 100 : 0;
               const barHeight = Math.max(v > 0 ? 6 : 0, (heightPct / 100) * CHART_HEIGHT);
               return (
                 <div
@@ -79,8 +85,7 @@ function BarChart({
             })}
           </div>
         </div>
-        {/* X-axis: dates + day of week */}
-        <div style={{ display: "flex", justifyContent: "space-around", fontSize: 11, color: "var(--text-muted)" }}>
+        <div style={{ display: "flex", justifyContent: "space-around", fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
           {xLabels.map((l, i) => (
             <div key={i} style={{ flex: 1, textAlign: "center", maxWidth: 40 }}>
               <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{l}</div>
@@ -95,7 +100,8 @@ function BarChart({
 
 export default function Earnings() {
   const { data } = useStoreContext();
-  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Weekly");
+  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Daily");
+  const [dailyWeekOffset, setDailyWeekOffset] = useState(0);
   const now = new Date();
   const completedLessons = data.lessons.filter((l) => l.completed);
   const thisYear = now.getFullYear();
@@ -110,7 +116,10 @@ export default function Earnings() {
   }
 
   const weeklyData = getWeeklyTotals(data.lessons, 6, now);
-  const dailyData = getDailyTotals(data.lessons, 14, now);
+  const dailyData = getDailyTotalsForWeek(completedLessons, now, dailyWeekOffset);
+  const dailyWeekTotal = dailyData.reduce((s, d) => s + d.total, 0);
+  const dailyRangeStart = dailyData[0]?.label ?? "";
+  const dailyRangeEnd = dailyData[6]?.label ?? "";
 
   const maxMonthly = Math.max(...monthlyTotals, 1);
   const maxWeekly = Math.max(...weeklyData.map((w) => w.total), 1);
@@ -128,10 +137,7 @@ export default function Earnings() {
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <span style={{ fontSize: 20 }}>✓</span>
-        <h1 style={{ fontSize: 28, fontWeight: 700 }}>Earnings</h1>
-      </div>
+      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 12 }}>Earnings</h1>
       <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
         {TABS.map((t) => (
           <button
@@ -202,7 +208,27 @@ export default function Earnings() {
 
       {activeTab === "Daily" && (
         <>
-          <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 16 }}>{formatCurrency(weekEarned)} (this week)</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => setDailyWeekOffset((o) => o - 1)}
+              style={{ width: 40, height: 40, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}
+              aria-label="Previous week"
+            >
+              ‹
+            </button>
+            <div style={{ fontSize: 28, fontWeight: 700 }}>
+              {dailyRangeStart} – {dailyRangeEnd}: {formatCurrency(dailyWeekTotal)}
+            </div>
+            <button
+              type="button"
+              onClick={() => setDailyWeekOffset((o) => o + 1)}
+              style={{ width: 40, height: 40, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}
+              aria-label="Next week"
+            >
+              ›
+            </button>
+          </div>
           <div className="card" style={{ marginBottom: 24 }}>
             <BarChart
               data={dailyData.map((d) => d.total)}
