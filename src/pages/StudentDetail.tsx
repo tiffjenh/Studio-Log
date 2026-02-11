@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { formatCurrency } from "@/utils/earnings";
-import type { Student } from "@/types";
+import type { Student, Lesson } from "@/types";
 
 const DURATIONS = [30, 45, 60, 90, 120];
 const DAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -70,7 +70,6 @@ export default function StudentDetail() {
   const earningsThisMonth = thisMonthLessons.reduce((sum, l) => sum + l.amountCents, 0);
   const earningsYTD = studentLessons.reduce((sum, l) => sum + l.amountCents, 0);
   const monthLabel = now.toLocaleDateString("en-US", { month: "short" });
-  const ytdLabel = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " YTD";
   const availableThisMonth =
     student != null
       ? countDaysWithDayOfWeek(
@@ -83,6 +82,7 @@ export default function StudentDetail() {
     student != null ? countDaysWithDayOfWeek(new Date(thisYear, 0, 1), now, student.dayOfWeek) : 0;
 
   const [editing, setEditing] = useState(false);
+  const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [firstName, setFirstName] = useState(student?.firstName ?? "");
   const [lastName, setLastName] = useState(student?.lastName ?? "");
@@ -231,7 +231,7 @@ export default function StudentDetail() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div className="card">
                 <div style={{ fontSize: 20, fontWeight: 700 }}>{thisYearLessons.length}/{availableThisYear}</div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{thisYearLessons.length} lessons out of {availableThisYear} ({ytdLabel})</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{thisYearLessons.length} lessons out of {availableThisYear} (YTD)</div>
               </div>
               <div className="card">
                 <div style={{ fontSize: 20, fontWeight: 700 }}>{formatCurrency(earningsYTD)}</div>
@@ -239,22 +239,22 @@ export default function StudentDetail() {
               </div>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
-            <div className="card">
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{formatDuration(student.durationMinutes)}</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Lesson time</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 24, minWidth: 0 }}>
+            <div className="card" style={{ minWidth: 0, padding: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatDuration(student.durationMinutes)}</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Lesson time</div>
             </div>
-            <div className="card">
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{formatCurrency(student.rateCents)}</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Rate per lesson</div>
+            <div className="card" style={{ minWidth: 0, padding: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatCurrency(student.rateCents)}</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Rate</div>
             </div>
-            <div className="card">
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{DAYS_FULL[student.dayOfWeek]}</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Day</div>
+            <div className="card" style={{ minWidth: 0, padding: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{DAYS_FULL[student.dayOfWeek]}</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Day</div>
             </div>
-            <div className="card">
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{student.timeOfDay && student.timeOfDay !== "—" ? formatTimeRange(student.timeOfDay, student.durationMinutes) : "—"}</div>
-              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Scheduled time</div>
+            <div className="card" style={{ minWidth: 0, padding: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{student.timeOfDay && student.timeOfDay !== "—" ? formatTimeRange(student.timeOfDay, student.durationMinutes) : "—"}</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Time</div>
             </div>
           </div>
         </>
@@ -268,14 +268,69 @@ export default function StudentDetail() {
           {thisYearLessons.length === 0 ? (
             <p style={{ color: "var(--text-muted)" }}>No lessons logged yet</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {[...thisYearLessons].reverse().map((l) => (
-                <div key={l.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>{l.date}</span>
-                  <span style={{ fontWeight: 600 }}>{formatCurrency(l.amountCents)}</span>
+            (() => {
+              const byMonth = new Map<string, Lesson[]>();
+              for (const l of thisYearLessons) {
+                const key = l.date.slice(0, 7);
+                if (!byMonth.has(key)) byMonth.set(key, []);
+                byMonth.get(key)!.push(l);
+              }
+              const rows = Array.from(byMonth.entries())
+                .map(([monthKey, lessons]) => {
+                  const [y, m] = monthKey.split("-").map(Number);
+                  const first = new Date(y, m - 1, 1);
+                  const last = new Date(y, m - 1 + 1, 0);
+                  const available = student ? countDaysWithDayOfWeek(first, last, student.dayOfWeek) : lessons.length;
+                  const totalEarned = lessons.reduce((s, l) => s + l.amountCents, 0);
+                  const monthName = first.toLocaleDateString("en-US", { month: "long" });
+                  return { monthKey, monthName, lessons: lessons.sort((a, b) => b.date.localeCompare(a.date)), available, totalEarned };
+                })
+                .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+              return (
+                <div className="card" style={{ overflowX: "auto", padding: 0 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                        <th style={{ padding: "12px 12px 12px 16px", fontWeight: 600 }}>Month</th>
+                        <th style={{ padding: 12, fontWeight: 600 }}>Number of Lessons</th>
+                        <th style={{ padding: "12px 16px 12px 12px", fontWeight: 600 }}>Total Earned</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(({ monthKey, monthName, lessons, available, totalEarned }) => (
+                        <Fragment key={monthKey}>
+                          <tr
+                            key={monthKey}
+                            onClick={() => setExpandedMonth((prev) => (prev === monthKey ? null : monthKey))}
+                            style={{ borderBottom: "1px solid var(--border)", cursor: "pointer", background: expandedMonth === monthKey ? "var(--bg)" : undefined }}
+                          >
+                            <td style={{ padding: "12px 12px 12px 16px" }}>
+                              {expandedMonth === monthKey ? "▼ " : "▶ "}{monthName}
+                            </td>
+                            <td style={{ padding: 12 }}>{lessons.length}/{available}</td>
+                            <td style={{ padding: "12px 16px 12px 12px", fontWeight: 600 }}>{formatCurrency(totalEarned)}</td>
+                          </tr>
+                          {expandedMonth === monthKey && (
+                            <tr key={`${monthKey}-detail`}>
+                              <td colSpan={3} style={{ padding: "0 16px 12px", background: "var(--bg)", verticalAlign: "top" }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8 }}>
+                                  {lessons.map((l) => (
+                                    <div key={l.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: 0 }}>
+                                      <span>{l.date}</span>
+                                      <span style={{ fontWeight: 600 }}>{formatCurrency(l.amountCents)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-            </div>
+              );
+            })()
           )}
         </>
       )}
