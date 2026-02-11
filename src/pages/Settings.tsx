@@ -239,6 +239,47 @@ export default function Settings() {
           Using local storage. Add Supabase to sync across browsers (see SETUP-SUPABASE.md).
         </p>
       )}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div style={rowStyle}>
+          <span style={{ flex: 1 }}>Name</span>
+          {editing === "name" ? (
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} onBlur={() => handleSave("name")} autoFocus />
+          ) : (
+            <span style={{ flex: 2 }}>{user.name}</span>
+          )}
+          <button type="button" onClick={() => (editing === "name" ? handleSave("name") : setEditing("name"))} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
+            {editing === "name" ? "Save" : "Edit"}
+          </button>
+        </div>
+        <div style={rowStyle}>
+          <span style={{ flex: 1 }}>Email</span>
+          {editing === "email" ? (
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} onBlur={() => handleSave("email")} autoFocus />
+          ) : (
+            <span style={{ flex: 2 }}>{user.email}</span>
+          )}
+          <button type="button" onClick={() => (editing === "email" ? handleSave("email") : setEditing("email"))} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
+            {editing === "email" ? "Save" : "Edit"}
+          </button>
+        </div>
+        <div style={rowStyle}>
+          <span style={{ flex: 1 }}>Phone Number</span>
+          {editing === "phone" ? (
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} onBlur={() => handleSave("phone")} autoFocus />
+          ) : (
+            <span style={{ flex: 2 }}>{user.phone || "—"}</span>
+          )}
+          <button type="button" onClick={() => (editing === "phone" ? handleSave("phone") : setEditing("phone"))} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
+            {editing === "phone" ? "Save" : "Edit"}
+          </button>
+        </div>
+        <div style={{ ...rowStyle, borderBottom: "none" }}>
+          <span style={{ flex: 1 }}>Password</span>
+          <span style={{ flex: 2 }}>••••••••</span>
+          <button type="button" style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
+        </div>
+      </div>
+      <button type="button" className="btn btn-pink" style={{ width: "100%", marginBottom: 24 }} onClick={handleLogOut}>Log Out</button>
       <div className="card" style={{ marginBottom: 24, padding: 16 }}>
         <div style={{ fontWeight: 600, marginBottom: 8 }}>Import lessons (attendance matrix)</div>
         <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--text-muted)" }}>
@@ -307,47 +348,6 @@ export default function Settings() {
           {importing ? "Importing…" : "Import CSV"}
         </button>
       </div>
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div style={rowStyle}>
-          <span style={{ flex: 1 }}>Name</span>
-          {editing === "name" ? (
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} onBlur={() => handleSave("name")} autoFocus />
-          ) : (
-            <span style={{ flex: 2 }}>{user.name}</span>
-          )}
-          <button type="button" onClick={() => (editing === "name" ? handleSave("name") : setEditing("name"))} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
-            {editing === "name" ? "Save" : "Edit"}
-          </button>
-        </div>
-        <div style={rowStyle}>
-          <span style={{ flex: 1 }}>Email</span>
-          {editing === "email" ? (
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} onBlur={() => handleSave("email")} autoFocus />
-          ) : (
-            <span style={{ flex: 2 }}>{user.email}</span>
-          )}
-          <button type="button" onClick={() => (editing === "email" ? handleSave("email") : setEditing("email"))} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
-            {editing === "email" ? "Save" : "Edit"}
-          </button>
-        </div>
-        <div style={rowStyle}>
-          <span style={{ flex: 1 }}>Phone Number</span>
-          {editing === "phone" ? (
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} onBlur={() => handleSave("phone")} autoFocus />
-          ) : (
-            <span style={{ flex: 2 }}>{user.phone || "—"}</span>
-          )}
-          <button type="button" onClick={() => (editing === "phone" ? handleSave("phone") : setEditing("phone"))} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
-            {editing === "phone" ? "Save" : "Edit"}
-          </button>
-        </div>
-        <div style={{ ...rowStyle, borderBottom: "none" }}>
-          <span style={{ flex: 1 }}>Password</span>
-          <span style={{ flex: 2 }}>••••••••</span>
-          <button type="button" style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
-        </div>
-      </div>
-      <button type="button" className="btn btn-pink" style={{ width: "100%" }} onClick={handleLogOut}>Log Out</button>
     </>
   );
 }

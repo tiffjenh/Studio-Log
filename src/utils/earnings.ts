@@ -4,10 +4,11 @@ export function formatCurrency(cents: number): string {
   return "$" + (cents / 100).toFixed(0);
 }
 
+/** Week is Sunday–Saturday. */
 export function getWeekBounds(date: Date): { start: Date; end: Date } {
   const d = new Date(date);
   const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const diff = d.getDate() - day;
   const start = new Date(d);
   start.setDate(diff);
   start.setHours(0, 0, 0, 0);
@@ -97,8 +98,10 @@ export function getWeeksInMonth(
       const total = lessons
         .filter((l) => l.completed && l.date >= startKey && l.date <= endKey)
         .reduce((s, l) => s + l.amountCents, 0);
+      const startLabel = `${start.getMonth() + 1}/${start.getDate()}`;
+      const endLabel = `${end.getMonth() + 1}/${end.getDate()}`;
       result.push({
-        label: `${start.getMonth() + 1}/${start.getDate()}`,
+        label: `${startLabel} – ${endLabel}`,
         dayOfWeek: DAY_ABBREV[start.getDay()],
         total,
         startKey,

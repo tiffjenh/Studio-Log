@@ -102,8 +102,8 @@ function BarChart({
         </div>
         <div style={{ display: "flex", justifyContent: "space-around", fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
           {xLabels.map((l, i) => (
-            <div key={i} style={{ flex: 1, textAlign: "center", maxWidth: 40 }}>
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{l}</div>
+            <div key={i} style={{ flex: 1, textAlign: "center", maxWidth: 56, minWidth: 0 }}>
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l}</div>
               {showSubLabels && xSubLabels![i] && <div style={{ fontSize: 10, opacity: 0.85 }}>{xSubLabels![i]}</div>}
             </div>
           ))}
@@ -208,7 +208,6 @@ export default function Earnings() {
               <BarChart
                 data={weeklyData.map((w) => w.total)}
                 xLabels={weeklyData.map((w) => w.label)}
-                xSubLabels={weeklyData.map((w) => w.dayOfWeek)}
                 maxVal={maxWeekly}
                 dateKeys={weeklyData.map((w) => w.startKey)}
                 onBarClick={(key) => setSelectedWeekStartKey((prev) => (prev === key ? null : key))}
