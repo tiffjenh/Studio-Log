@@ -157,6 +157,7 @@ export function useStore() {
           dayOfWeek: student.dayOfWeek,
           timeOfDay: student.timeOfDay,
           location: student.location,
+          avatarIcon: student.avatarIcon,
         });
         setData((prev) => ({ ...prev, students: [...prev.students, created] }));
         return;

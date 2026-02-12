@@ -17,6 +17,7 @@ function rowToStudent(r: Record<string, unknown>): Student {
     scheduleChangeDurationMinutes: r.schedule_change_duration_minutes != null ? (r.schedule_change_duration_minutes as number) : undefined,
     scheduleChangeRateCents: r.schedule_change_rate_cents != null ? (r.schedule_change_rate_cents as number) : undefined,
     terminatedFromDate: (r.terminated_from_date as string) || undefined,
+    avatarIcon: (r.avatar_icon as string) || undefined,
   };
 }
 
@@ -149,6 +150,7 @@ export async function addStudentSupabase(uid: string, student: Omit<Student, "id
       schedule_change_duration_minutes: student.scheduleChangeDurationMinutes ?? null,
       schedule_change_rate_cents: student.scheduleChangeRateCents ?? null,
       terminated_from_date: student.terminatedFromDate ?? null,
+      avatar_icon: student.avatarIcon ?? null,
     })
     .select()
     .single();
@@ -172,6 +174,7 @@ export async function updateStudentSupabase(uid: string, id: string, updates: Pa
   if (updates.scheduleChangeDurationMinutes !== undefined) row.schedule_change_duration_minutes = updates.scheduleChangeDurationMinutes ?? null;
   if (updates.scheduleChangeRateCents !== undefined) row.schedule_change_rate_cents = updates.scheduleChangeRateCents ?? null;
   if (updates.terminatedFromDate !== undefined) row.terminated_from_date = updates.terminatedFromDate || null;
+  if (updates.avatarIcon !== undefined) row.avatar_icon = updates.avatarIcon || null;
   if (Object.keys(row).length) await supabase.from("students").update(row).eq("id", id).eq("user_id", uid);
 }
 

@@ -4,13 +4,13 @@ import { useStoreContext } from "@/context/StoreContext";
 import { hasSupabase } from "@/lib/supabase";
 import { updatePasswordSupabase, updateEmailSupabase } from "@/store/supabaseSync";
 import { parseLessonCSV, parseLessonMatrixCSV, rowToLesson, type ImportResult } from "@/utils/csvImport";
+import { filterCurrencies, getCurrencyByCode, getStoredCurrencyCode, setStoredCurrencyCode } from "@/utils/currencies";
 import { getLessonForStudentOnDate } from "@/utils/earnings";
 import type { Student } from "@/types";
 
 export default function Settings() {
-  const { data, setUser, updateUserProfile, reload, addLesson, updateLesson } = useStoreContext();
+  const { data, setUser, updateUserProfile, addLesson, updateLesson } = useStoreContext();
   const navigate = useNavigate();
-  const [refreshing, setRefreshing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importYear, setImportYear] = useState(new Date().getFullYear());
@@ -25,9 +25,12 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [importDataOpen, setImportDataOpen] = useState(false);
   const [importMatrixOpen, setImportMatrixOpen] = useState(false);
   const [importRowOpen, setImportRowOpen] = useState(false);
-  const [syncedToCloudOpen, setSyncedToCloudOpen] = useState(false);
+  const [defaultCurrencyCode, setDefaultCurrencyCode] = useState(() => getStoredCurrencyCode());
+  const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
+  const [currencySearch, setCurrencySearch] = useState("");
 
   const handleSave = async (field: "name" | "email") => {
     if (!user) return;
@@ -255,8 +258,8 @@ export default function Settings() {
 
   if (!user) return null;
 
-  const rowStyle: React.CSSProperties = { display: "flex", alignItems: "center", padding: "14px 0", borderBottom: "1px solid rgba(201, 123, 148, 0.1)" };
-  const inputStyle: React.CSSProperties = { flex: 2, padding: 8, fontSize: 16, border: "1px solid var(--border)", borderRadius: 8 };
+  const rowStyle: React.CSSProperties = { display: "flex", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(201, 123, 148, 0.1)" };
+  const inputStyle: React.CSSProperties = { flex: 2, padding: 6, fontSize: 15, border: "1px solid var(--border)", borderRadius: 8 };
 
   return (
     <>
@@ -267,7 +270,6 @@ export default function Settings() {
         </p>
       )}
       <div className="float-card" style={{ marginBottom: 24 }}>
-        <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, margin: "0 0 16px", color: "var(--text-muted)" }}>Profile</h2>
         <div style={rowStyle}>
           <span style={{ flex: 1 }}>Name</span>
           {editing === "name" ? (
@@ -275,7 +277,7 @@ export default function Settings() {
           ) : (
             <span style={{ flex: 2 }}>{user.name}</span>
           )}
-          <button type="button" onClick={() => (editing === "name" ? handleSave("name") : setEditing("name"))} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
+          <button type="button" onClick={() => (editing === "name" ? handleSave("name") : setEditing("name"))} style={{ marginLeft: 8, color: "var(--text)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
             {editing === "name" ? "Save" : "Edit"}
           </button>
         </div>
@@ -286,7 +288,7 @@ export default function Settings() {
           ) : (
             <span style={{ flex: 2 }}>{user.email}</span>
           )}
-          <button type="button" onClick={() => { if (editing === "email") handleSave("email"); else { setEmailChangeMessage(null); setEditing("email"); } }} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
+          <button type="button" onClick={() => { if (editing === "email") handleSave("email"); else { setEmailChangeMessage(null); setEditing("email"); } }} style={{ marginLeft: 8, color: "var(--text)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
             {editing === "email" ? "Save" : "Edit"}
           </button>
         </div>
@@ -324,12 +326,46 @@ export default function Settings() {
           ) : (
             <>
               <span style={{ flex: 2 }}>••••••••</span>
-              <button type="button" onClick={() => { setPasswordError(""); setEditing("password"); }} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
+              <button type="button" onClick={() => { setPasswordError(""); setEditing("password"); }} style={{ marginLeft: 8, color: "var(--text)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
             </>
           )}
         </div>
       </div>
-      <button type="button" className="btn btn-pink pill" style={{ width: "100%", marginBottom: 24, borderRadius: "var(--radius-pill)" }} onClick={handleLogOut}>Log Out</button>
+      <div className="float-card" style={{ marginBottom: 24 }}>
+        <label style={{ display: "block", marginBottom: 8, fontWeight: 600, fontFamily: "var(--font-sans)" }}>Default currency</label>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Used when entering rates on Add student and Edit student.</p>
+        <div style={{ position: "relative" }}>
+          <button
+            type="button"
+            onClick={() => { setCurrencyDropdownOpen((o) => !o); setCurrencySearch(""); }}
+            style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", textAlign: "left", cursor: "pointer", fontSize: 14, fontFamily: "var(--font-sans)" }}
+          >
+            {getCurrencyByCode(defaultCurrencyCode)?.symbol ?? "$"} {defaultCurrencyCode} – {getCurrencyByCode(defaultCurrencyCode)?.name ?? "US Dollar"}
+          </button>
+          {currencyDropdownOpen && (
+            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "var(--shadow-elevated)", maxHeight: 220, overflow: "hidden", zIndex: 10 }}>
+              <input type="text" value={currencySearch} onChange={(e) => setCurrencySearch(e.target.value)} placeholder="Search currency..." style={{ width: "100%", padding: "10px 12px", border: "none", borderBottom: "1px solid var(--border)", fontSize: 14, fontFamily: "var(--font-sans)" }} autoFocus />
+              <div style={{ maxHeight: 180, overflowY: "auto" }}>
+                {filterCurrencies(currencySearch).map((c) => (
+                  <button key={c.code} type="button" onClick={() => { setStoredCurrencyCode(c.code); setDefaultCurrencyCode(c.code); setCurrencyDropdownOpen(false); }} style={{ width: "100%", padding: "10px 12px", border: "none", background: defaultCurrencyCode === c.code ? "rgba(201, 123, 148, 0.15)" : "transparent", textAlign: "left", cursor: "pointer", fontSize: 14, fontFamily: "var(--font-sans)" }}>
+                    {c.symbol} {c.code} – {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <button type="button" className="pill" style={{ width: "auto", padding: "10px 20px", marginBottom: 8, borderRadius: "var(--radius-pill)", background: "transparent", border: "2px solid #fff", color: "var(--text)", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }} onClick={handleLogOut}>Log Out</button>
+        <div>
+          <button type="button" onClick={() => setImportDataOpen((o) => !o)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text-muted)", textDecoration: "underline" }}>
+            Import Data
+          </button>
+        </div>
+      </div>
+      {importDataOpen && (
+      <>
       <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
         <button
           type="button"
@@ -367,7 +403,7 @@ export default function Settings() {
                 type="button"
                 onClick={() => matrixFileInputRef.current?.click()}
                 disabled={importing}
-                style={{ padding: "10px 16px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: importing ? "not-allowed" : "pointer" }}
+                style={{ padding: "10px 16px", fontSize: 14, border: "2px solid #fff", borderRadius: 8, background: "transparent", color: "var(--text)", cursor: importing ? "not-allowed" : "pointer" }}
               >
                 {importing ? "Importing…" : "Import matrix"}
               </button>
@@ -413,42 +449,14 @@ export default function Settings() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={importing}
-              style={{ padding: "10px 16px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: importing ? "not-allowed" : "pointer" }}
+              style={{ padding: "10px 16px", fontSize: 14, border: "2px solid #fff", borderRadius: 8, background: "transparent", color: "var(--text)", cursor: importing ? "not-allowed" : "pointer" }}
             >
               {importing ? "Importing…" : "Import CSV"}
             </button>
           </div>
         )}
       </div>
-      {hasSupabase() && (
-        <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
-          <button
-            type="button"
-            onClick={() => setSyncedToCloudOpen((o) => !o)}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", background: "none", border: "none", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}
-          >
-            <span style={{ fontSize: 14 }}>{syncedToCloudOpen ? "▼" : "▶"}</span>
-            Synced to cloud
-          </button>
-          {syncedToCloudOpen && (
-            <div style={{ padding: "0 20px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)", fontSize: 13 }}>
-              <p style={{ margin: "12px 0", fontSize: 13, color: "var(--text-muted)" }}>
-                Logged in as <strong>{user.email}</strong>. Data is shared across devices when you use this account.
-              </p>
-              <p style={{ margin: "0 0 12px", fontSize: 11, color: "var(--text-muted)", fontFamily: "monospace", wordBreak: "break-all" }}>
-                User ID: {user.id}
-              </p>
-              <button
-                type="button"
-                onClick={async () => { setRefreshing(true); await reload(); setRefreshing(false); }}
-                disabled={refreshing}
-                style={{ padding: "8px 16px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: "pointer" }}
-              >
-                {refreshing ? "Refreshing…" : "Refresh data"}
-              </button>
-            </div>
-          )}
-        </div>
+      </>
       )}
     </>
   );

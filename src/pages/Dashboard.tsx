@@ -16,6 +16,7 @@ import {
   dedupeLessons,
   filterLessonsOnScheduledDay,
 } from "@/utils/earnings";
+import StudentAvatar from "@/components/StudentAvatar";
 import type { Lesson, Student } from "@/types";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -42,9 +43,7 @@ function LessonRow({
   const { timeOfDay } = getEffectiveSchedule(student, dateKey);
   return (
     <div className="float-card" style={{ display: "flex", alignItems: "center", marginBottom: 12, cursor: "pointer", gap: 16 }} onClick={onEdit}>
-      <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--avatar-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
-        {student.firstName[0]}{student.lastName[0]}
-      </div>
+      <StudentAvatar student={student} size={48} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontFamily: "var(--font-sans)" }}>{student.firstName} {student.lastName}</div>
         <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{rateText} / {formatCurrency(effectiveRate)}</div>
@@ -184,7 +183,7 @@ export default function Dashboard() {
         })
       )}
       <div style={{ marginTop: 28, textAlign: "center" }}>
-        <Link to="/calendar" className="btn btn-primary" style={{ textDecoration: "none" }}>View Calendar</Link>
+        <Link to="/calendar" className="btn btn-primary pill" style={{ textDecoration: "none", borderRadius: "var(--radius-pill)" }}>View Calendar</Link>
       </div>
     </>
   );

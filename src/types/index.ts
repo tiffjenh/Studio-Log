@@ -15,6 +15,8 @@ export interface Student {
   scheduleChangeRateCents?: number;
   /** Last lesson date (YYYY-MM-DD). After this date the student no longer appears on the calendar/dashboard. */
   terminatedFromDate?: string;
+  /** Optional avatar icon: dog | cat | koala. Omit for initials (gradient). */
+  avatarIcon?: string;
 }
 
 export interface Lesson {

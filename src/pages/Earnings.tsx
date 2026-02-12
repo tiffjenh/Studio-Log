@@ -323,25 +323,13 @@ export default function Earnings() {
           </div>
           <div className="hero-card" style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 16 }}>Earnings overview</div>
-            <div style={{ display: "grid", gridTemplateColumns: displayYear === thisYear ? "1fr 1fr" : "1fr", gap: 20 }}>
-              {displayYear === thisYear && (
-                <>
-                  <div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Earnings – YTD</div>
-                    <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earningsYTD)}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Earnings {displayYear}</div>
-                    <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earningsForDisplayYear)}</div>
-                  </div>
-                </>
-              )}
-              {displayYear !== thisYear && (
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Earnings {displayYear}</div>
-                  <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earningsForDisplayYear)}</div>
-                </div>
-              )}
+            <div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
+                {displayYear === thisYear ? "Earnings – YTD" : `Earnings ${displayYear}`}
+              </div>
+              <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>
+                {formatCurrency(displayYear === thisYear ? earningsYTD : earningsForDisplayYear)}
+              </div>
             </div>
           </div>
           {monthsToShow > 0 && (

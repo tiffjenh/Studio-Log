@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { formatCurrency } from "@/utils/earnings";
 import DatePicker from "@/components/DatePicker";
+import StudentAvatar from "@/components/StudentAvatar";
 import type { Lesson } from "@/types";
 
 const DURATIONS = [
@@ -53,9 +54,7 @@ export default function EditLesson() {
       <form onSubmit={handleSave}>
         <div className="float-card" style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
-            <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--avatar-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 14, flexShrink: 0 }}>
-              {student.firstName[0]}{student.lastName[0]}
-            </div>
+            <span style={{ marginRight: 14, flexShrink: 0 }}><StudentAvatar student={student} size={48} /></span>
             <div>
               <div style={{ fontWeight: 600, fontSize: 18 }}>{student.firstName} {student.lastName}</div>
               <div style={{ color: "var(--text-muted)" }}>{dateFormatted}{timeStr}</div>

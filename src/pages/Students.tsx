@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { hasSupabase } from "@/lib/supabase";
 import { formatCurrency } from "@/utils/earnings";
-import { parseStudentCSV, rowToStudent } from "@/utils/csvImport";
+import StudentAvatar from "@/components/StudentAvatar";
 import type { Student } from "@/types";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -54,14 +54,9 @@ function sortStudentsByTime(students: Student[]): Student[] {
 }
 
 export default function Students() {
-  const { data, reload, addStudent } = useStoreContext();
-  const [refreshing, setRefreshing] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { data } = useStoreContext();
   const [search, setSearch] = useState("");
   const [dayFilter, setDayFilter] = useState<number | null>(null);
-  const [importCsvOpen, setImportCsvOpen] = useState(false);
 
   let filtered = data.students.filter((s) =>
     (dayFilter === null || s.dayOfWeek === dayFilter) &&
@@ -79,86 +74,11 @@ export default function Students() {
   const durationStr = (s: Student) =>
     s.durationMinutes === 60 ? "1 hour" : s.durationMinutes === 30 ? "30 min" : s.durationMinutes === 45 ? "45 min" : `${s.durationMinutes / 60} hours`;
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportResult(null);
-    setImporting(true);
-
-    try {
-      const text = await file.text();
-      const parsed = parseStudentCSV(text);
-      if (parsed.error) {
-        setImportResult({ imported: 0, skipped: 0, errors: [parsed.error] });
-        setImporting(false);
-        e.target.value = "";
-        return;
-      }
-
-      const existing = new Set(data.students.map((s) => `${s.firstName.toLowerCase()}|${s.lastName.toLowerCase()}`));
-      let imported = 0;
-      let skipped = 0;
-      const errors: string[] = [];
-
-      for (let i = 0; i < parsed.rows.length; i++) {
-        const studentData = rowToStudent(parsed.rows[i]);
-        if (!studentData) {
-          skipped++;
-          errors.push(`Row ${i + 2}: Invalid or missing data`);
-          continue;
-        }
-
-        const key = `${studentData.first_name.toLowerCase()}|${studentData.last_name.toLowerCase()}`;
-        if (existing.has(key)) {
-          skipped++;
-          errors.push(`Row ${i + 2}: ${studentData.first_name} ${studentData.last_name} already exists`);
-          continue;
-        }
-
-        try {
-          await addStudent({
-            id: `s_${Date.now()}_${i}`,
-            firstName: studentData.first_name,
-            lastName: studentData.last_name,
-            durationMinutes: studentData.duration_minutes,
-            rateCents: studentData.rate_cents,
-            dayOfWeek: studentData.day_of_week,
-            timeOfDay: studentData.time_of_day,
-          });
-          existing.add(key);
-          imported++;
-        } catch {
-          skipped++;
-          errors.push(`Row ${i + 2}: Failed to save`);
-        }
-      }
-
-      setImportResult({ imported, skipped, errors });
-    } catch (err) {
-      setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
-    } finally {
-      setImporting(false);
-      e.target.value = "";
-    }
-  };
-
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0 }}>Students</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {hasSupabase() && (
-            <button
-              type="button"
-              onClick={async () => { setRefreshing(true); await reload(); setRefreshing(false); }}
-              disabled={refreshing}
-              className="pill"
-              style={{ minHeight: 40 }}
-              title="Pull latest from cloud"
-            >
-              {refreshing ? "…" : "↻ Sync"}
-            </button>
-          )}
           <Link
             to="/add-student"
             title="Add student"
@@ -250,9 +170,7 @@ export default function Students() {
                 {students.map((s) => (
                   <Link key={s.id} to={`/students/${s.id}`} style={{ textDecoration: "none", color: "inherit" }}>
                     <div className="float-card" style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                      <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--avatar-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
-                        {s.firstName[0]}{s.lastName[0]}
-                      </div>
+                      <StudentAvatar student={s} size={48} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
                         <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{durationStr(s)} / {formatCurrency(s.rateCents)}</div>
@@ -267,52 +185,6 @@ export default function Students() {
           ))}
         </div>
       )}
-      <div style={{ marginTop: 24, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "#ffffff" }}>
-        <button
-          type="button"
-          onClick={() => setImportCsvOpen((o) => !o)}
-          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", background: "#ffffff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)", fontFamily: "var(--font-sans)" }}
-        >
-          <span style={{ fontSize: 14 }}>{importCsvOpen ? "▼" : "▶"}</span>
-          Import students from CSV
-        </button>
-        {importCsvOpen && (
-          <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)" }}>
-            <p style={{ margin: "12px 0", fontSize: 12, color: "var(--text-muted)" }}>
-              Columns: first_name, last_name, rate, duration_minutes, day_of_week, time_of_day (one student per row)
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleImport}
-              style={{ display: "none" }}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
-              className="pill"
-              style={{ padding: "12px 20px", cursor: importing ? "not-allowed" : "pointer" }}
-            >
-              {importing ? "Importing…" : "Select CSV file"}
-            </button>
-            {importResult && (
-              <div style={{ marginTop: 12, fontSize: 14 }}>
-                <p style={{ margin: 0, fontWeight: 600 }}>Imported {importResult.imported} students, skipped {importResult.skipped}</p>
-                {importResult.errors.length > 0 && (
-                  <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "var(--text-muted)", maxHeight: 100, overflowY: "auto" }}>
-                    {importResult.errors.slice(0, 8).map((err, i) => (
-                      <li key={i}>{err}</li>
-                    ))}
-                    {importResult.errors.length > 8 && <li>…and {importResult.errors.length - 8} more</li>}
-                  </ul>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
     </>
   );
 }

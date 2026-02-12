@@ -2,11 +2,30 @@ import { useState, useEffect, Fragment } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { formatCurrency, getEffectiveSchedule, getDayOfWeekFromDateKey } from "@/utils/earnings";
+import { getCurrencyByCode, getStoredCurrencyCode } from "@/utils/currencies";
 import DatePicker from "@/components/DatePicker";
+import StudentAvatar from "@/components/StudentAvatar";
 import type { Student, Lesson } from "@/types";
 
 const DURATIONS = [30, 45, 60, 90, 120];
+const DURATION_LABELS: Record<number, string> = { 30: "30 min", 45: "45 min", 60: "1 hr", 90: "1.5 hr", 120: "2 hr" };
 const DAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function parseTimeOfDay(s: string): { hour: number; minute: number; amPm: "AM" | "PM" } {
+  const t = s.trim();
+  if (!t || t === "—") return { hour: 5, minute: 0, amPm: "PM" };
+  const match = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+  if (!match) return { hour: 5, minute: 0, amPm: "PM" };
+  let hour = parseInt(match[1]!, 10);
+  const minute = match[2] ? parseInt(match[2], 10) : 0;
+  const period = (match[3] || "").toUpperCase();
+  if (period === "PM" && hour !== 12) hour += 12;
+  if (period === "AM" && hour === 12) hour = 0;
+  const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  const amPm = hour < 12 ? "AM" : "PM";
+  return { hour: displayHour, minute: Math.min(59, Math.max(0, minute)), amPm };
+}
 
 function formatDuration(mins: number): string {
   return mins === 60 ? "1 hour" : mins === 90 ? "1.5 hours" : mins === 120 ? "2 hours" : `${mins} min`;
@@ -114,6 +133,18 @@ export default function StudentDetail() {
   const [terminatedFromDate, setTerminatedFromDate] = useState(student?.terminatedFromDate ?? "");
   const [changeScheduleOpen, setChangeScheduleOpen] = useState(false);
   const [terminateStudentOpen, setTerminateStudentOpen] = useState(false);
+  const [rateModalOpen, setRateModalOpen] = useState(false);
+  const [rateKeypadValue, setRateKeypadValue] = useState("");
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [timePickerHour, setTimePickerHour] = useState(5);
+  const [timePickerMinute, setTimePickerMinute] = useState(0);
+  const [timePickerAmPm, setTimePickerAmPm] = useState<"AM" | "PM">("PM");
+  const [scheduleChangeRateModalOpen, setScheduleChangeRateModalOpen] = useState(false);
+  const [scheduleChangeRateKeypadValue, setScheduleChangeRateKeypadValue] = useState("");
+  const [scheduleChangeTimePickerOpen, setScheduleChangeTimePickerOpen] = useState(false);
+  const [scheduleChangeTimePickerHour, setScheduleChangeTimePickerHour] = useState(5);
+  const [scheduleChangeTimePickerMinute, setScheduleChangeTimePickerMinute] = useState(0);
+  const [scheduleChangeTimePickerAmPm, setScheduleChangeTimePickerAmPm] = useState<"AM" | "PM">("PM");
 
   useEffect(() => {
     if (student) {
@@ -216,16 +247,27 @@ export default function StudentDetail() {
     }
   };
 
-  const inputStyle: React.CSSProperties = { width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, fontFamily: "var(--font-sans)" };
+  const fontStyle = { fontFamily: "var(--font-sans)" };
+  const inputStyle: React.CSSProperties = { width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, ...fontStyle };
+  const labelStyle: React.CSSProperties = { display: "block", marginBottom: 8, fontWeight: 600, ...fontStyle };
+  const rowStyle: React.CSSProperties = { display: "flex", flexWrap: "nowrap", gap: 6, marginBottom: 16, minWidth: 0 };
+
+  const openRateModal = () => { setRateKeypadValue(rateDollars || ""); setRateModalOpen(true); };
+  const applyRate = () => { const v = rateKeypadValue.trim(); if (v !== "" && !Number.isNaN(Number(v))) setRateDollars(v); setRateModalOpen(false); };
+  const openTimePicker = () => { const p = parseTimeOfDay(timeOfDay); setTimePickerHour(p.hour); setTimePickerMinute(p.minute); setTimePickerAmPm(p.amPm); setTimePickerOpen(true); };
+  const applyTime = () => { const displayHour = timePickerHour; const displayMin = String(timePickerMinute).padStart(2, "0"); setTimeOfDay(`${displayHour}:${displayMin} ${timePickerAmPm}`); setTimePickerOpen(false); };
+
+  const openScheduleChangeRateModal = () => { setScheduleChangeRateKeypadValue(scheduleChangeRateDollars || ""); setScheduleChangeRateModalOpen(true); };
+  const applyScheduleChangeRate = () => { const v = scheduleChangeRateKeypadValue.trim(); if (v !== "" && !Number.isNaN(Number(v))) setScheduleChangeRateDollars(v); setScheduleChangeRateModalOpen(false); };
+  const openScheduleChangeTimePicker = () => { const p = parseTimeOfDay(scheduleChangeTimeOfDay); setScheduleChangeTimePickerHour(p.hour); setScheduleChangeTimePickerMinute(p.minute); setScheduleChangeTimePickerAmPm(p.amPm); setScheduleChangeTimePickerOpen(true); };
+  const applyScheduleChangeTime = () => { const displayHour = scheduleChangeTimePickerHour; const displayMin = String(scheduleChangeTimePickerMinute).padStart(2, "0"); setScheduleChangeTimeOfDay(`${displayHour}:${displayMin} ${scheduleChangeTimePickerAmPm}`); setScheduleChangeTimePickerOpen(false); };
 
   return (
     <>
       <Link to="/students" style={{ display: "inline-flex", alignItems: "center", marginBottom: 20, color: "var(--text)", textDecoration: "none", fontSize: 15 }}>← Back</Link>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 48, height: 48, minWidth: 48, minHeight: 48, borderRadius: "50%", background: "var(--avatar-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 16, flexShrink: 0 }}>
-            {student.firstName[0]}{student.lastName[0]}
-          </div>
+          <StudentAvatar student={student} size={48} />
           <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0 }}>{student.firstName} {student.lastName}</h1>
         </div>
         {!editing ? (
@@ -236,36 +278,34 @@ export default function StudentDetail() {
       </div>
 
       {editing ? (
-        <form onSubmit={handleSaveEdit} className="float-card" style={{ marginBottom: 28, fontFamily: "var(--font-sans)" }}>
-          <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>First name</label>
+        <div>
+        <form onSubmit={handleSaveEdit} className="float-card" style={{ marginBottom: 28, ...fontStyle }}>
+          <label style={labelStyle}>First name</label>
           <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" style={inputStyle} required />
-          <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Last name</label>
+          <label style={labelStyle}>Last name</label>
           <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" style={inputStyle} required />
-          <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Lesson duration</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+          <label style={labelStyle}>Lesson duration</label>
+          <div style={rowStyle}>
             {DURATIONS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setDurationMinutes(m)}
-                className={durationMinutes === m ? "pill pill--active" : "pill"}
-              >
-                {m === 60 ? "1 hour" : m === 90 ? "1.5 hours" : m === 120 ? "2 hours" : `${m} min`}
+              <button key={m} type="button" onClick={() => setDurationMinutes(m)} className={durationMinutes === m ? "pill pill--active" : "pill"} style={{ padding: "8px 12px", fontSize: 14, flexShrink: 0, ...fontStyle }}>
+                {DURATION_LABELS[m]}
               </button>
             ))}
           </div>
-          <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Rate ($)</label>
-          <input type="number" step="0.01" value={rateDollars} onChange={(e) => setRateDollars(e.target.value)} placeholder="70" style={inputStyle} required />
-          <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Day of week</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
-            {DAYS_FULL.map((d, i) => (
-              <button key={i} type="button" onClick={() => setDayOfWeek(i)} className={dayOfWeek === i ? "pill pill--active" : "pill"} style={{ fontSize: 13 }}>
-                {d.slice(0, 3)}
-              </button>
+          <label style={labelStyle}>Rate</label>
+          <button type="button" onClick={openRateModal} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+            {rateDollars ? `${getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$"}${rateDollars}` : (getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$") + "0"}
+          </button>
+          <label style={labelStyle}>Day of week</label>
+          <div style={rowStyle}>
+            {DAY_SHORT.map((label, i) => (
+              <button key={i} type="button" onClick={() => setDayOfWeek(i)} className={dayOfWeek === i ? "pill pill--active" : "pill"} style={{ padding: "8px 10px", fontSize: 13, flexShrink: 0, ...fontStyle }}>{label}</button>
             ))}
           </div>
-          <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Time (e.g. 5:00 PM) – include AM or PM</label>
-          <input type="text" value={timeOfDay} onChange={(e) => setTimeOfDay(e.target.value)} placeholder="5:00 PM" style={inputStyle} />
+          <label style={labelStyle}>Time</label>
+          <button type="button" onClick={openTimePicker} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+            {timeOfDay || "5:00 PM"}
+          </button>
 
           <div style={{ marginTop: 24, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
             <button
@@ -279,35 +319,32 @@ export default function StudentDetail() {
             {changeScheduleOpen && (
               <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
                 <p style={{ fontSize: 14, color: "var(--text-muted)", margin: "12px 0" }}>From the date below, this student&apos;s lessons use the new day, time, duration, and rate.</p>
-                <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>From date (e.g. July 1)</label>
+                <label style={labelStyle}>From date (e.g. July 1)</label>
                 <div style={{ marginBottom: 16 }}>
                   <DatePicker value={scheduleChangeFromDate} onChange={setScheduleChangeFromDate} placeholder="Select date" />
                 </div>
-                <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>New day of week</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
-                  {DAYS_FULL.map((d, i) => (
-                    <button key={i} type="button" onClick={() => setScheduleChangeDayOfWeek(i)} className={scheduleChangeDayOfWeek === i ? "pill pill--active" : "pill"} style={{ fontSize: 13 }}>
-                      {d.slice(0, 3)}
-                    </button>
+                <label style={labelStyle}>New day of week</label>
+                <div style={rowStyle}>
+                  {DAY_SHORT.map((label, i) => (
+                    <button key={i} type="button" onClick={() => setScheduleChangeDayOfWeek(i)} className={scheduleChangeDayOfWeek === i ? "pill pill--active" : "pill"} style={{ padding: "8px 10px", fontSize: 13, flexShrink: 0, ...fontStyle }}>{label}</button>
                   ))}
                 </div>
-                <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>New time (e.g. 5:00 PM)</label>
-                <input type="text" value={scheduleChangeTimeOfDay} onChange={(e) => setScheduleChangeTimeOfDay(e.target.value)} placeholder="5:00 PM" style={inputStyle} />
-                <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>New lesson duration</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+                <label style={labelStyle}>New time</label>
+                <button type="button" onClick={openScheduleChangeTimePicker} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+                  {scheduleChangeTimeOfDay || "5:00 PM"}
+                </button>
+                <label style={labelStyle}>New lesson duration</label>
+                <div style={rowStyle}>
                   {DURATIONS.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setScheduleChangeDurationMinutes(m)}
-                      className={scheduleChangeDurationMinutes === m ? "pill pill--active" : "pill"}
-                    >
-                      {m === 60 ? "1 hour" : m === 90 ? "1.5 hours" : m === 120 ? "2 hours" : `${m} min`}
+                    <button key={m} type="button" onClick={() => setScheduleChangeDurationMinutes(m)} className={scheduleChangeDurationMinutes === m ? "pill pill--active" : "pill"} style={{ padding: "8px 12px", fontSize: 14, flexShrink: 0, ...fontStyle }}>
+                      {DURATION_LABELS[m]}
                     </button>
                   ))}
                 </div>
-                <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>New rate ($)</label>
-                <input type="number" step="0.01" value={scheduleChangeRateDollars} onChange={(e) => setScheduleChangeRateDollars(e.target.value)} placeholder="e.g. 60" style={inputStyle} />
+                <label style={labelStyle}>New rate</label>
+                <button type="button" onClick={openScheduleChangeRateModal} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+                  {scheduleChangeRateDollars ? `${getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$"}${scheduleChangeRateDollars}` : (getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$") + "0"}
+                </button>
               </div>
             )}
           </div>
@@ -332,13 +369,113 @@ export default function StudentDetail() {
             )}
           </div>
 
-          {error ? <p style={{ color: "#dc2626", marginBottom: 16 }}>{error}</p> : null}
+          {error ? <p style={{ color: "#dc2626", marginBottom: 16, ...fontStyle }}>{error}</p> : null}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
-            <button type="submit" className="btn btn-primary">Save</button>
-            <button type="button" onClick={handleCancelEdit} className="btn" style={{ border: "1px solid var(--border)", background: "#ffffff", color: "var(--text)" }}>Cancel</button>
-            <button type="button" onClick={handleDelete} className="btn" style={{ border: "1px solid rgba(220,38,38,0.4)", background: "transparent", color: "#dc2626" }}>Delete</button>
+            <button type="submit" className="btn btn-primary" style={fontStyle}>Save</button>
+            <button type="button" onClick={handleCancelEdit} className="btn" style={{ border: "1px solid var(--border)", background: "#ffffff", color: "var(--text)", ...fontStyle }}>Cancel</button>
+            <button type="button" onClick={handleDelete} className="btn" style={{ border: "1px solid rgba(220,38,38,0.4)", background: "transparent", color: "#dc2626", ...fontStyle }}>Delete</button>
           </div>
         </form>
+
+        {rateModalOpen && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setRateModalOpen(false)}>
+            <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                <button type="button" onClick={() => setRateModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>×</button>
+              </div>
+              <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text-muted)" }}>Rate (currency set in Settings)</p>
+              <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 16, color: "var(--text)" }}>{(getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$")}{rateKeypadValue || "0"}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                  <button key={n} type="button" onClick={() => setRateKeypadValue((v) => v + n)} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>{n}</button>
+                ))}
+                <button type="button" onClick={() => setRateKeypadValue((v) => (v.includes(".") ? v : v + "."))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, cursor: "pointer", ...fontStyle }}>.</button>
+                <button type="button" onClick={() => setRateKeypadValue((v) => v + "0")} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>0</button>
+                <button type="button" onClick={() => setRateKeypadValue((v) => v.slice(0, -1))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "rgba(180, 160, 180, 0.12)", fontSize: 18, cursor: "pointer", ...fontStyle }}>←</button>
+              </div>
+              <button type="button" onClick={applyRate} className="btn btn-primary" style={{ width: "100%", ...fontStyle }}>Set rate</button>
+            </div>
+          </div>
+        )}
+        {timePickerOpen && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setTimePickerOpen(false)}>
+            <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                <button type="button" onClick={() => setTimePickerOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>×</button>
+              </div>
+              <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>Select time</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <select value={timePickerHour} onChange={(e) => setTimePickerHour(Number(e.target.value))} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, ...fontStyle }}>
+                    {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (<option key={h} value={h}>{h}</option>))}
+                  </select>
+                  <span style={{ fontSize: 18, fontWeight: 600 }}>:</span>
+                  <select value={timePickerMinute} onChange={(e) => setTimePickerMinute(Number(e.target.value))} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, ...fontStyle }}>
+                    {Array.from({ length: 60 }, (_, i) => i).map((m) => (<option key={m} value={m}>{String(m).padStart(2, "0")}</option>))}
+                  </select>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <button type="button" onClick={() => setTimePickerAmPm("AM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: timePickerAmPm === "AM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, ...fontStyle }}>AM</button>
+                  <button type="button" onClick={() => setTimePickerAmPm("PM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: timePickerAmPm === "PM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, ...fontStyle }}>PM</button>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button type="button" onClick={() => setTimePickerOpen(false)} style={{ padding: "10px 20px", background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", ...fontStyle }}>Cancel</button>
+                <button type="button" onClick={applyTime} className="btn btn-primary" style={{ padding: "10px 20px", ...fontStyle }}>OK</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {scheduleChangeRateModalOpen && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setScheduleChangeRateModalOpen(false)}>
+            <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                <button type="button" onClick={() => setScheduleChangeRateModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>×</button>
+              </div>
+              <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text-muted)" }}>New rate (currency set in Settings)</p>
+              <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 16, color: "var(--text)" }}>{(getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$")}{scheduleChangeRateKeypadValue || "0"}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                  <button key={n} type="button" onClick={() => setScheduleChangeRateKeypadValue((v) => v + n)} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>{n}</button>
+                ))}
+                <button type="button" onClick={() => setScheduleChangeRateKeypadValue((v) => (v.includes(".") ? v : v + "."))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, cursor: "pointer", ...fontStyle }}>.</button>
+                <button type="button" onClick={() => setScheduleChangeRateKeypadValue((v) => v + "0")} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>0</button>
+                <button type="button" onClick={() => setScheduleChangeRateKeypadValue((v) => v.slice(0, -1))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "rgba(180, 160, 180, 0.12)", fontSize: 18, cursor: "pointer", ...fontStyle }}>←</button>
+              </div>
+              <button type="button" onClick={applyScheduleChangeRate} className="btn btn-primary" style={{ width: "100%", ...fontStyle }}>Set rate</button>
+            </div>
+          </div>
+        )}
+        {scheduleChangeTimePickerOpen && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setScheduleChangeTimePickerOpen(false)}>
+            <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                <button type="button" onClick={() => setScheduleChangeTimePickerOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>×</button>
+              </div>
+              <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>New time</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <select value={scheduleChangeTimePickerHour} onChange={(e) => setScheduleChangeTimePickerHour(Number(e.target.value))} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, ...fontStyle }}>
+                    {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (<option key={h} value={h}>{h}</option>))}
+                  </select>
+                  <span style={{ fontSize: 18, fontWeight: 600 }}>:</span>
+                  <select value={scheduleChangeTimePickerMinute} onChange={(e) => setScheduleChangeTimePickerMinute(Number(e.target.value))} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, ...fontStyle }}>
+                    {Array.from({ length: 60 }, (_, i) => i).map((m) => (<option key={m} value={m}>{String(m).padStart(2, "0")}</option>))}
+                  </select>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <button type="button" onClick={() => setScheduleChangeTimePickerAmPm("AM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: scheduleChangeTimePickerAmPm === "AM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, ...fontStyle }}>AM</button>
+                  <button type="button" onClick={() => setScheduleChangeTimePickerAmPm("PM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: scheduleChangeTimePickerAmPm === "PM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, ...fontStyle }}>PM</button>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button type="button" onClick={() => setScheduleChangeTimePickerOpen(false)} style={{ padding: "10px 20px", background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", ...fontStyle }}>Cancel</button>
+                <button type="button" onClick={applyScheduleChangeTime} className="btn btn-primary" style={{ padding: "10px 20px", ...fontStyle }}>OK</button>
+              </div>
+            </div>
+          </div>
+        )}
+        </div>
       ) : (
         <>
           <div className="hero-card" style={{ marginBottom: 24 }}>
@@ -363,16 +500,16 @@ export default function StudentDetail() {
             </div>
           </div>
           <div className="float-card" style={{ padding: 16, marginBottom: 24 }}>
-            <div style={{ fontSize: 16, fontWeight: 600, display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {(() => {
                 const todayKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
                 const { dayOfWeek: d, timeOfDay: t } = getEffectiveSchedule(student, todayKey);
                 const timeRange = t && t !== "—" ? ` @ ${formatCompactTimeRange(t, student.durationMinutes)}` : "";
                 return (
                   <>
-                    <span style={{ textAlign: "left" }}>{DAYS_FULL[d]}s{timeRange}</span>
-                    <span style={{ textAlign: "center", color: "var(--text-muted)" }}>|</span>
-                    <span style={{ textAlign: "left" }}>{formatDuration(student.durationMinutes)}, {formatCurrency(student.rateCents)}</span>
+                    <span>{DAYS_FULL[d]}s{timeRange}</span>
+                    <span style={{ color: "var(--text-muted)" }}>|</span>
+                    <span>{formatDuration(student.durationMinutes)}, {formatCurrency(student.rateCents)}</span>
                   </>
                 );
               })()}
