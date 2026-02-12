@@ -45,12 +45,12 @@
   --space-xl: 40px;
 }
 
-/* Motion gradient keyframes for landing – smooth palette transitions */
-@keyframes motion-gradient {
-  0%, 100% { background: linear-gradient(165deg, #f7e7d8 0%, #f5e4e8 30%, #e8eef5 60%, #e2dfeb 85%, #b6b1d9 100%); }
-  25% { background: linear-gradient(165deg, #f5e4e8 0%, #f3a2bd 25%, #e0e8f0 55%, #e2dfeb 85%, #b6b1d9 100%); }
-  50% { background: linear-gradient(165deg, #e0e8f0 0%, #c9dae7 30%, #d8d6e8 60%, #b6b1d9 85%, #f0e6e2 100%); }
-  75% { background: linear-gradient(165deg, #d8d6e8 0%, #b6b1d9 25%, #e8d4dc 55%, #f0e6e2 85%, #c9dae7 100%); }
+/* Wave gradient: palette colors (Tender, Pink Chalk, Sea Breeze, Delicate Lilac) – position animates for wave effect */
+@keyframes landing-wave {
+  0%, 100% { background-position: 0% 0%; }
+  25%      { background-position: 0% 40%; }
+  50%      { background-position: 0% 70%; }
+  75%      { background-position: 0% 40%; }
 }
 
 * {
@@ -298,6 +298,12 @@ input, select, textarea {
   box-shadow: var(--shadow-soft);
 }
 
+.logo-circle {
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: var(--shadow-soft);
+}
+
 /* Loading */
 .loading-screen {
   min-height: 100dvh;
@@ -321,8 +327,22 @@ input, select, textarea {
 }
 
 .landing--motion {
-  background: linear-gradient(165deg, #f7e7d8 0%, #f5e4e8 25%, #e8eef5 50%, #e2dfeb 75%, #b6b1d9 100%);
-  animation: motion-gradient 20s ease-in-out infinite;
+  /* Palette: Tender #f7e7d8, Pink Chalk #f3a2bd, Sea Breeze #c9dae7, Delicate Lilac #b6b1d9 – prominent and smooth */
+  background: linear-gradient(
+    165deg,
+    #f7e7d8 0%,
+    #f5dfe4 12%,
+    #f3a2bd 25%,
+    #e8b8c8 38%,
+    #c9dae7 50%,
+    #c1d2e2 62%,
+    #b6b1d9 75%,
+    #c5c0dc 88%,
+    #f7e7d8 100%
+  );
+  background-size: 100% 300%;
+  background-position: 0% 0%;
+  animation: landing-wave 9s ease-in-out infinite;
 }
 
 .landing__inner {
@@ -349,9 +369,9 @@ input, select, textarea {
   width: 52px;
   height: 52px;
   min-width: 52px;
-  border-radius: 14px;
-  background: var(--avatar-gradient);
-  color: white;
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--text);
   display: flex;
   align-items: center;
   justify-content: center;

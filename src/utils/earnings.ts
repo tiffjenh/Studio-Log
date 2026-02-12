@@ -118,7 +118,7 @@ export function getLessonForStudentOnDate(lessons: Lesson[], studentId: string, 
 }
 
 /** Day of week (0–6) for a YYYY-MM-DD date key. */
-function getDayOfWeekFromDateKey(dateKey: string): number {
+export function getDayOfWeekFromDateKey(dateKey: string): number {
   const [y, m, d] = dateKey.split("-").map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1).getDay();
 }

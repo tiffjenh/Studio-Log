@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
-import { formatCurrency, getEffectiveSchedule } from "@/utils/earnings";
+import { formatCurrency, getEffectiveSchedule, getDayOfWeekFromDateKey } from "@/utils/earnings";
 import DatePicker from "@/components/DatePicker";
 import type { Student, Lesson } from "@/types";
 
@@ -71,7 +71,13 @@ export default function StudentDetail() {
   const navigate = useNavigate();
   const { data, updateStudent, deleteStudent } = useStoreContext();
   const student = data.students.find((s) => s.id === id);
-  const studentLessons = data.lessons.filter((l) => l.studentId === id && l.completed);
+  const completedForStudent = data.lessons.filter((l) => l.studentId === id && l.completed);
+  const studentLessons =
+    student == null
+      ? completedForStudent
+      : completedForStudent.filter(
+          (l) => getDayOfWeekFromDateKey(l.date) === getEffectiveSchedule(student, l.date).dayOfWeek
+        );
   const now = new Date();
   const thisYear = now.getFullYear();
   const thisMonthPrefix = `${thisYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -364,9 +370,9 @@ export default function StudentDetail() {
                 const timeRange = t && t !== "—" ? ` @ ${formatCompactTimeRange(t, student.durationMinutes)}` : "";
                 return (
                   <>
-                    <span style={{ textAlign: "right" }}>{formatDuration(student.durationMinutes)}, {formatCurrency(student.rateCents)}</span>
-                    <span style={{ textAlign: "center", color: "var(--text-muted)" }}>|</span>
                     <span style={{ textAlign: "left" }}>{DAYS_FULL[d]}s{timeRange}</span>
+                    <span style={{ textAlign: "center", color: "var(--text-muted)" }}>|</span>
+                    <span style={{ textAlign: "left" }}>{formatDuration(student.durationMinutes)}, {formatCurrency(student.rateCents)}</span>
                   </>
                 );
               })()}

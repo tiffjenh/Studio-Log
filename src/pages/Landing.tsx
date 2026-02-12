@@ -69,7 +69,7 @@ export default function Landing() {
         <div className="landing__card">
           {/* Logo + app name */}
           <div className="landing__brand">
-            <div className="landing__logo" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "white" }}>
+            <div className="landing__logo" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
               <LogoIcon size={28} />
             </div>
             <div className="landing__brand-text">
