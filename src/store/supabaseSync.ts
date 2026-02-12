@@ -11,6 +11,12 @@ function rowToStudent(r: Record<string, unknown>): Student {
     dayOfWeek: r.day_of_week as number,
     timeOfDay: (r.time_of_day as string) || "",
     location: (r.location as string) || undefined,
+    scheduleChangeFromDate: (r.schedule_change_from_date as string) || undefined,
+    scheduleChangeDayOfWeek: r.schedule_change_day_of_week != null ? (r.schedule_change_day_of_week as number) : undefined,
+    scheduleChangeTimeOfDay: (r.schedule_change_time_of_day as string) || undefined,
+    scheduleChangeDurationMinutes: r.schedule_change_duration_minutes != null ? (r.schedule_change_duration_minutes as number) : undefined,
+    scheduleChangeRateCents: r.schedule_change_rate_cents != null ? (r.schedule_change_rate_cents as number) : undefined,
+    terminatedFromDate: (r.terminated_from_date as string) || undefined,
   };
 }
 
@@ -123,6 +129,12 @@ export async function addStudentSupabase(uid: string, student: Omit<Student, "id
       day_of_week: student.dayOfWeek,
       time_of_day: student.timeOfDay,
       location: student.location ?? null,
+      schedule_change_from_date: student.scheduleChangeFromDate ?? null,
+      schedule_change_day_of_week: student.scheduleChangeDayOfWeek ?? null,
+      schedule_change_time_of_day: student.scheduleChangeTimeOfDay ?? null,
+      schedule_change_duration_minutes: student.scheduleChangeDurationMinutes ?? null,
+      schedule_change_rate_cents: student.scheduleChangeRateCents ?? null,
+      terminated_from_date: student.terminatedFromDate ?? null,
     })
     .select()
     .single();
@@ -140,6 +152,12 @@ export async function updateStudentSupabase(uid: string, id: string, updates: Pa
   if (updates.dayOfWeek != null) row.day_of_week = updates.dayOfWeek;
   if (updates.timeOfDay != null) row.time_of_day = updates.timeOfDay;
   if (updates.location !== undefined) row.location = updates.location ?? null;
+  if (updates.scheduleChangeFromDate !== undefined) row.schedule_change_from_date = updates.scheduleChangeFromDate || null;
+  if (updates.scheduleChangeDayOfWeek !== undefined) row.schedule_change_day_of_week = updates.scheduleChangeDayOfWeek ?? null;
+  if (updates.scheduleChangeTimeOfDay !== undefined) row.schedule_change_time_of_day = updates.scheduleChangeTimeOfDay || null;
+  if (updates.scheduleChangeDurationMinutes !== undefined) row.schedule_change_duration_minutes = updates.scheduleChangeDurationMinutes ?? null;
+  if (updates.scheduleChangeRateCents !== undefined) row.schedule_change_rate_cents = updates.scheduleChangeRateCents ?? null;
+  if (updates.terminatedFromDate !== undefined) row.terminated_from_date = updates.terminatedFromDate || null;
   if (Object.keys(row).length) await supabase.from("students").update(row).eq("id", id).eq("user_id", uid);
 }
 
@@ -171,9 +189,10 @@ export async function addLessonSupabase(uid: string, lesson: Omit<Lesson, "id">)
 export async function updateLessonSupabase(uid: string, id: string, updates: Partial<Lesson>): Promise<void> {
   if (!supabase) return;
   const row: Record<string, unknown> = {};
+  if (updates.date != null) row.date = updates.date;
   if (updates.durationMinutes != null) row.duration_minutes = updates.durationMinutes;
   if (updates.amountCents != null) row.amount_cents = updates.amountCents;
-  if (updates.completed != null) row.completed = updates.completed;
+  if (updates.completed !== undefined) row.completed = updates.completed;
   if (updates.note !== undefined) row.note = updates.note ?? null;
   if (Object.keys(row).length) await supabase.from("lessons").update(row).eq("id", id).eq("user_id", uid);
 }

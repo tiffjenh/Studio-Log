@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
-import { formatCurrency, getStudentsForDay, getLessonForStudentOnDate, toDateKey } from "@/utils/earnings";
+import { formatCurrency, getStudentsForDay, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, toDateKey } from "@/utils/earnings";
 import type { Student } from "@/types";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -29,8 +29,12 @@ export default function Calendar() {
 
   const dateKey = toDateKey(selectedDate);
   const dayOfWeek = selectedDate.getDay();
-  const todaysStudents = getStudentsForDay(data.students, dayOfWeek);
-  const todayEarnings = data.lessons.filter((l) => l.date === dateKey && l.completed).reduce((s, l) => s + l.amountCents, 0);
+  const todaysStudents = getStudentsForDay(data.students, dayOfWeek, dateKey);
+  const todaysStudentIds = new Set(todaysStudents.map((s) => s.id));
+  // Only count completed lessons for students who are on today's schedule (avoids orphan lessons and matches Schedule list)
+  const todayEarnings = data.lessons
+    .filter((l) => l.date === dateKey && l.completed && todaysStudentIds.has(l.studentId))
+    .reduce((s, l) => s + l.amountCents, 0);
   const stripDates = getFiveDays(viewCenter);
 
   // Always center the 5-day strip on the selected date when it changes
@@ -54,7 +58,7 @@ export default function Calendar() {
     else {
       const student = data.students.find((s) => s.id === studentId);
       if (!student) return;
-      addLesson({ studentId, date: dateKey, durationMinutes: student.durationMinutes, amountCents: student.rateCents, completed: true });
+      addLesson({ studentId, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: true });
     }
   };
 
@@ -62,16 +66,16 @@ export default function Calendar() {
     const existing = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
     if (existing) navigate(`/edit-lesson/${existing.id}`);
     else {
-      const id = await addLesson({ studentId: student.id, date: dateKey, durationMinutes: student.durationMinutes, amountCents: student.rateCents, completed: false });
+      const id = await addLesson({ studentId: student.id, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: false });
       if (id) navigate(`/edit-lesson/${id}`);
     }
   };
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <Link to="/" style={{ color: "var(--text)", textDecoration: "none" }}>← Back</Link>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>Calendar</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <Link to="/" style={{ color: "var(--text)", textDecoration: "none", fontSize: 15 }}>← Back</Link>
+        <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0 }}>Calendar</h1>
         <Link to="/add-student" style={{ color: "var(--text)", textDecoration: "none", fontSize: 24 }}>+</Link>
       </div>
       <div style={{ marginBottom: 16, position: "relative" }} ref={monthPickerRef}>
@@ -85,7 +89,7 @@ export default function Calendar() {
         </button>
 
         {monthPickerOpen && (
-          <div className="card" style={{ position: "absolute", left: 16, right: 16, maxWidth: 360, padding: 16, boxShadow: "0 10px 40px rgba(0,0,0,0.15)", zIndex: 50, marginBottom: 16 }}>
+          <div className="float-card" style={{ position: "absolute", left: 16, right: 16, maxWidth: 360, zIndex: 50, marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <button type="button" onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth(), 1), -1))} style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}>‹</button>
               <span style={{ fontWeight: 600 }}>{monthPickerView.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
@@ -170,12 +174,14 @@ export default function Calendar() {
         todaysStudents.map((student) => {
           const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
           const completed = lesson?.completed ?? false;
-          const amount = lesson?.amountCents ?? student.rateCents;
-          const duration = lesson?.durationMinutes ?? student.durationMinutes;
-          const display = duration >= 60 ? `${duration / 60} hour / ${formatCurrency(student.rateCents)}` : `${duration} mins ${formatCurrency(student.rateCents)}`;
+          const effectiveDuration = getEffectiveDurationMinutes(student, dateKey);
+          const effectiveRate = getEffectiveRateCents(student, dateKey);
+          const amount = lesson?.amountCents ?? effectiveRate;
+          const duration = lesson?.durationMinutes ?? effectiveDuration;
+          const display = duration >= 60 ? `${duration / 60} hour / ${formatCurrency(effectiveRate)}` : `${duration} mins ${formatCurrency(effectiveRate)}`;
           return (
-            <div key={student.id} className="card" style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 22, background: "var(--primary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 12 }} onClick={() => handlePressLesson(student)}>
+            <div key={student.id} className="float-card" style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 24, background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 14, flexShrink: 0 }} onClick={() => handlePressLesson(student)}>
                 {student.firstName[0]}{student.lastName[0]}
               </div>
               <div style={{ flex: 1 }} onClick={() => handlePressLesson(student)}>
@@ -190,8 +196,9 @@ export default function Calendar() {
           );
         })
       )}
-      <div style={{ marginTop: 24, padding: 16, background: "var(--card)", borderRadius: 12, border: "1px solid var(--border)" }}>
-        <strong>Today&apos;s Earnings {formatCurrency(todayEarnings)}</strong>
+      <div className="float-card" style={{ marginTop: 24, padding: 18 }}>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Today&apos;s earnings</div>
+        <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(todayEarnings)}</div>
       </div>
     </>
   );

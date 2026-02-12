@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { hasSupabase } from "@/lib/supabase";
 import { signInSupabase, signUpSupabase } from "@/store/supabaseSync";
+import LogoIcon from "@/components/LogoIcon";
 
 export default function Landing() {
   const { setUser } = useStoreContext();
@@ -68,7 +69,9 @@ export default function Landing() {
       <div className="landing__inner">
         {/* Logo + app name */}
         <div className="landing__brand">
-          <div className="landing__logo">P</div>
+          <div className="landing__logo" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "white" }}>
+            <LogoIcon size={32} />
+          </div>
           <h1 className="landing__title">Studio Log</h1>
           <p className="landing__tagline">Track lessons and earnings. Simple.</p>
         </div>

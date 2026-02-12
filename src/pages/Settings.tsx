@@ -209,18 +209,19 @@ export default function Settings() {
 
   if (!user) return null;
 
-  const rowStyle: React.CSSProperties = { display: "flex", alignItems: "center", padding: "12px 0", borderBottom: "1px solid var(--border)" };
+  const rowStyle: React.CSSProperties = { display: "flex", alignItems: "center", padding: "14px 0", borderBottom: "1px solid rgba(201, 123, 148, 0.1)" };
   const inputStyle: React.CSSProperties = { flex: 2, padding: 8, fontSize: 16, border: "1px solid var(--border)", borderRadius: 8 };
 
   return (
     <>
-      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Settings</h1>
+      <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, marginBottom: 24 }}>Settings</h1>
       {!hasSupabase() && (
         <p style={{ marginBottom: 24, fontSize: 14, color: "var(--text-muted)" }}>
           Using local storage. Add Supabase to sync across browsers (see SETUP-SUPABASE.md).
         </p>
       )}
-      <div className="card" style={{ marginBottom: 24 }}>
+      <div className="float-card" style={{ marginBottom: 24 }}>
+        <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, margin: "0 0 16px", color: "var(--text-muted)" }}>Profile</h2>
         <div style={rowStyle}>
           <span style={{ flex: 1 }}>Name</span>
           {editing === "name" ? (
@@ -260,9 +261,9 @@ export default function Settings() {
           <button type="button" style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
         </div>
       </div>
-      <button type="button" className="btn btn-pink" style={{ width: "100%", marginBottom: 24 }} onClick={handleLogOut}>Log Out</button>
-      <div className="card" style={{ marginBottom: 24, padding: 16 }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>Import lessons (attendance matrix)</div>
+      <button type="button" className="btn btn-pink pill" style={{ width: "100%", marginBottom: 24, borderRadius: "var(--radius-pill)" }} onClick={handleLogOut}>Log Out</button>
+      <div className="float-card" style={{ marginBottom: 24, padding: 20 }}>
+        <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, margin: "0 0 12px", color: "var(--text-muted)" }}>Import lessons (attendance matrix)</h2>
         <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--text-muted)" }}>
           First row: student names. First column: dates (e.g. 1/1, 1/4). Put &quot;Y&quot; if they attended. Uses each student&apos;s rate. Students must already exist.
         </p>
@@ -308,8 +309,8 @@ export default function Settings() {
           </div>
         )}
       </div>
-      <div className="card" style={{ marginBottom: 24, padding: 16 }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>Import lessons (row format)</div>
+      <div className="float-card" style={{ marginBottom: 24, padding: 20 }}>
+        <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, margin: "0 0 12px", color: "var(--text-muted)" }}>Import lessons (row format)</h2>
         <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--text-muted)" }}>
           CSV needs: <code>first_name</code>, <code>last_name</code>, <code>date</code> (YYYY-MM-DD or M/D/YYYY), <code>duration_minutes</code>, <code>amount</code> (dollars) or <code>amount_cents</code>. Optional: <code>completed</code>, <code>note</code>. Students must already exist.
         </p>
@@ -330,8 +331,8 @@ export default function Settings() {
         </button>
       </div>
       {hasSupabase() && (
-        <div className="card" style={{ marginBottom: 24, padding: 16 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Synced to cloud</div>
+        <div className="float-card" style={{ marginBottom: 24, padding: 20 }}>
+          <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, margin: "0 0 8px", color: "var(--text-muted)" }}>Synced to cloud</h2>
           <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--text-muted)" }}>
             Logged in as <strong>{user.email}</strong>. Data is shared across devices when you use this account.
           </p>

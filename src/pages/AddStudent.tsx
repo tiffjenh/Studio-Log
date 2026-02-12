@@ -63,7 +63,8 @@ export default function AddStudent() {
               key={m}
               type="button"
               onClick={() => setDurationMinutes(m)}
-              style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid var(--border)", background: durationMinutes === m ? "var(--primary)" : "var(--card)", color: durationMinutes === m ? "white" : "var(--text)" }}
+              className={durationMinutes === m ? "pill pill--active" : "pill"}
+              style={{ padding: "10px 16px" }}
             >
               {m === 60 ? "1 hour" : m === 90 ? "1.5 hours" : m === 120 ? "2 hours" : `${m} min`}
             </button>
@@ -74,7 +75,7 @@ export default function AddStudent() {
         <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Day of week</label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
           {DAYS.map((d, i) => (
-            <button key={i} type="button" onClick={() => setDayOfWeek(i)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: dayOfWeek === i ? "var(--primary)" : "var(--card)", color: dayOfWeek === i ? "white" : "var(--text)", fontSize: 13 }}>
+            <button key={i} type="button" onClick={() => setDayOfWeek(i)} className={dayOfWeek === i ? "pill pill--active" : "pill"} style={{ fontSize: 13 }}>
               {d.slice(0, 3)}
             </button>
           ))}

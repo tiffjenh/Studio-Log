@@ -28,10 +28,31 @@ export function toDateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Dedupe lessons to one per (studentId, date), keeping first (matches getLessonForStudentOnDate). */
+export function dedupeLessons(lessons: Lesson[]): Lesson[] {
+  const byKey = new Map<string, Lesson>();
+  for (const l of lessons) {
+    const key = `${l.studentId}|${l.date}`;
+    if (!byKey.has(key)) byKey.set(key, l);
+  }
+  return [...byKey.values()];
+}
+
 export function earnedThisWeek(lessons: Lesson[], ref: Date): number {
   const { start, end } = getWeekBounds(ref);
-  return lessons
-    .filter((l) => l.completed && l.date >= toDateKey(start) && l.date <= toDateKey(end))
+  const startKey = toDateKey(start);
+  const endKey = toDateKey(end);
+  const inWeek = lessons.filter((l) => l.date >= startKey && l.date <= endKey);
+  return dedupeLessons(inWeek)
+    .filter((l) => l.completed)
+    .reduce((sum, l) => sum + l.amountCents, 0);
+}
+
+/** Sum completed earnings in a date range, one lesson per (studentId, date). */
+export function earnedInDateRange(lessons: Lesson[], startKey: string, endKey: string): number {
+  const inRange = lessons.filter((l) => l.date >= startKey && l.date <= endKey);
+  return dedupeLessons(inRange)
+    .filter((l) => l.completed)
     .reduce((sum, l) => sum + l.amountCents, 0);
 }
 
@@ -45,10 +66,46 @@ export function potentialThisWeek(students: Student[], ref: Date): number {
   return total;
 }
 
-export function getStudentsForDay(students: Student[], dayOfWeek: number): Student[] {
+/** Effective day and time for a student on a given date (respects schedule change from date). */
+export function getEffectiveSchedule(student: Student, dateKey: string): { dayOfWeek: number; timeOfDay: string } {
+  const from = student.scheduleChangeFromDate;
+  if (from && dateKey >= from && student.scheduleChangeDayOfWeek != null && student.scheduleChangeTimeOfDay != null) {
+    return { dayOfWeek: student.scheduleChangeDayOfWeek, timeOfDay: student.scheduleChangeTimeOfDay };
+  }
+  return { dayOfWeek: student.dayOfWeek, timeOfDay: student.timeOfDay };
+}
+
+/** Effective lesson duration (minutes) for a student on a given date. */
+export function getEffectiveDurationMinutes(student: Student, dateKey: string): number {
+  const from = student.scheduleChangeFromDate;
+  if (from && dateKey >= from && student.scheduleChangeDurationMinutes != null) {
+    return student.scheduleChangeDurationMinutes;
+  }
+  return student.durationMinutes;
+}
+
+/** Effective lesson rate (cents) for a student on a given date. */
+export function getEffectiveRateCents(student: Student, dateKey: string): number {
+  const from = student.scheduleChangeFromDate;
+  if (from && dateKey >= from && student.scheduleChangeRateCents != null) {
+    return student.scheduleChangeRateCents;
+  }
+  return student.rateCents;
+}
+
+/** Students who have a lesson on the given day. Pass dateKey to respect schedule changes and termination. */
+export function getStudentsForDay(students: Student[], dayOfWeek: number, dateKey?: string): Student[] {
   return students
-    .filter((s) => s.dayOfWeek === dayOfWeek)
-    .sort((a, b) => (a.timeOfDay > b.timeOfDay ? 1 : -1));
+    .filter((s) => {
+      if (s.terminatedFromDate && dateKey && dateKey > s.terminatedFromDate) return false;
+      const { dayOfWeek: d } = dateKey ? getEffectiveSchedule(s, dateKey) : { dayOfWeek: s.dayOfWeek };
+      return d === dayOfWeek;
+    })
+    .sort((a, b) => {
+      const ta = dateKey ? getEffectiveSchedule(a, dateKey).timeOfDay : a.timeOfDay;
+      const tb = dateKey ? getEffectiveSchedule(b, dateKey).timeOfDay : b.timeOfDay;
+      return ta > tb ? 1 : -1;
+    });
 }
 
 export function getLessonForStudentOnDate(lessons: Lesson[], studentId: string, dateKey: string): Lesson | undefined {

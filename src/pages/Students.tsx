@@ -7,7 +7,21 @@ import { parseStudentCSV, rowToStudent } from "@/utils/csvImport";
 import type { Student } from "@/types";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+const roundBtnStyle = {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  display: "flex",
+  alignItems: "center" as const,
+  justifyContent: "center" as const,
+  border: "none",
+  cursor: "pointer" as const,
+  fontSize: 14,
+  fontWeight: 600,
+};
 
 /** Parse timeOfDay string to minutes from midnight for sorting. Returns 9999 if unparseable (sorts last). */
 function timeOfDayToMinutes(t: string): number {
@@ -123,50 +137,83 @@ export default function Students() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>Students</h1>
-        {hasSupabase() && (
-          <button
-            type="button"
-            onClick={async () => { setRefreshing(true); await reload(); setRefreshing(false); }}
-            disabled={refreshing}
-            style={{ padding: "8px 12px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: "pointer" }}
-            title="Pull latest from cloud"
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0 }}>Students</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {hasSupabase() && (
+            <button
+              type="button"
+              onClick={async () => { setRefreshing(true); await reload(); setRefreshing(false); }}
+              disabled={refreshing}
+              className="pill"
+              style={{ minHeight: 40 }}
+              title="Pull latest from cloud"
+            >
+              {refreshing ? "…" : "↻ Sync"}
+            </button>
+          )}
+          <Link
+            to="/add-student"
+            title="Add student"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              background: "var(--accent-gradient)",
+              color: "white",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 22,
+              fontWeight: 300,
+              lineHeight: 1,
+              textDecoration: "none",
+              flexShrink: 0,
+            }}
           >
-            {refreshing ? "…" : "↻ Sync"}
-          </button>
-        )}
+            +
+          </Link>
+        </div>
       </div>
       <input
         type="search"
         placeholder="Search by name"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 12, fontSize: 16 }}
+        className="search-frosted"
+        style={{ marginBottom: 16 }}
       />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
         <button
           type="button"
           onClick={() => setDayFilter(null)}
-          style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: dayFilter === null ? "var(--primary)" : "var(--card)", color: dayFilter === null ? "white" : "var(--text)" }}
+          style={{
+            ...roundBtnStyle,
+            background: dayFilter === null ? "var(--accent-gradient)" : "rgba(201, 123, 148, 0.12)",
+            color: dayFilter === null ? "white" : "var(--text)",
+          }}
         >
           All
         </button>
-        {DAY_LABELS.map((label, i) => (
+        {DAY_SHORT.map((label, i) => (
           <button
             key={i}
             type="button"
             onClick={() => setDayFilter(i)}
-            style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: dayFilter === i ? "var(--primary)" : "var(--card)", color: dayFilter === i ? "white" : "var(--text)" }}
+            style={{
+              ...roundBtnStyle,
+              background: dayFilter === i ? "var(--accent-gradient)" : "rgba(201, 123, 148, 0.12)",
+              color: dayFilter === i ? "white" : "var(--text)",
+            }}
           >
             {label}
           </button>
         ))}
       </div>
       {filtered.length === 0 ? (
-        <div style={{ padding: 24, textAlign: "center" }}>
-          <p style={{ color: "var(--text-muted)", marginBottom: 8 }}>
-            {search ? "No students match your search" : dayFilter !== null ? `No students on ${DAY_LABELS[dayFilter!]}` : "No students yet. Add one below."}
+        <div className="float-card" style={{ padding: 28, textAlign: "center" }}>
+          <p style={{ color: "var(--text-muted)", marginBottom: 8, fontSize: 15 }}>
+            {search ? "No students match your search" : dayFilter !== null ? `No students on ${DAY_LABELS[dayFilter!]}` : "No students yet. Tap + to add one."}
           </p>
           {hasSupabase() && data.user && !search && dayFilter === null && (
             <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
@@ -175,27 +222,27 @@ export default function Students() {
           )}
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {byDayThenTime.map(({ dayIndex, students }) => (
             <div key={dayIndex}>
               {dayFilter === null && (
-                <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-muted)", margin: "0 0 8px", textTransform: "none" }}>
+                <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, color: "var(--text-muted)", margin: "0 0 12px", textTransform: "none" }}>
                   {DAY_FULL[dayIndex]}
                 </h2>
               )}
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {students.map((s) => (
                   <Link key={s.id} to={`/students/${s.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                    <div className="card" style={{ display: "flex", alignItems: "center" }}>
-                      <div style={{ width: 44, height: 44, borderRadius: 22, background: "var(--primary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 12 }}>
+                    <div className="float-card" style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: 24, background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
                         {s.firstName[0]}{s.lastName[0]}
                       </div>
-                      <div style={{ flex: 1 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
                         <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{durationStr(s)} / {formatCurrency(s.rateCents)}</div>
                         <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{DAY_LABELS[s.dayOfWeek]}{s.timeOfDay && s.timeOfDay !== "—" ? ` at ${s.timeOfDay}` : ""}</div>
                       </div>
-                      <span style={{ color: "var(--text-muted)" }}>›</span>
+                      <span style={{ color: "var(--text-muted)", fontSize: 18 }}>›</span>
                     </div>
                   </Link>
                 ))}
@@ -216,14 +263,8 @@ export default function Students() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={importing}
-          style={{
-            padding: "12px 16px",
-            fontSize: 14,
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--card)",
-            cursor: importing ? "not-allowed" : "pointer",
-          }}
+          className="pill"
+          style={{ padding: "12px 20px", cursor: importing ? "not-allowed" : "pointer" }}
           title="Columns: first_name, last_name, rate, duration_minutes, day_of_week, time_of_day"
         >
           {importing ? "Importing…" : "Import students from CSV"}
@@ -244,7 +285,6 @@ export default function Students() {
             )}
           </div>
         )}
-        <Link to="/add-student" className="btn btn-primary" style={{ width: "100%", textAlign: "center", textDecoration: "none" }}>+ Add Student</Link>
       </div>
     </>
   );

@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
-import { formatCurrency } from "@/utils/earnings";
+import { formatCurrency, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents } from "@/utils/earnings";
 import type { Student, Lesson } from "@/types";
 
 const DURATIONS = [30, 45, 60, 90, 120];
@@ -34,10 +34,19 @@ function formatMinutesToTime(totalMinutes: number): string {
   return m > 0 ? `${hour}:${String(m).padStart(2, "0")}${period}` : `${hour}${period}`;
 }
 
-function formatTimeRange(startTimeStr: string, durationMinutes: number): string {
+/** Compact range e.g. "5-6pm". */
+function formatCompactTimeRange(startTimeStr: string, durationMinutes: number): string {
   const startMins = parseTimeToMinutes(startTimeStr);
-  if (startMins == null) return startTimeStr;
+  if (startMins == null) return "—";
   const endMins = startMins + durationMinutes;
+  const h1 = Math.floor(startMins / 60) % 24;
+  const h2 = Math.floor(endMins / 60) % 24;
+  const period = h1 >= 12 ? "pm" : "am";
+  const hour1 = h1 === 0 ? 12 : h1 > 12 ? h1 - 12 : h1;
+  const hour2 = h2 === 0 ? 12 : h2 > 12 ? h2 - 12 : h2;
+  const m1 = startMins % 60;
+  const m2 = endMins % 60;
+  if (m1 === 0 && m2 === 0) return `${hour1}-${hour2}${period}`;
   return `${formatMinutesToTime(startMins)} - ${formatMinutesToTime(endMins)}`;
 }
 
@@ -90,6 +99,14 @@ export default function StudentDetail() {
   const [rateDollars, setRateDollars] = useState(student ? String((student.rateCents / 100).toFixed(2)) : "");
   const [dayOfWeek, setDayOfWeek] = useState(student?.dayOfWeek ?? 1);
   const [timeOfDay, setTimeOfDay] = useState(student?.timeOfDay ?? "");
+  const [scheduleChangeFromDate, setScheduleChangeFromDate] = useState(student?.scheduleChangeFromDate ?? "");
+  const [scheduleChangeDayOfWeek, setScheduleChangeDayOfWeek] = useState<number | undefined>(student?.scheduleChangeDayOfWeek);
+  const [scheduleChangeTimeOfDay, setScheduleChangeTimeOfDay] = useState(student?.scheduleChangeTimeOfDay ?? "");
+  const [scheduleChangeDurationMinutes, setScheduleChangeDurationMinutes] = useState<number | undefined>(student?.scheduleChangeDurationMinutes);
+  const [scheduleChangeRateDollars, setScheduleChangeRateDollars] = useState(student?.scheduleChangeRateCents != null ? String((student.scheduleChangeRateCents / 100).toFixed(2)) : "");
+  const [terminatedFromDate, setTerminatedFromDate] = useState(student?.terminatedFromDate ?? "");
+  const [changeScheduleOpen, setChangeScheduleOpen] = useState(false);
+  const [terminateStudentOpen, setTerminateStudentOpen] = useState(false);
 
   useEffect(() => {
     if (student) {
@@ -100,6 +117,12 @@ export default function StudentDetail() {
       setRateDollars(String((student.rateCents / 100).toFixed(2)));
       setDayOfWeek(student.dayOfWeek);
       setTimeOfDay(student.timeOfDay);
+      setScheduleChangeFromDate(student.scheduleChangeFromDate ?? "");
+      setScheduleChangeDayOfWeek(student.scheduleChangeDayOfWeek);
+      setScheduleChangeTimeOfDay(student.scheduleChangeTimeOfDay ?? "");
+      setScheduleChangeDurationMinutes(student.scheduleChangeDurationMinutes);
+      setScheduleChangeRateDollars(student.scheduleChangeRateCents != null ? String((student.scheduleChangeRateCents / 100).toFixed(2)) : "");
+      setTerminatedFromDate(student.terminatedFromDate ?? "");
     }
   }, [id]);
 
@@ -112,6 +135,12 @@ export default function StudentDetail() {
     setRateDollars(String((student.rateCents / 100).toFixed(2)));
     setDayOfWeek(student.dayOfWeek);
     setTimeOfDay(student.timeOfDay);
+    setScheduleChangeFromDate(student.scheduleChangeFromDate ?? "");
+    setScheduleChangeDayOfWeek(student.scheduleChangeDayOfWeek);
+    setScheduleChangeTimeOfDay(student.scheduleChangeTimeOfDay ?? "");
+    setScheduleChangeDurationMinutes(student.scheduleChangeDurationMinutes);
+    setScheduleChangeRateDollars(student.scheduleChangeRateCents != null ? String((student.scheduleChangeRateCents / 100).toFixed(2)) : "");
+    setTerminatedFromDate(student.terminatedFromDate ?? "");
   };
 
   const handleStartEdit = () => {
@@ -133,7 +162,18 @@ export default function StudentDetail() {
       setError("Time must include AM or PM (e.g. 5:00 PM)");
       return;
     }
+    const fromDateTrimmed = scheduleChangeFromDate.trim();
+    if (fromDateTrimmed && (scheduleChangeDayOfWeek == null || scheduleChangeTimeOfDay.trim() === "")) {
+      setError("If you set a \"From date\" for schedule change, please select day of week and time.");
+      return;
+    }
+    const scheduleTimeTrimmed = scheduleChangeTimeOfDay.trim();
+    if (fromDateTrimmed && scheduleTimeTrimmed && scheduleTimeTrimmed !== "—" && !/am|pm/i.test(scheduleTimeTrimmed)) {
+      setError("Schedule change time must include AM or PM (e.g. 5:00 PM).");
+      return;
+    }
     const rateCents = Math.round(parseFloat(rateDollars) * 100) || 0;
+    const scheduleChangeRateCents = scheduleChangeRateDollars.trim() ? Math.round(parseFloat(scheduleChangeRateDollars) * 100) || undefined : undefined;
     const updates: Partial<Student> = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
@@ -141,6 +181,12 @@ export default function StudentDetail() {
       rateCents,
       dayOfWeek,
       timeOfDay: trimmed || "—",
+      scheduleChangeFromDate: fromDateTrimmed || undefined,
+      scheduleChangeDayOfWeek: fromDateTrimmed && scheduleChangeDayOfWeek != null ? scheduleChangeDayOfWeek : undefined,
+      scheduleChangeTimeOfDay: fromDateTrimmed && scheduleTimeTrimmed ? (scheduleTimeTrimmed === "—" ? "—" : scheduleTimeTrimmed) : undefined,
+      scheduleChangeDurationMinutes: fromDateTrimmed && scheduleChangeDurationMinutes != null ? scheduleChangeDurationMinutes : undefined,
+      scheduleChangeRateCents: fromDateTrimmed && scheduleChangeRateCents != null ? scheduleChangeRateCents : undefined,
+      terminatedFromDate: terminatedFromDate.trim() || undefined,
     };
     try {
       await updateStudent(student.id, updates);
@@ -167,31 +213,31 @@ export default function StudentDetail() {
 
   return (
     <>
-      <Link to="/students" style={{ display: "inline-flex", alignItems: "center", marginBottom: 16, color: "var(--text)", textDecoration: "none" }}>← Back</Link>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{student.firstName} {student.lastName}</h1>
+      <Link to="/students" style={{ display: "inline-flex", alignItems: "center", marginBottom: 20, color: "var(--text)", textDecoration: "none", fontSize: 15 }}>← Back</Link>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0 }}>{student.firstName} {student.lastName}</h1>
         {!editing ? (
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" onClick={handleStartEdit} className="btn btn-primary" style={{ padding: "10px 16px" }}>Edit</button>
-            <button type="button" onClick={handleDelete} style={{ padding: "10px 16px", border: "1px solid #dc2626", borderRadius: 8, background: "transparent", color: "#dc2626", fontWeight: 600, cursor: "pointer" }}>Delete</button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button type="button" onClick={handleStartEdit} className="pill pill--active" style={{ padding: "10px 18px" }}>Edit</button>
+            <button type="button" onClick={handleDelete} className="pill" style={{ border: "1px solid rgba(220,38,38,0.4)", color: "#dc2626", background: "transparent" }}>Delete</button>
           </div>
         ) : null}
       </div>
 
       {editing ? (
-        <form onSubmit={handleSaveEdit} className="card" style={{ marginBottom: 24 }}>
+        <form onSubmit={handleSaveEdit} className="float-card" style={{ marginBottom: 28 }}>
           <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>First name</label>
           <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" style={inputStyle} required />
           <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Last name</label>
           <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" style={inputStyle} required />
           <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Lesson duration</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
             {DURATIONS.map((m) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => setDurationMinutes(m)}
-                style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid var(--border)", background: durationMinutes === m ? "var(--primary)" : "var(--card)", color: durationMinutes === m ? "white" : "var(--text)" }}
+                className={durationMinutes === m ? "pill pill--active" : "pill"}
               >
                 {m === 60 ? "1 hour" : m === 90 ? "1.5 hours" : m === 120 ? "2 hours" : `${m} min`}
               </button>
@@ -200,15 +246,77 @@ export default function StudentDetail() {
           <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Rate ($)</label>
           <input type="number" step="0.01" value={rateDollars} onChange={(e) => setRateDollars(e.target.value)} placeholder="70" style={inputStyle} required />
           <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Day of week</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
             {DAYS_FULL.map((d, i) => (
-              <button key={i} type="button" onClick={() => setDayOfWeek(i)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: dayOfWeek === i ? "var(--primary)" : "var(--card)", color: dayOfWeek === i ? "white" : "var(--text)", fontSize: 13 }}>
+              <button key={i} type="button" onClick={() => setDayOfWeek(i)} className={dayOfWeek === i ? "pill pill--active" : "pill"} style={{ fontSize: 13 }}>
                 {d.slice(0, 3)}
               </button>
             ))}
           </div>
           <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Time (e.g. 5:00 PM) – include AM or PM</label>
           <input type="text" value={timeOfDay} onChange={(e) => setTimeOfDay(e.target.value)} placeholder="5:00 PM" style={inputStyle} />
+
+          <div style={{ marginTop: 24, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+            <button
+              type="button"
+              onClick={() => setChangeScheduleOpen((o) => !o)}
+              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--bg)", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--text)", textTransform: "uppercase", letterSpacing: "0.06em" }}
+            >
+              Change schedule
+              <span style={{ fontSize: 18 }}>{changeScheduleOpen ? "▼" : "▶"}</span>
+            </button>
+            {changeScheduleOpen && (
+              <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
+                <p style={{ fontSize: 14, color: "var(--text-muted)", margin: "12px 0" }}>From the date below, this student&apos;s lessons use the new day, time, duration, and rate.</p>
+                <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>From date (e.g. July 1)</label>
+                <input type="date" value={scheduleChangeFromDate} onChange={(e) => setScheduleChangeFromDate(e.target.value)} style={inputStyle} />
+                <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>New day of week</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+                  {DAYS_FULL.map((d, i) => (
+                    <button key={i} type="button" onClick={() => setScheduleChangeDayOfWeek(i)} className={scheduleChangeDayOfWeek === i ? "pill pill--active" : "pill"} style={{ fontSize: 13 }}>
+                      {d.slice(0, 3)}
+                    </button>
+                  ))}
+                </div>
+                <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>New time (e.g. 5:00 PM)</label>
+                <input type="text" value={scheduleChangeTimeOfDay} onChange={(e) => setScheduleChangeTimeOfDay(e.target.value)} placeholder="5:00 PM" style={inputStyle} />
+                <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>New lesson duration</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+                  {DURATIONS.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setScheduleChangeDurationMinutes(m)}
+                      className={scheduleChangeDurationMinutes === m ? "pill pill--active" : "pill"}
+                    >
+                      {m === 60 ? "1 hour" : m === 90 ? "1.5 hours" : m === 120 ? "2 hours" : `${m} min`}
+                    </button>
+                  ))}
+                </div>
+                <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>New rate ($)</label>
+                <input type="number" step="0.01" value={scheduleChangeRateDollars} onChange={(e) => setScheduleChangeRateDollars(e.target.value)} placeholder="e.g. 60" style={inputStyle} />
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+            <button
+              type="button"
+              onClick={() => setTerminateStudentOpen((o) => !o)}
+              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--bg)", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--text)", textTransform: "uppercase", letterSpacing: "0.06em" }}
+            >
+              Terminate student
+              <span style={{ fontSize: 18 }}>{terminateStudentOpen ? "▼" : "▶"}</span>
+            </button>
+            {terminateStudentOpen && (
+              <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
+                <p style={{ fontSize: 14, color: "var(--text-muted)", margin: "12px 0" }}>Select the date of this student&apos;s last lesson. After that date they will no longer appear on the calendar or dashboard.</p>
+                <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Last lesson date</label>
+                <input type="date" value={terminatedFromDate} onChange={(e) => setTerminatedFromDate(e.target.value)} style={inputStyle} />
+              </div>
+            )}
+          </div>
+
           {error ? <p style={{ color: "#dc2626", marginBottom: 16 }}>{error}</p> : null}
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
             <button type="submit" className="btn btn-primary">Save</button>
@@ -217,44 +325,60 @@ export default function StudentDetail() {
         </form>
       ) : (
         <>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div className="card">
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{thisMonthLessons.length}/{availableThisMonth}</div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{thisMonthLessons.length} of {availableThisMonth} lessons for {monthLabel}</div>
+          <div className="hero-card" style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 12 }}>Progress & earnings</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              <div>
+                <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400, lineHeight: 1.3 }}>{thisMonthLessons.length} out of {availableThisMonth} lessons</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{monthLabel}</div>
               </div>
-              <div className="card">
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{formatCurrency(earningsThisMonth)}</div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Total earnings this month</div>
+              <div>
+                <div className="headline-serif" style={{ fontSize: 24, fontWeight: 400 }}>{formatCurrency(earningsThisMonth)}</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>This month</div>
               </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div className="card">
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{thisYearLessons.length}/{availableThisYear}</div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{thisYearLessons.length} lessons out of {availableThisYear} (YTD)</div>
+              <div>
+                <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400, lineHeight: 1.3 }}>{thisYearLessons.length} out of {availableThisYear} lessons</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>YTD</div>
               </div>
-              <div className="card">
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{formatCurrency(earningsYTD)}</div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Total earnings YTD</div>
+              <div>
+                <div className="headline-serif" style={{ fontSize: 24, fontWeight: 400 }}>{formatCurrency(earningsYTD)}</div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>YTD earnings</div>
               </div>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 0.6fr 1fr 1.4fr", gap: 8, marginBottom: 24, minWidth: 0 }}>
-            <div className="card" style={{ minWidth: 0, padding: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{formatDuration(student.durationMinutes)}</div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Lesson time</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
+            <div className="float-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>
+                {(() => {
+                  const todayKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+                  const { dayOfWeek: d, timeOfDay: t } = getEffectiveSchedule(student, todayKey);
+                  return (
+                    <>
+                      {DAYS_FULL[d]}s
+                      {t && t !== "—" ? ` @ ${formatCompactTimeRange(t, student.durationMinutes)}` : ""}
+                    </>
+                  );
+                })()}
+              </div>
+              {student.scheduleChangeFromDate && (
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>
+                  From {new Date(student.scheduleChangeFromDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}: {DAYS_FULL[student.scheduleChangeDayOfWeek ?? 0]}s
+                  {student.scheduleChangeTimeOfDay && student.scheduleChangeTimeOfDay !== "—"
+                    ? ` @ ${formatCompactTimeRange(student.scheduleChangeTimeOfDay, student.scheduleChangeDurationMinutes ?? student.durationMinutes)}`
+                    : ""}
+                  {(student.scheduleChangeDurationMinutes != null || student.scheduleChangeRateCents != null)
+                    ? ` · ${formatDuration(student.scheduleChangeDurationMinutes ?? student.durationMinutes)}, ${formatCurrency(student.scheduleChangeRateCents ?? student.rateCents)}`
+                    : ""}
+                </div>
+              )}
+              {student.terminatedFromDate && (
+                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>Last lesson: {new Date(student.terminatedFromDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+              )}
             </div>
-            <div className="card" style={{ minWidth: 0, padding: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{formatCurrency(student.rateCents)}</div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Rate</div>
-            </div>
-            <div className="card" style={{ minWidth: 0, padding: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{DAYS_FULL[student.dayOfWeek]}</div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Day</div>
-            </div>
-            <div className="card" style={{ minWidth: 0, padding: 10, textAlign: "center" }}>
-              <div style={{ fontSize: 14, fontWeight: 700, wordBreak: "break-word", lineHeight: 1.3 }}>{student.timeOfDay && student.timeOfDay !== "—" ? formatTimeRange(student.timeOfDay, student.durationMinutes) : "—"}</div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Time</div>
+            <div className="float-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>
+                {formatDuration(student.durationMinutes)}, {formatCurrency(student.rateCents)}
+              </div>
             </div>
           </div>
         </>
@@ -289,53 +413,42 @@ export default function StudentDetail() {
                 })
                 .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
               return (
-                <div key={year} style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Lessons Log {year}</h3>
-                  <div className="card" style={{ overflowX: "auto", padding: 0 }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, tableLayout: "fixed" }}>
-                      <colgroup>
-                        <col style={{ width: "40%" }} />
-                        <col style={{ width: "28%" }} />
-                        <col style={{ width: "32%" }} />
-                      </colgroup>
-                      <thead>
-                        <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
-                          <th style={{ padding: "12px 6px 12px 16px", fontWeight: 600 }}>Month</th>
-                          <th style={{ padding: "12px 4px", fontWeight: 600, textAlign: "center" }}># of lessons</th>
-                          <th style={{ padding: "12px 16px 12px 12px", fontWeight: 600, textAlign: "right" }}>Total Earned</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map(({ monthKey, monthName, lessons, available, totalEarned }) => (
-                          <Fragment key={monthKey}>
-                            <tr
-                              onClick={() => setExpandedMonth((prev) => (prev === monthKey ? null : monthKey))}
-                              style={{ borderBottom: "1px solid var(--border)", cursor: "pointer", background: expandedMonth === monthKey ? "var(--bg)" : undefined }}
-                            >
-                              <td style={{ padding: "12px 6px 12px 16px", whiteSpace: "nowrap" }}>
-                                {expandedMonth === monthKey ? "▼ " : "▶ "}{monthName}
-                              </td>
-                              <td style={{ padding: "12px 4px", textAlign: "center" }}>{lessons.length}/{available}</td>
-                              <td style={{ padding: "12px 16px 12px 12px", fontWeight: 600, textAlign: "right" }}>{formatCurrency(totalEarned)}</td>
-                            </tr>
-                            {expandedMonth === monthKey && (
-                              <tr>
-                                <td colSpan={3} style={{ padding: "0 16px 12px", background: "var(--bg)", verticalAlign: "top" }}>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingTop: 8 }}>
-                                    {lessons.map((l) => (
-                                      <div key={l.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: 0 }}>
-                                        <span>{l.date}</span>
-                                        <span style={{ fontWeight: 600 }}>{formatCurrency(l.amountCents)}</span>
-                                      </div>
-                                    ))}
+                <div key={year} style={{ marginBottom: 28 }}>
+                  <h3 className="headline-serif" style={{ fontSize: 20, fontWeight: 400, marginBottom: 14 }}>Lessons Log {year}</h3>
+                  <div className="float-card" style={{ overflow: "hidden", padding: 0 }}>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      {rows.map(({ monthKey, monthName, lessons, available, totalEarned }) => (
+                        <Fragment key={monthKey}>
+                          <div
+                            onClick={() => setExpandedMonth((prev) => (prev === monthKey ? null : monthKey))}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: "14px 20px",
+                              cursor: "pointer",
+                              background: expandedMonth === monthKey ? "var(--hero-gradient-subtle)" : undefined,
+                              borderBottom: "1px solid rgba(201, 123, 148, 0.08)",
+                            }}
+                          >
+                            <span style={{ fontWeight: 500 }}>{expandedMonth === monthKey ? "▼ " : "▶ "}{monthName}</span>
+                            <span style={{ fontSize: 14, color: "var(--text-muted)" }}>{lessons.length}/{available} · {formatCurrency(totalEarned)}</span>
+                          </div>
+                          {expandedMonth === monthKey && (
+                            <div style={{ padding: "12px 20px 16px", background: "var(--hero-gradient-subtle)" }}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                {lessons.map((l) => (
+                                  <div key={l.id} className="float-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 12, margin: 0 }}>
+                                    <span style={{ fontSize: 14 }}>{l.date}</span>
+                                    <span style={{ fontWeight: 600 }}>{formatCurrency(l.amountCents)}</span>
                                   </div>
-                                </td>
-                              </tr>
-                            )}
-                          </Fragment>
-                        ))}
-                      </tbody>
-                    </table>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </Fragment>
+                      ))}
+                    </div>
                   </div>
                 </div>
               );

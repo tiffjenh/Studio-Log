@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
+import LogoIcon from "@/components/LogoIcon";
 import {
   formatCurrency,
   earnedThisWeek,
+  earnedInDateRange,
   getMonthBounds,
   getStudentsForDay,
+  getEffectiveSchedule,
+  getEffectiveDurationMinutes,
+  getEffectiveRateCents,
   getLessonForStudentOnDate,
   toDateKey,
 } from "@/utils/earnings";
@@ -16,29 +21,36 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 function LessonRow({
   student,
   lesson,
+  dateKey,
   onToggle,
   onEdit,
 }: {
   student: Student;
   lesson: Lesson | undefined;
+  dateKey: string;
   onToggle: (v: boolean) => void;
   onEdit: () => void;
 }) {
   const completed = lesson?.completed ?? false;
-  const duration = lesson?.durationMinutes ?? student.durationMinutes;
-  const amount = lesson?.amountCents ?? student.rateCents;
+  const effectiveDuration = getEffectiveDurationMinutes(student, dateKey);
+  const effectiveRate = getEffectiveRateCents(student, dateKey);
+  const duration = lesson?.durationMinutes ?? effectiveDuration;
+  const amount = lesson?.amountCents ?? effectiveRate;
   const rateText = duration >= 60 ? `${duration / 60} hour` : `${duration} mins`;
+  const { timeOfDay } = getEffectiveSchedule(student, dateKey);
   return (
-    <div className="card" style={{ display: "flex", alignItems: "center", marginBottom: 8, cursor: "pointer" }} onClick={onEdit}>
-      <div style={{ width: 44, height: 44, borderRadius: 22, background: "var(--primary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 12 }}>
+    <div className="float-card" style={{ display: "flex", alignItems: "center", marginBottom: 12, cursor: "pointer", gap: 16 }} onClick={onEdit}>
+      <div style={{ width: 48, height: 48, borderRadius: 24, background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
         {student.firstName[0]}{student.lastName[0]}
       </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 600 }}>{student.firstName} {student.lastName}</div>
-        <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{rateText} / {formatCurrency(student.rateCents)}</div>
-        <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{student.timeOfDay && student.timeOfDay !== "—" ? student.timeOfDay : ""}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontFamily: "var(--font-sans)" }}>{student.firstName} {student.lastName}</div>
+        <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{rateText} / {formatCurrency(effectiveRate)}</div>
+        {timeOfDay && timeOfDay !== "—" && (
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{timeOfDay}</div>
+        )}
       </div>
-      <label className="toggle-wrap" onClick={(e) => e.stopPropagation()}>
+      <label className="toggle-wrap" onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
         <input type="checkbox" checked={completed} onChange={(e) => onToggle(e.target.checked)} />
         {completed && <span style={{ color: "var(--success)", fontWeight: 600 }}>{formatCurrency(amount)}</span>}
       </label>
@@ -61,22 +73,19 @@ export default function Dashboard() {
   const dateKey = toDateKey(selectedDate);
   const dayOfWeek = selectedDate.getDay();
   const earned = earnedThisWeek(data.lessons, today);
-  const firstName = data.user?.name?.split(" ")[0] ?? "there";
+  const studioOwnerName = data.user?.name?.trim().split(/\s+/)[0] ?? null;
+  const dashboardTitle = studioOwnerName ? `${studioOwnerName}'s Studio Log` : "Studio Log";
 
   const { start: monthStart, end: monthEnd } = getMonthBounds(today);
   const monthStartKey = toDateKey(monthStart);
   const monthEndKey = toDateKey(monthEnd);
-  const earningsThisMonth = data.lessons
-    .filter((l) => l.completed && l.date >= monthStartKey && l.date <= monthEndKey)
-    .reduce((sum, l) => sum + l.amountCents, 0);
+  const earningsThisMonth = earnedInDateRange(data.lessons, monthStartKey, monthEndKey);
 
   const year = today.getFullYear();
   const ytdEndKey = toDateKey(today);
-  const earningsYTD = data.lessons
-    .filter((l) => l.completed && l.date >= `${year}-01-01` && l.date <= ytdEndKey)
-    .reduce((sum, l) => sum + l.amountCents, 0);
+  const earningsYTD = earnedInDateRange(data.lessons, `${year}-01-01`, ytdEndKey);
 
-  const todaysStudents = getStudentsForDay(data.students, dayOfWeek);
+  const todaysStudents = getStudentsForDay(data.students, dayOfWeek, dateKey);
   const isToday = toDateKey(selectedDate) === toDateKey(today);
 
   const handleToggle = (studentId: string, completed: boolean) => {
@@ -85,7 +94,7 @@ export default function Dashboard() {
     else {
       const student = data.students.find((s) => s.id === studentId);
       if (!student) return;
-      addLesson({ studentId, date: dateKey, durationMinutes: student.durationMinutes, amountCents: student.rateCents, completed: true });
+      addLesson({ studentId, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: true });
     }
   };
 
@@ -93,57 +102,66 @@ export default function Dashboard() {
     const existing = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
     if (existing) navigate(`/edit-lesson/${existing.id}`);
     else {
-      const id = await addLesson({ studentId: student.id, date: dateKey, durationMinutes: student.durationMinutes, amountCents: student.rateCents, completed: false });
+      const id = await addLesson({ studentId: student.id, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: false });
       if (id) navigate(`/edit-lesson/${id}`);
     }
   };
 
   return (
     <>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <div className="logo-gradient" style={{ width: 48, height: 48, borderRadius: 12, color: "white", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 24, marginBottom: 8 }}>P</div>
-        <h2 style={{ fontSize: 22, fontWeight: 700 }}>Welcome back, {firstName}</h2>
+      <div style={{ textAlign: "center", marginBottom: 28 }}>
+        <div className="logo-gradient" style={{ width: 52, height: 52, borderRadius: 16, color: "white", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+          <LogoIcon size={28} />
+        </div>
+        <h2 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0, color: "var(--text)" }}>{dashboardTitle}</h2>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
-        <div className="card">
-          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Earned This Week</div>
-          <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(earned)}</div>
-        </div>
-        <div className="card">
-          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Earnings This Month</div>
-          <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(earningsThisMonth)}</div>
-        </div>
-        <div className="card">
-          <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 4 }}>Earnings YTD</div>
-          <div style={{ fontSize: 24, fontWeight: 700 }}>{formatCurrency(earningsYTD)}</div>
+      <div className="hero-card" style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 16 }}>Earnings overview</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
+          <div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>This week</div>
+            <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earned)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>This month</div>
+            <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earningsThisMonth)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>YTD</div>
+            <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earningsYTD)}</div>
+          </div>
         </div>
       </div>
-      <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        {isToday ? "Today's lessons" : "Lessons"}
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+        <h3 className="headline-serif" style={{ fontSize: 22, fontWeight: 400, margin: 0 }}>
+          {isToday ? "Today's lessons" : "Lessons"}
+        </h3>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <button
             type="button"
             onClick={() => setSelectedDate((d) => addDays(d, -1))}
-            style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 16 }}
+            className="pill"
+            style={{ minWidth: 36, minHeight: 36, padding: "8px 12px" }}
             aria-label="Previous day"
           >
             ‹
           </button>
-          <span style={{ minWidth: 120 }}>
-            ({DAY_NAMES[dayOfWeek]}, {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })})
+          <span style={{ minWidth: 100, textAlign: "center", fontSize: 14, color: "var(--text-muted)" }}>
+            {DAY_NAMES[dayOfWeek]}, {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           </span>
           <button
             type="button"
             onClick={() => setSelectedDate((d) => addDays(d, 1))}
-            style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 16 }}
+            className="pill"
+            style={{ minWidth: 36, minHeight: 36, padding: "8px 12px" }}
             aria-label="Next day"
           >
             ›
           </button>
         </span>
-      </h3>
+      </div>
       {todaysStudents.length === 0 ? (
-        <p style={{ color: "var(--text-muted)", padding: 24 }}>No lessons scheduled for this day</p>
+        <p style={{ color: "var(--text-muted)", padding: 28, fontSize: 15 }}>No lessons scheduled for this day</p>
       ) : (
         todaysStudents.map((student) => {
           const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
@@ -152,13 +170,14 @@ export default function Dashboard() {
               key={student.id}
               student={student}
               lesson={lesson}
+              dateKey={dateKey}
               onToggle={(v) => handleToggle(student.id, v)}
               onEdit={() => handleEdit(student)}
             />
           );
         })
       )}
-      <div style={{ marginTop: 24, textAlign: "center" }}>
+      <div style={{ marginTop: 28, textAlign: "center" }}>
         <Link to="/calendar" className="btn btn-primary" style={{ textDecoration: "none" }}>View Calendar</Link>
       </div>
     </>

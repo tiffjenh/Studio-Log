@@ -1,18 +1,34 @@
 :root {
-  --primary: #6366f1;
-  --primary-dark: #4f46e5;
-  --purple: #8b5cf6;
-  --pink: #ec4899;
-  --bg: #f8fafc;
+  --primary: #c97b94;
+  --primary-dark: #b86b84;
+  --purple: #b794c4;
+  --pink: #e8a0b5;
+  --bg: #faf8f9;
   --card: #ffffff;
-  --text: #1e293b;
-  --text-muted: #64748b;
+  --text: #2d1f24;
+  --text-muted: #7d6b72;
   --success: #22c55e;
-  --border: #e2e8f0;
+  --border: rgba(201, 123, 148, 0.18);
   --nav-height: 56px;
   --safe-top: env(safe-area-inset-top, 0);
   --safe-bottom: env(safe-area-inset-bottom, 0);
-  --gradient-primary: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  --gradient-primary: linear-gradient(135deg, #e8b4c4 0%, #d4a5b5 50%, #c9b1d4 100%);
+  --hero-gradient: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 40%, #e1bee7 100%);
+  --hero-gradient-subtle: linear-gradient(135deg, #fdf2f6 0%, #fce8ef 50%, #f5eef9 100%);
+  --accent-gradient: linear-gradient(135deg, #e8a0b5 0%, #c97b94 50%, #b794c4 100%);
+  --accent-gradient-soft: linear-gradient(135deg, #f5c6d4 0%, #e8a0b5 100%);
+  --font-serif: "DM Serif Display", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --radius-card: 24px;
+  --radius-pill: 999px;
+  --shadow-soft: 0 4px 20px rgba(201, 123, 148, 0.08);
+  --shadow-card: 0 8px 32px rgba(201, 123, 148, 0.06);
+  --shadow-elevated: 0 12px 40px rgba(201, 123, 148, 0.1);
+  --space-xs: 6px;
+  --space-sm: 12px;
+  --space-md: 20px;
+  --space-lg: 28px;
+  --space-xl: 40px;
 }
 
 * {
@@ -25,7 +41,7 @@ html {
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   color: var(--text);
   min-height: 100dvh;
@@ -61,7 +77,9 @@ input, select, textarea {
   right: 0;
   height: calc(var(--nav-height) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
-  background: var(--card);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: space-around;
@@ -69,6 +87,7 @@ input, select, textarea {
   z-index: 100;
   max-width: 900px;
   margin: 0 auto;
+  box-shadow: 0 -4px 24px rgba(201, 123, 148, 0.04);
 }
 
 .bottom-nav a {
@@ -76,12 +95,27 @@ input, select, textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 4px;
   color: var(--text-muted);
   text-decoration: none;
-  font-size: 12px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 14px;
+  transition: color 0.2s;
+}
+
+.bottom-nav__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.bottom-nav__label {
+  white-space: nowrap;
 }
 
 .bottom-nav a.active {
@@ -89,12 +123,74 @@ input, select, textarea {
   font-weight: 600;
 }
 
+.bottom-nav a.active .bottom-nav__icon {
+  color: var(--primary);
+}
+
 /* Cards */
 .card {
   background: var(--card);
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  padding: 16px;
+  border-radius: var(--radius-card);
+  border: none;
+  padding: var(--space-md);
+  box-shadow: var(--shadow-card);
+}
+
+.hero-card {
+  background: var(--hero-gradient);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-card);
+  border: none;
+}
+
+.float-card {
+  background: var(--card);
+  border-radius: var(--radius-card);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-card);
+  border: none;
+}
+
+.headline-serif {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.pill {
+  border-radius: var(--radius-pill);
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  background: rgba(201, 123, 148, 0.12);
+  color: var(--text);
+}
+
+.pill--active {
+  background: var(--accent-gradient);
+  color: white;
+}
+
+.search-frosted {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: var(--radius-card);
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-soft);
+  font-size: 16px;
+}
+
+.card-list-item {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(201, 123, 148, 0.08);
+}
+.card-list-item:last-child {
+  border-bottom: none;
 }
 
 /* Buttons */
@@ -113,13 +209,13 @@ input, select, textarea {
 }
 
 .btn-primary {
-  background: var(--gradient-primary);
+  background: var(--accent-gradient);
   color: white;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+  box-shadow: var(--shadow-soft);
 }
 
 .btn-pink {
-  background: var(--pink);
+  background: var(--accent-gradient);
   color: white;
 }
 
@@ -143,7 +239,7 @@ input, select, textarea {
 }
 
 .toggle-wrap input:checked {
-  background: var(--primary);
+  background: var(--accent-gradient);
 }
 
 .toggle-wrap input::after {
@@ -164,8 +260,8 @@ input, select, textarea {
 }
 
 .logo-gradient {
-  background: var(--gradient-primary);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  background: var(--accent-gradient);
+  box-shadow: var(--shadow-soft);
 }
 
 /* Loading */
@@ -203,8 +299,8 @@ input, select, textarea {
 .landing__logo {
   width: 56px;
   height: 56px;
-  border-radius: 14px;
-  background: var(--gradient-primary);
+  border-radius: 16px;
+  background: var(--accent-gradient);
   color: white;
   display: inline-flex;
   align-items: center;
@@ -212,12 +308,13 @@ input, select, textarea {
   font-size: 28px;
   font-weight: 700;
   margin-bottom: 12px;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: var(--shadow-soft);
 }
 
 .landing__title {
+  font-family: var(--font-serif);
   font-size: 26px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--text);
   margin: 0 0 6px 0;
 }
@@ -252,7 +349,7 @@ input, select, textarea {
 }
 
 .landing__tab--active {
-  background: var(--primary);
+  background: var(--accent-gradient);
   color: white;
   font-weight: 600;
 }

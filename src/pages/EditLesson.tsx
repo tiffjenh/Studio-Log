@@ -17,10 +17,12 @@ export default function EditLesson() {
   const { data, updateLesson } = useStoreContext();
   const lesson = data.lessons.find((l) => l.id === id);
   const student = lesson ? data.students.find((s) => s.id === lesson.studentId) : null;
+  const [lessonDate, setLessonDate] = useState(lesson?.date ?? "");
   const [durationMinutes, setDurationMinutes] = useState(lesson?.durationMinutes ?? 60);
   const [note, setNote] = useState(lesson?.note ?? "");
 
   useEffect(() => {
+    if (lesson) setLessonDate(lesson.date);
     if (lesson) setDurationMinutes(lesson.durationMinutes);
     if (lesson) setNote(lesson.note ?? "");
   }, [lesson?.id, student?.id]);
@@ -29,47 +31,41 @@ export default function EditLesson() {
 
   const ratePerHour = student.rateCents / (student.durationMinutes / 60);
   const amountCents = Math.round((ratePerHour * durationMinutes) / 60);
-  const dateStr = lesson.date;
-  const [y, m, d] = dateStr.split("-").map(Number);
+  const [y, m, d] = lessonDate.split("-").map(Number);
   const date = new Date(y, m - 1, d);
-  const dateFormatted = date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const dateFormatted = isNaN(date.getTime()) ? lessonDate : date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   const timeStr = student.timeOfDay ? ` - ${student.timeOfDay}` : "";
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    updateLesson(lesson.id, { durationMinutes, amountCents, note: note.trim() || undefined });
+    const updates: Parameters<typeof updateLesson>[2] = { durationMinutes, amountCents, note: note.trim() || undefined };
+    if (/^\d{4}-\d{2}-\d{2}$/.test(lessonDate)) updates.date = lessonDate;
+    updateLesson(lesson.id, updates);
     navigate(-1);
   };
 
   return (
     <>
       <Link to="/" style={{ display: "inline-flex", marginBottom: 24, color: "var(--text)", textDecoration: "none" }}>← Back</Link>
-      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Edit Lesson</h1>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <span style={{ marginRight: 8 }}>←</span>
-        <span>{dateFormatted}{timeStr}</span>
-        <span style={{ marginLeft: 8 }}>→</span>
-      </div>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <div style={{ width: 48, height: 48, borderRadius: 24, background: "var(--primary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 12 }}>
-            {student.firstName[0]}{student.lastName[0]}
-          </div>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 18 }}>{student.firstName} {student.lastName}</div>
-            <div style={{ color: "var(--text-muted)" }}>
-              {durationMinutes >= 60 ? `${durationMinutes / 60} hr ${durationMinutes % 60 ? ` ${durationMinutes % 60} mins` : ""}` : `${durationMinutes} mins`} &gt; {formatCurrency(amountCents)}
+      <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, marginBottom: 24 }}>Edit Lesson</h1>
+      <form onSubmit={handleSave}>
+        <div className="float-card" style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <div style={{ width: 48, height: 48, borderRadius: 24, background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 14, flexShrink: 0 }}>
+              {student.firstName[0]}{student.lastName[0]}
             </div>
-            {note && <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 4, fontStyle: "italic" }}>{note}</div>}
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 18 }}>{student.firstName} {student.lastName}</div>
+              <div style={{ color: "var(--text-muted)" }}>{dateFormatted}{timeStr}</div>
+            </div>
           </div>
         </div>
-      </div>
-      <form onSubmit={handleSave}>
-        <textarea
-          placeholder="e.g. Updated today's lesson to 1 hr 30 mins for $105."
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          style={{ width: "100%", minHeight: 80, padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 24, fontSize: 16 }}
+        <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Reschedule to date</label>
+        <input
+          type="date"
+          value={lessonDate}
+          onChange={(e) => setLessonDate(e.target.value)}
+          style={{ width: "100%", padding: 14, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 20, fontSize: 16 }}
         />
         <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Duration</label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
@@ -78,16 +74,24 @@ export default function EditLesson() {
               key={opt.minutes}
               type="button"
               onClick={() => setDurationMinutes(opt.minutes)}
-              style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid var(--border)", background: durationMinutes === opt.minutes ? "var(--primary)" : "var(--card)", color: durationMinutes === opt.minutes ? "white" : "var(--text)" }}
+              className={durationMinutes === opt.minutes ? "pill pill--active" : "pill"}
+              style={{ padding: "10px 16px" }}
             >
               {opt.label}
             </button>
           ))}
         </div>
-        <div className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div className="float-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <span>Lesson Rate</span>
           <span style={{ color: "var(--text-muted)" }}>{formatCurrency(student.rateCents)} &gt;</span>
         </div>
+        <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Notes</label>
+        <textarea
+          placeholder="e.g. Updated today's lesson to 1 hr 30 mins for $105."
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          style={{ width: "100%", minHeight: 80, padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 24, fontSize: 16 }}
+        />
         <button type="submit" className="btn btn-primary" style={{ width: "100%" }}>Save</button>
       </form>
     </>

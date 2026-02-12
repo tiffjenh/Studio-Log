@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppData, Lesson, Student, User } from "@/types";
 import { hasSupabase } from "@/lib/supabase";
 import {
@@ -185,12 +185,48 @@ export function useStore() {
   const addLesson = useCallback(
     async (lesson: Omit<Lesson, "id">) => {
       if (hasSupabase() && data.user) {
+        const existingIdRef = { current: "" };
+        const pendingId = `pending_${lesson.studentId}_${lesson.date}`;
+        setData((prev) => {
+          const ex = prev.lessons.find((l) => l.studentId === lesson.studentId && l.date === lesson.date);
+          if (ex) {
+            existingIdRef.current = ex.id;
+            return prev;
+          }
+          existingIdRef.current = "";
+          return { ...prev, lessons: [...prev.lessons, { ...lesson, id: pendingId }] };
+        });
+        if (existingIdRef.current) {
+          updateLesson(existingIdRef.current, lesson);
+          return existingIdRef.current;
+        }
         try {
           const created = await addLessonSupabase(data.user.id, lesson);
-          setData((prev) => ({ ...prev, lessons: [...prev.lessons, created] }));
+          const syncAfterMerge = { current: null as { completed: boolean; amountCents: number; durationMinutes: number } | null };
+          setData((prev) => {
+            const pending = prev.lessons.find((l) => l.id === pendingId);
+            const merged = pending
+              ? { ...created, completed: pending.completed, amountCents: pending.amountCents, durationMinutes: pending.durationMinutes }
+              : created;
+            if (pending && (pending.completed !== created.completed || pending.amountCents !== created.amountCents)) {
+              syncAfterMerge.current = { completed: merged.completed, amountCents: merged.amountCents, durationMinutes: merged.durationMinutes };
+            }
+            return {
+              ...prev,
+              lessons: prev.lessons.map((l) => (l.id === pendingId ? merged : l)),
+            };
+          });
+          if (syncAfterMerge.current) {
+            try {
+              await updateLessonSupabase(data.user.id, created.id, syncAfterMerge.current);
+            } catch {
+              /* ignore */
+            }
+          }
           return created.id;
         } catch (e) {
           console.error(e);
+          setData((prev) => ({ ...prev, lessons: prev.lessons.filter((l) => l.id !== pendingId) }));
           return "";
         }
       }
@@ -203,13 +239,15 @@ export function useStore() {
 
   const updateLesson = useCallback(
     async (id: string, updates: Partial<Lesson>) => {
+      // Apply to local state immediately so toggle and earnings stay in sync (optimistic update)
+      const applyUpdate = (prev: AppData) => ({
+        ...prev,
+        lessons: prev.lessons.map((l) => (l.id === id ? { ...l, ...updates } : l)),
+      });
+      setData(applyUpdate);
       if (hasSupabase() && data.user) {
         try {
           await updateLessonSupabase(data.user.id, id, updates);
-          setData((prev) => ({
-            ...prev,
-            lessons: prev.lessons.map((l) => (l.id === id ? { ...l, ...updates } : l)),
-          }));
         } catch (e) {
           console.error(e);
         }

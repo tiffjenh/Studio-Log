@@ -7,6 +7,14 @@ export interface Student {
   dayOfWeek: number;
   timeOfDay: string;
   location?: string;
+  /** From this date (YYYY-MM-DD), use scheduleChange* fields instead of dayOfWeek/timeOfDay/duration/rate. */
+  scheduleChangeFromDate?: string;
+  scheduleChangeDayOfWeek?: number;
+  scheduleChangeTimeOfDay?: string;
+  scheduleChangeDurationMinutes?: number;
+  scheduleChangeRateCents?: number;
+  /** Last lesson date (YYYY-MM-DD). After this date the student no longer appears on the calendar/dashboard. */
+  terminatedFromDate?: string;
 }
 
 export interface Lesson {
