@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { AppData, Lesson, Student, User } from "@/types";
 import { hasSupabase } from "@/lib/supabase";
 import {

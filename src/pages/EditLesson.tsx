@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { formatCurrency } from "@/utils/earnings";
+import type { Lesson } from "@/types";
 
 const DURATIONS = [
   { label: "30 min", minutes: 30 },
@@ -38,7 +39,7 @@ export default function EditLesson() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const updates: Parameters<typeof updateLesson>[2] = { durationMinutes, amountCents, note: note.trim() || undefined };
+    const updates: Partial<Lesson> = { durationMinutes, amountCents, note: note.trim() || undefined };
     if (/^\d{4}-\d{2}-\d{2}$/.test(lessonDate)) updates.date = lessonDate;
     updateLesson(lesson.id, updates);
     navigate(-1);

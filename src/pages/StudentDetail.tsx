@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
-import { formatCurrency, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents } from "@/utils/earnings";
+import { formatCurrency, getEffectiveSchedule } from "@/utils/earnings";
 import type { Student, Lesson } from "@/types";
 
 const DURATIONS = [30, 45, 60, 90, 120];
