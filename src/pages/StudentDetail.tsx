@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { formatCurrency, getEffectiveSchedule } from "@/utils/earnings";
+import DatePicker from "@/components/DatePicker";
 import type { Student, Lesson } from "@/types";
 
 const DURATIONS = [30, 45, 60, 90, 120];
@@ -269,7 +270,9 @@ export default function StudentDetail() {
               <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
                 <p style={{ fontSize: 14, color: "var(--text-muted)", margin: "12px 0" }}>From the date below, this student&apos;s lessons use the new day, time, duration, and rate.</p>
                 <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>From date (e.g. July 1)</label>
-                <input type="date" value={scheduleChangeFromDate} onChange={(e) => setScheduleChangeFromDate(e.target.value)} style={inputStyle} />
+                <div style={{ marginBottom: 16 }}>
+                  <DatePicker value={scheduleChangeFromDate} onChange={setScheduleChangeFromDate} placeholder="Select date" />
+                </div>
                 <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>New day of week</label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
                   {DAYS_FULL.map((d, i) => (
@@ -312,7 +315,9 @@ export default function StudentDetail() {
               <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
                 <p style={{ fontSize: 14, color: "var(--text-muted)", margin: "12px 0" }}>Select the date of this student&apos;s last lesson. After that date they will no longer appear on the calendar or dashboard.</p>
                 <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Last lesson date</label>
-                <input type="date" value={terminatedFromDate} onChange={(e) => setTerminatedFromDate(e.target.value)} style={inputStyle} />
+                <div style={{ marginBottom: 16 }}>
+                  <DatePicker value={terminatedFromDate} onChange={setTerminatedFromDate} placeholder="Select date" />
+                </div>
               </div>
             )}
           </div>

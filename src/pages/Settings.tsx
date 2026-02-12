@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { hasSupabase } from "@/lib/supabase";
-import { updatePasswordSupabase } from "@/store/supabaseSync";
+import { updatePasswordSupabase, updateEmailSupabase } from "@/store/supabaseSync";
 import { parseLessonCSV, parseLessonMatrixCSV, rowToLesson, type ImportResult } from "@/utils/csvImport";
 import { getLessonForStudentOnDate } from "@/utils/earnings";
 import type { Student } from "@/types";
@@ -19,21 +19,26 @@ export default function Settings() {
   const user = data.user;
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
-  const [phone, setPhone] = useState(user?.phone ?? "");
-  const [editing, setEditing] = useState<"name" | "email" | "phone" | "password" | null>(null);
+  const [editing, setEditing] = useState<"name" | "email" | "password" | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
-  const handleSave = async (field: "name" | "email" | "phone") => {
+  const handleSave = async (field: "name" | "email") => {
     if (!user) return;
     if (field === "name" && hasSupabase()) {
       await updateUserProfile({ name });
-    } else if (field === "phone" && hasSupabase()) {
-      await updateUserProfile({ phone });
+    } else if (field === "email" && hasSupabase()) {
+      const { error } = await updateEmailSupabase(email.trim());
+      if (error) {
+        setError(error);
+        return;
+      }
+      setUser({ ...user, email: email.trim() });
     } else {
-      setUser({ ...user, name: field === "name" ? name : user.name, email: field === "email" ? email : user.email, phone: field === "phone" ? phone : user.phone });
+      setUser({ ...user, name: field === "name" ? name : user.name, email: field === "email" ? email : user.email });
     }
+    setError("");
     setEditing(null);
   };
 
@@ -270,17 +275,6 @@ export default function Settings() {
           )}
           <button type="button" onClick={() => (editing === "email" ? handleSave("email") : setEditing("email"))} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
             {editing === "email" ? "Save" : "Edit"}
-          </button>
-        </div>
-        <div style={rowStyle}>
-          <span style={{ flex: 1 }}>Phone Number</span>
-          {editing === "phone" ? (
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} onBlur={() => handleSave("phone")} autoFocus />
-          ) : (
-            <span style={{ flex: 2 }}>{user.phone || "—"}</span>
-          )}
-          <button type="button" onClick={() => (editing === "phone" ? handleSave("phone") : setEditing("phone"))} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
-            {editing === "phone" ? "Save" : "Edit"}
           </button>
         </div>
         <div style={{ ...rowStyle, borderBottom: "none" }}>

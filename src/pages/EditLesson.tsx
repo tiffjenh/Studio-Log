@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { formatCurrency } from "@/utils/earnings";
+import DatePicker from "@/components/DatePicker";
 import type { Lesson } from "@/types";
 
 const DURATIONS = [
@@ -62,12 +63,9 @@ export default function EditLesson() {
           </div>
         </div>
         <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Reschedule to date</label>
-        <input
-          type="date"
-          value={lessonDate}
-          onChange={(e) => setLessonDate(e.target.value)}
-          style={{ width: "100%", padding: 14, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 20, fontSize: 16 }}
-        />
+        <div style={{ marginBottom: 20 }}>
+          <DatePicker value={lessonDate} onChange={setLessonDate} placeholder="Select date" />
+        </div>
         <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Duration</label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
           {DURATIONS.map((opt) => (

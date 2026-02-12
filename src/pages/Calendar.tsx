@@ -107,22 +107,57 @@ export default function Calendar() {
         <button
           type="button"
           onClick={() => { setMonthPickerOpen((o) => !o); setMonthPickerView(selectedDate); }}
-          className="btn btn-primary"
-          style={{ marginBottom: 12 }}
+          className="pill pill--active"
+          style={{
+            marginBottom: 12,
+            minHeight: 48,
+            padding: "12px 20px",
+            border: "none",
+            borderRadius: "var(--radius-pill)",
+            background: "var(--accent-gradient)",
+            color: "white",
+            fontSize: 16,
+            fontWeight: 500,
+            fontFamily: "var(--font-sans)",
+            cursor: "pointer",
+            boxShadow: "var(--shadow-soft)",
+          }}
         >
           {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
         </button>
 
         {monthPickerOpen && (
-          <div className="float-card" style={{ position: "absolute", left: 16, right: 16, maxWidth: 360, zIndex: 50, marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <button type="button" onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth(), 1), -1))} style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}>‹</button>
-              <span style={{ fontWeight: 600 }}>{monthPickerView.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
-              <button type="button" onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 1))} style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}>›</button>
+          <div className="float-card" style={{ position: "absolute", left: 16, right: 16, maxWidth: 360, zIndex: 50, marginBottom: 16, padding: 16, boxShadow: "var(--shadow-elevated)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <button
+                type="button"
+                onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth(), 1), -1))}
+                style={{
+                  width: 36, height: 36, minWidth: 36, maxWidth: 36, minHeight: 36, maxHeight: 36, borderRadius: "50%",
+                  border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18,
+                  display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)",
+                }}
+                aria-label="Previous month"
+              >
+                ‹
+              </button>
+              <span style={{ fontWeight: 600, fontSize: 16, fontFamily: "var(--font-sans)" }}>{monthPickerView.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
+              <button
+                type="button"
+                onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 1))}
+                style={{
+                  width: 36, height: 36, minWidth: 36, maxWidth: 36, minHeight: 36, maxHeight: 36, borderRadius: "50%",
+                  border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18,
+                  display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)",
+                }}
+                aria-label="Next month"
+              >
+                ›
+              </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gridAutoRows: "32px", gap: 4, textAlign: "center", marginBottom: 8, alignItems: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, textAlign: "center", marginBottom: 8 }}>
               {DAYS_SHORT.map((label) => (
-                <div key={label} style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", lineHeight: 1 }}>{label}</div>
+                <div key={label} style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", fontFamily: "var(--font-sans)" }}>{label}</div>
               ))}
               {(() => {
                 const year = monthPickerView.getFullYear();
@@ -144,10 +179,10 @@ export default function Calendar() {
                       type="button"
                       onClick={() => { setSelectedDate(date); setMonthPickerOpen(false); }}
                       style={{
-                        width: 32, minWidth: 32, height: 32, minHeight: 32, maxHeight: 32, padding: 0, borderRadius: "50%", border: "none", cursor: "pointer", fontSize: 14, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center",
+                        width: 36, minWidth: 36, height: 36, minHeight: 36, maxHeight: 36, padding: 0, borderRadius: "50%", border: "none", cursor: "pointer", fontSize: 14, fontFamily: "var(--font-sans)", display: "flex", alignItems: "center", justifyContent: "center",
                         background: isSelected ? "var(--primary)" : "transparent",
                         color: isSelected ? "white" : isCurrentMonth ? "var(--text)" : "var(--text-muted)",
-                        opacity: isCurrentMonth ? 1 : 0.5,
+                        opacity: isCurrentMonth ? 1 : 0.6,
                       }}
                     >
                       {date.getDate()}

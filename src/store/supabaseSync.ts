@@ -121,6 +121,13 @@ export async function updateProfileSupabase(uid: string, updates: { name?: strin
   await supabase.from("profiles").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", uid);
 }
 
+export async function updateEmailSupabase(newEmail: string): Promise<{ error?: string }> {
+  if (!supabase) return { error: "Supabase not configured" };
+  const { data, error } = await supabase.auth.updateUser({ email: newEmail.trim() });
+  if (error) return { error: error.message };
+  return {};
+}
+
 export async function addStudentSupabase(uid: string, student: Omit<Student, "id">): Promise<Student> {
   if (!supabase) throw new Error("Supabase not configured");
   const { data: { session } } = await supabase.auth.getSession();

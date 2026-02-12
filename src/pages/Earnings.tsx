@@ -206,13 +206,22 @@ export default function Earnings() {
   return (
     <>
       <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, marginBottom: 20 }}>Earnings</h1>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
+      <div style={{ display: "flex", flexWrap: "nowrap", gap: 8, marginBottom: 20 }}>
         {TABS.map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setActiveTab(t)}
             className={activeTab === t ? "pill pill--active" : "pill"}
+            style={{
+              flex: "1 1 0",
+              minWidth: 0,
+              textAlign: "center",
+              fontFamily: "var(--font-sans)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
             {t}
           </button>
@@ -407,15 +416,16 @@ export default function Earnings() {
 
       {activeTab === "Daily" && (
         <>
-          <div className="hero-card" style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 8 }}>Week total</div>
-            <div className="headline-serif" style={{ fontSize: 26, fontWeight: 400 }}>{formatCurrency(dailyWeekTotal)}</div>
-            <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 4 }}>{dailyRangeStart} – {dailyRangeEnd}</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => setDailyWeekOffset((o) => o - 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Previous week">‹</button>
-            <span style={{ fontSize: 15, color: "var(--text-muted)" }}>{dailyRangeStart} – {dailyRangeEnd}</span>
-            <button type="button" onClick={() => setDailyWeekOffset((o) => o + 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next week">›</button>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, paddingBottom: 2 }}>
+              <button type="button" onClick={() => setDailyWeekOffset((o) => o - 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Previous week">‹</button>
+              <span style={{ fontSize: 15, color: "var(--text-muted)" }}>{dailyRangeStart}–{dailyRangeEnd}</span>
+              <button type="button" onClick={() => setDailyWeekOffset((o) => o + 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next week">›</button>
+            </div>
+            <div className="hero-card" style={{ flex: "0 0 auto", width: "fit-content", padding: "12px 16px", marginLeft: "auto" }}>
+              <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 4 }}>{dailyRangeStart}–{dailyRangeEnd} week total</div>
+              <div className="headline-serif" style={{ fontSize: 26, fontWeight: 400 }}>{formatCurrency(dailyWeekTotal)}</div>
+            </div>
           </div>
           <div className="float-card" style={{ marginBottom: 24 }}>
             <BarChart
