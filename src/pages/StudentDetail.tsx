@@ -210,7 +210,7 @@ export default function StudentDetail() {
     }
   };
 
-  const inputStyle: React.CSSProperties = { width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16 };
+  const inputStyle: React.CSSProperties = { width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, fontFamily: "var(--font-sans)" };
 
   return (
     <>
@@ -226,7 +226,7 @@ export default function StudentDetail() {
       </div>
 
       {editing ? (
-        <form onSubmit={handleSaveEdit} className="float-card" style={{ marginBottom: 28 }}>
+        <form onSubmit={handleSaveEdit} className="float-card" style={{ marginBottom: 28, fontFamily: "var(--font-sans)" }}>
           <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>First name</label>
           <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" style={inputStyle} required />
           <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Last name</label>
@@ -261,10 +261,10 @@ export default function StudentDetail() {
             <button
               type="button"
               onClick={() => setChangeScheduleOpen((o) => !o)}
-              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--bg)", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--text)", textTransform: "uppercase", letterSpacing: "0.06em" }}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-start", padding: "14px 16px", background: "var(--bg)", border: "none", cursor: "pointer", fontSize: 16, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text-muted)", textAlign: "left" }}
             >
-              Change schedule
               <span style={{ fontSize: 18 }}>{changeScheduleOpen ? "▼" : "▶"}</span>
+              Change schedule
             </button>
             {changeScheduleOpen && (
               <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
@@ -306,10 +306,10 @@ export default function StudentDetail() {
             <button
               type="button"
               onClick={() => setTerminateStudentOpen((o) => !o)}
-              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", background: "var(--bg)", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--text)", textTransform: "uppercase", letterSpacing: "0.06em" }}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-start", padding: "14px 16px", background: "var(--bg)", border: "none", cursor: "pointer", fontSize: 16, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text-muted)", textAlign: "left" }}
             >
-              Terminate student
               <span style={{ fontSize: 18 }}>{terminateStudentOpen ? "▼" : "▶"}</span>
+              Terminate student
             </button>
             {terminateStudentOpen && (
               <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)" }}>
@@ -325,7 +325,7 @@ export default function StudentDetail() {
           {error ? <p style={{ color: "#dc2626", marginBottom: 16 }}>{error}</p> : null}
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
             <button type="submit" className="btn btn-primary">Save</button>
-            <button type="button" onClick={handleCancelEdit} style={{ padding: "10px 16px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", color: "var(--text)", cursor: "pointer" }}>Cancel</button>
+            <button type="button" onClick={handleCancelEdit} className="btn" style={{ border: "1px solid var(--border)", background: "#ffffff", color: "var(--text)" }}>Cancel</button>
           </div>
         </form>
       ) : (
@@ -334,7 +334,7 @@ export default function StudentDetail() {
             <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 12 }}>Progress & earnings</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
               <div>
-                <div className="headline-serif" style={{ fontSize: 15, fontWeight: 400, lineHeight: 1.3 }}>{thisMonthLessons.length} out of {availableThisMonth} lessons</div>
+                <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400, lineHeight: 1.3, whiteSpace: "nowrap" }}>{thisMonthLessons.length} out of {availableThisMonth} lessons</div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{monthLabel}</div>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -342,7 +342,7 @@ export default function StudentDetail() {
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>This month</div>
               </div>
               <div>
-                <div className="headline-serif" style={{ fontSize: 15, fontWeight: 400, lineHeight: 1.3 }}>{thisYearLessons.length} out of {availableThisYear} lessons</div>
+                <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400, lineHeight: 1.3, whiteSpace: "nowrap" }}>{thisYearLessons.length} out of {availableThisYear} lessons</div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>YTD</div>
               </div>
               <div style={{ textAlign: "right" }}>

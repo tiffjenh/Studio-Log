@@ -64,19 +64,22 @@ export default function Landing() {
   };
 
   return (
-    <div className="landing">
+    <div className="landing landing--motion">
       <div className="landing__inner">
-        {/* Logo + app name */}
-        <div className="landing__brand">
-          <div className="landing__logo" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "white" }}>
-            <LogoIcon size={32} />
+        <div className="landing__card">
+          {/* Logo + app name */}
+          <div className="landing__brand">
+            <div className="landing__logo" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "white" }}>
+              <LogoIcon size={28} />
+            </div>
+            <div className="landing__brand-text">
+              <h1 className="landing__title">Studio Log</h1>
+              <p className="landing__tagline">track lessons and earnings</p>
+            </div>
           </div>
-          <h1 className="landing__title">Studio Log</h1>
-          <p className="landing__tagline">track lessons and earnings</p>
-        </div>
 
-        {/* Tabs: Log in | Sign up */}
-        <div className="landing__tabs">
+          {/* Tabs: Log in | Sign up */}
+          <div className="landing__tabs">
           <button
             type="button"
             className={`landing__tab ${mode === "login" ? "landing__tab--active" : ""}`}
@@ -119,7 +122,7 @@ export default function Landing() {
               <Link to="/forgot-password" className="landing__link landing__link--muted">
                 Forgot password?
               </Link>
-              <button type="button" className="landing__link" onClick={() => setMode("signup")}>
+              <button type="button" className="landing__link landing__link--muted" onClick={() => setMode("signup")}>
                 Don&apos;t have an account? Sign up
               </button>
             </div>
@@ -164,6 +167,7 @@ export default function Landing() {
             </div>
           </form>
         )}
+        </div>
       </div>
     </div>
   );
