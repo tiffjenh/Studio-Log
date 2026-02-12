@@ -20,6 +20,7 @@ export default function Settings() {
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [editing, setEditing] = useState<"name" | "email" | "password" | null>(null);
+  const [saveError, setSaveError] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -31,14 +32,14 @@ export default function Settings() {
     } else if (field === "email" && hasSupabase()) {
       const { error } = await updateEmailSupabase(email.trim());
       if (error) {
-        setError(error);
+        setSaveError(error);
         return;
       }
       setUser({ ...user, email: email.trim() });
     } else {
       setUser({ ...user, name: field === "name" ? name : user.name, email: field === "email" ? email : user.email });
     }
-    setError("");
+    setSaveError("");
     setEditing(null);
   };
 
@@ -277,6 +278,7 @@ export default function Settings() {
             {editing === "email" ? "Save" : "Edit"}
           </button>
         </div>
+        {saveError ? <p style={{ color: "#dc2626", marginTop: 8, marginBottom: 0 }}>{saveError}</p> : null}
         <div style={{ ...rowStyle, borderBottom: "none" }}>
           <span style={{ flex: 1 }}>Password</span>
           {editing === "password" ? (

@@ -123,7 +123,7 @@ export async function updateProfileSupabase(uid: string, updates: { name?: strin
 
 export async function updateEmailSupabase(newEmail: string): Promise<{ error?: string }> {
   if (!supabase) return { error: "Supabase not configured" };
-  const { data, error } = await supabase.auth.updateUser({ email: newEmail.trim() });
+  const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
   if (error) return { error: error.message };
   return {};
 }
