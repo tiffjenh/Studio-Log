@@ -273,7 +273,7 @@ input, select, textarea {
 }
 
 .toggle-wrap input:checked {
-  background: var(--accent-gradient);
+  background: var(--avatar-gradient);
 }
 
 .toggle-wrap input::after {

@@ -160,9 +160,17 @@ export default function Earnings() {
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [weeklyMonthOffset, setWeeklyMonthOffset] = useState(0);
   const [monthlyYearOffset, setMonthlyYearOffset] = useState(0);
+  const [studentsYearOffset, setStudentsYearOffset] = useState(0);
   const now = new Date();
+  // Earnings only count lessons that are completed (toggled on Dashboard/Calendar or imported via CSV). Bars match toggles.
   const completedLessons = dedupeLessons(data.lessons.filter((l) => l.completed));
   const thisYear = now.getFullYear();
+  const studentsDisplayYear = thisYear + studentsYearOffset;
+  const todayKey = toDateKey(now);
+  const lessonsForStudentsYear =
+    studentsDisplayYear === thisYear
+      ? completedLessons.filter((l) => l.date >= `${studentsDisplayYear}-01-01` && l.date <= todayKey)
+      : completedLessons.filter((l) => l.date.startsWith(String(studentsDisplayYear)));
 
   const weeklyMonthDate = new Date(now.getFullYear(), now.getMonth() + weeklyMonthOffset, 1);
   const weeklyYear = weeklyMonthDate.getFullYear();
@@ -488,17 +496,26 @@ export default function Earnings() {
       )}
 
       {activeTab === "Students" && (
-        <div className="float-card" style={{ padding: 0, overflow: "hidden" }}>
-          {data.students.map((s) => {
-            const total = completedLessons.filter((l) => l.studentId === s.id).reduce((a, l) => a + l.amountCents, 0);
-            return (
-              <div key={s.id} className="card-list-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 20, paddingRight: 20 }}>
-                <span>{s.firstName} {s.lastName}</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(total)}</span>
-              </div>
-            );
-          })}
-        </div>
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+            <button type="button" onClick={() => setStudentsYearOffset((o) => o - 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Previous year">‹</button>
+            <h2 className="headline-serif" style={{ fontSize: 20, fontWeight: 400, margin: 0 }}>
+              {studentsDisplayYear} earnings{studentsDisplayYear === thisYear ? " YTD" : ""}
+            </h2>
+            <button type="button" onClick={() => setStudentsYearOffset((o) => o + 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next year">›</button>
+          </div>
+          <div className="float-card" style={{ padding: 0, overflow: "hidden" }}>
+            {data.students.map((s) => {
+              const total = lessonsForStudentsYear.filter((l) => l.studentId === s.id).reduce((a, l) => a + l.amountCents, 0);
+              return (
+                <div key={s.id} className="card-list-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 20, paddingRight: 20 }}>
+                  <span>{s.firstName} {s.lastName}</span>
+                  <span style={{ fontWeight: 600 }}>{formatCurrency(total)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </>
   );

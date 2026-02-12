@@ -217,7 +217,7 @@ export default function Students() {
             onClick={() => setDayFilter(i)}
             style={{
               ...roundBtnStyle,
-              background: dayFilter === i ? "var(--accent-gradient)" : "rgba(201, 123, 148, 0.12)",
+              background: dayFilter === i ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
               color: dayFilter === i ? "white" : "var(--text)",
               flexShrink: 0,
             }}

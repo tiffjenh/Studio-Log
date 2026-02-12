@@ -24,8 +24,12 @@ export function getMonthBounds(date: Date): { start: Date; end: Date } {
   return { start, end };
 }
 
+/** Date key in local calendar date (YYYY-MM-DD). Use local time so daily earnings and UI stay in sync across timezones. */
 export function toDateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 /** Dedupe lessons to one per (studentId, date), keeping first (matches getLessonForStudentOnDate). */
@@ -38,6 +42,7 @@ export function dedupeLessons(lessons: Lesson[]): Lesson[] {
   return [...byKey.values()];
 }
 
+/** Earnings for the week (only completed lessons: toggled on Dashboard/Calendar or imported via CSV). */
 export function earnedThisWeek(lessons: Lesson[], ref: Date): number {
   const { start, end } = getWeekBounds(ref);
   const startKey = toDateKey(start);
@@ -48,7 +53,7 @@ export function earnedThisWeek(lessons: Lesson[], ref: Date): number {
     .reduce((sum, l) => sum + l.amountCents, 0);
 }
 
-/** Sum completed earnings in a date range, one lesson per (studentId, date). */
+/** Sum completed earnings in a date range (only toggled or CSV-imported lessons), one per (studentId, date). */
 export function earnedInDateRange(lessons: Lesson[], startKey: string, endKey: string): number {
   const inRange = lessons.filter((l) => l.date >= startKey && l.date <= endKey);
   return dedupeLessons(inRange)

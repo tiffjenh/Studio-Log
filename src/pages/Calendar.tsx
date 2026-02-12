@@ -87,7 +87,7 @@ export default function Calendar() {
             minHeight: 40,
             maxHeight: 40,
             borderRadius: "50%",
-            background: "var(--accent-gradient)",
+            background: "var(--avatar-gradient)",
             color: "white",
             display: "flex",
             alignItems: "center",
@@ -114,10 +114,10 @@ export default function Calendar() {
             padding: "12px 20px",
             border: "none",
             borderRadius: "var(--radius-pill)",
-            background: "var(--accent-gradient)",
+            background: "var(--avatar-gradient)",
             color: "white",
             fontSize: 16,
-            fontWeight: 500,
+            fontWeight: 600,
             fontFamily: "var(--font-sans)",
             cursor: "pointer",
             boxShadow: "var(--shadow-soft)",
@@ -198,7 +198,7 @@ export default function Calendar() {
           <button
             type="button"
             onClick={() => setViewCenter((prev) => addDays(prev, -5))}
-            style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}
+            style={{ flexShrink: 0, width: 40, height: 40, minWidth: 40, minHeight: 40, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}
           >
             ‹
           </button>
@@ -210,10 +210,14 @@ export default function Calendar() {
                   key={d.toISOString()}
                   type="button"
                   onClick={() => setSelectedDate(d)}
-                  style={{ minWidth: 56, padding: 12, borderRadius: 12, border: "1px solid var(--border)", background: isSelected ? "var(--primary)" : "var(--card)", color: isSelected ? "white" : "var(--text)", cursor: "pointer" }}
+                  style={{
+                    width: 56, minWidth: 56, height: 56, minHeight: 56, padding: 0, borderRadius: "50%", border: "1px solid var(--border)",
+                    background: isSelected ? "var(--avatar-gradient)" : "var(--card)", color: isSelected ? "white" : "var(--text)", cursor: "pointer",
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-sans)",
+                  }}
                 >
-                  <div style={{ fontSize: 12, color: isSelected ? "rgba(255,255,255,0.8)" : "var(--text-muted)" }}>{DAYS[d.getDay()]}</div>
-                  <div style={{ fontSize: 18, fontWeight: 700 }}>{d.getDate()}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: isSelected ? "rgba(255,255,255,0.9)" : "var(--text-muted)" }}>{DAYS[d.getDay()]}</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>{d.getDate()}</div>
                 </button>
               );
             })}
@@ -221,7 +225,7 @@ export default function Calendar() {
           <button
             type="button"
             onClick={() => setViewCenter((prev) => addDays(prev, 5))}
-            style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}
+            style={{ flexShrink: 0, width: 40, height: 40, minWidth: 40, minHeight: 40, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}
           >
             ›
           </button>
@@ -233,7 +237,7 @@ export default function Calendar() {
         <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(todayEarnings)}</div>
       </div>
       {todaysStudents.length === 0 ? (
-        <p style={{ color: "var(--text-muted)" }}>No lessons scheduled</p>
+        <p style={{ color: "var(--text-muted)", textAlign: "center", fontStyle: "italic" }}>No lessons scheduled</p>
       ) : (
         todaysStudents.map((student) => {
           const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);

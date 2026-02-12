@@ -132,28 +132,28 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      <div className="float-card" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16, padding: "14px 18px" }}>
-        <h3 className="headline-serif" style={{ fontSize: 22, fontWeight: 400, margin: 0 }}>
+      <div className="float-card" style={{ display: "flex", alignItems: "center", flexWrap: "nowrap", gap: 10, marginBottom: 16, padding: "12px 16px" }}>
+        <h3 className="headline-serif" style={{ fontSize: 17, fontWeight: 400, margin: 0, flexShrink: 0 }}>
           {isToday ? "Today's lessons" : "Lessons"}
         </h3>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 1, marginLeft: "auto", minWidth: 0 }}>
           <button
             type="button"
             onClick={() => setSelectedDate((d) => addDays(d, -1))}
             className="pill"
-            style={{ minWidth: 36, minHeight: 36, padding: "8px 12px" }}
+            style={{ minWidth: 32, minHeight: 32, padding: "6px 8px", fontSize: 14 }}
             aria-label="Previous day"
           >
             ‹
           </button>
-          <span style={{ minWidth: 100, textAlign: "center", fontSize: 14, color: "var(--text-muted)" }}>
+          <span style={{ minWidth: 88, textAlign: "center", fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>
             {DAY_NAMES[dayOfWeek]}, {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           </span>
           <button
             type="button"
             onClick={() => setSelectedDate((d) => addDays(d, 1))}
             className="pill"
-            style={{ minWidth: 36, minHeight: 36, padding: "8px 12px" }}
+            style={{ minWidth: 32, minHeight: 32, padding: "6px 8px", fontSize: 14 }}
             aria-label="Next day"
           >
             ›

@@ -216,11 +216,15 @@ export default function StudentDetail() {
     <>
       <Link to="/students" style={{ display: "inline-flex", alignItems: "center", marginBottom: 20, color: "var(--text)", textDecoration: "none", fontSize: 15 }}>← Back</Link>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0 }}>{student.firstName} {student.lastName}</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ width: 48, height: 48, minWidth: 48, minHeight: 48, borderRadius: "50%", background: "var(--avatar-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 16, flexShrink: 0 }}>
+            {student.firstName[0]}{student.lastName[0]}
+          </div>
+          <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0 }}>{student.firstName} {student.lastName}</h1>
+        </div>
         {!editing ? (
           <div style={{ display: "flex", gap: 10 }}>
             <button type="button" onClick={handleStartEdit} className="pill pill--active" style={{ padding: "10px 18px" }}>Edit</button>
-            <button type="button" onClick={handleDelete} className="pill" style={{ border: "1px solid rgba(220,38,38,0.4)", color: "#dc2626", background: "transparent" }}>Delete</button>
           </div>
         ) : null}
       </div>
@@ -323,9 +327,10 @@ export default function StudentDetail() {
           </div>
 
           {error ? <p style={{ color: "#dc2626", marginBottom: 16 }}>{error}</p> : null}
-          <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
             <button type="submit" className="btn btn-primary">Save</button>
             <button type="button" onClick={handleCancelEdit} className="btn" style={{ border: "1px solid var(--border)", background: "#ffffff", color: "var(--text)" }}>Cancel</button>
+            <button type="button" onClick={handleDelete} className="btn" style={{ border: "1px solid rgba(220,38,38,0.4)", background: "transparent", color: "#dc2626" }}>Delete</button>
           </div>
         </form>
       ) : (
@@ -352,20 +357,19 @@ export default function StudentDetail() {
             </div>
           </div>
           <div className="float-card" style={{ padding: 16, marginBottom: 24 }}>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8 }}>
               {(() => {
                 const todayKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
                 const { dayOfWeek: d, timeOfDay: t } = getEffectiveSchedule(student, todayKey);
+                const timeRange = t && t !== "—" ? ` @ ${formatCompactTimeRange(t, student.durationMinutes)}` : "";
                 return (
                   <>
-                    {DAYS_FULL[d]}s
-                    {t && t !== "—" ? ` @ ${formatCompactTimeRange(t, student.durationMinutes)}` : ""}
+                    <span style={{ textAlign: "right" }}>{formatDuration(student.durationMinutes)}, {formatCurrency(student.rateCents)}</span>
+                    <span style={{ textAlign: "center", color: "var(--text-muted)" }}>|</span>
+                    <span style={{ textAlign: "left" }}>{DAYS_FULL[d]}s{timeRange}</span>
                   </>
                 );
               })()}
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 600, marginTop: 4 }}>
-              {formatDuration(student.durationMinutes)}, {formatCurrency(student.rateCents)}
             </div>
             {student.scheduleChangeFromDate && (
               <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>

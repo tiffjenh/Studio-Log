@@ -123,7 +123,7 @@ export default function Settings() {
           const existing = getLessonForStudentOnDate(data.lessons, student.id, lessonData.date);
           if (existing) {
             await updateLesson(existing.id, {
-              completed: true,
+              completed: true, // Imported lessons count in earnings; no need to toggle manually
               durationMinutes: lessonData.duration_minutes,
               amountCents: lessonData.amount_cents,
               note: lessonData.note,
@@ -135,7 +135,7 @@ export default function Settings() {
               date: lessonData.date,
               durationMinutes: lessonData.duration_minutes,
               amountCents: lessonData.amount_cents,
-              completed: true,
+              completed: true, // Imported lessons count in earnings; no need to toggle manually
               note: lessonData.note,
             });
             if (id) imported++;
@@ -218,7 +218,7 @@ export default function Settings() {
         try {
           const existing = getLessonForStudentOnDate(data.lessons, student.id, date);
           if (existing) {
-            await updateLesson(existing.id, { completed: true });
+            await updateLesson(existing.id, { completed: true }); // Imported = toggled on for earnings
             imported++;
           } else {
             const id = await addLesson({
@@ -226,7 +226,7 @@ export default function Settings() {
               date,
               durationMinutes: student.durationMinutes,
               amountCents: student.rateCents,
-              completed: true,
+              completed: true, // Imported = toggled on for earnings
             });
             if (id) imported++;
             else { skipped++; errors.push(`Failed: ${name} on ${date}`); }
