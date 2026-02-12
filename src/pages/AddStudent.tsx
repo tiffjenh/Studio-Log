@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { parseStudentCSV, rowToStudent } from "@/utils/csvImport";
 import { getCurrencyByCode, getStoredCurrencyCode } from "@/utils/currencies";
 import type { Student } from "@/types";
@@ -26,6 +27,7 @@ function parseTimeOfDay(s: string): { hour: number; minute: number; amPm: "AM" |
 
 export default function AddStudent() {
   const { data, addStudent } = useStoreContext();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [firstName, setFirstName] = useState("");
@@ -159,13 +161,13 @@ export default function AddStudent() {
 
   return (
     <>
-      <Link to="/students" style={{ display: "inline-flex", marginBottom: 24, color: "var(--text)", textDecoration: "none", ...fontStyle }}>← Back</Link>
+      <Link to="/students" style={{ display: "inline-flex", marginBottom: 24, color: "var(--text)", textDecoration: "none", ...fontStyle }}>← {t("common.back")}</Link>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, ...fontStyle }}>Add Student</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, ...fontStyle }}>{t("addStudent.title")}</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} />
-          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} className="pill" style={{ minHeight: 40, ...fontStyle }} title="Import students from CSV">
-            {importing ? "…" : "Import students"}
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} className="pill" style={{ minHeight: 40, ...fontStyle }} title={t("students.importStudents")}>
+            {importing ? "…" : t("students.importStudents")}
           </button>
         </div>
       </div>
@@ -183,11 +185,11 @@ export default function AddStudent() {
         </div>
       )}
       <form onSubmit={handleSave}>
-        <label style={labelStyle}>First name</label>
-        <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" style={inputStyle} required />
-        <label style={labelStyle}>Last name</label>
-        <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" style={inputStyle} required />
-        <label style={labelStyle}>Lesson duration</label>
+        <label style={labelStyle}>{t("addStudent.firstName")}</label>
+        <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t("addStudent.firstName")} style={inputStyle} required />
+        <label style={labelStyle}>{t("addStudent.lastName")}</label>
+        <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder={t("addStudent.lastName")} style={inputStyle} required />
+        <label style={labelStyle}>{t("addStudent.lessonDuration")}</label>
         <div style={rowStyle}>
           {DURATIONS.map((m) => (
             <button
@@ -201,11 +203,11 @@ export default function AddStudent() {
             </button>
           ))}
         </div>
-        <label style={labelStyle}>Rate</label>
+        <label style={labelStyle}>{t("common.rate")}</label>
         <button type="button" onClick={openRateModal} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
           {rateDollars ? `${getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$"}${rateDollars}` : (getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$") + "0"}
         </button>
-        <label style={labelStyle}>Day of week</label>
+        <label style={labelStyle}>{t("addStudent.dayOfWeek")}</label>
         <div style={rowStyle}>
           {DAY_SHORT.map((label, i) => (
             <button key={i} type="button" onClick={() => setDayOfWeek(i)} className={dayOfWeek === i ? "pill pill--active" : "pill"} style={{ padding: "8px 10px", fontSize: 13, flexShrink: 0, ...fontStyle }}>
@@ -213,12 +215,12 @@ export default function AddStudent() {
             </button>
           ))}
         </div>
-        <label style={labelStyle}>Time</label>
+        <label style={labelStyle}>{t("common.time")}</label>
         <button type="button" onClick={openTimePicker} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
           {timeOfDay || "5:00 PM"}
         </button>
         {error ? <p style={{ color: "#dc2626", marginBottom: 16, ...fontStyle }}>{error}</p> : null}
-        <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 24, ...fontStyle }}>Save</button>
+        <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 24, ...fontStyle }}>{t("common.save")}</button>
       </form>
 
       {rateModalOpen && (
@@ -227,7 +229,7 @@ export default function AddStudent() {
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
               <button type="button" onClick={() => setRateModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>×</button>
             </div>
-            <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text-muted)" }}>Rate (currency set in Settings)</p>
+            <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text-muted)" }}>{t("common.rate")} ({t("common.currencySetInSettings")})</p>
             <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 16, color: "var(--text)" }}>
               {(getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$")}{rateKeypadValue || "0"}
             </div>
@@ -241,7 +243,7 @@ export default function AddStudent() {
               <button type="button" onClick={() => setRateKeypadValue((v) => v + "0")} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>0</button>
               <button type="button" onClick={() => setRateKeypadValue((v) => v.slice(0, -1))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "rgba(180, 160, 180, 0.12)", fontSize: 18, cursor: "pointer", ...fontStyle }}>←</button>
             </div>
-            <button type="button" onClick={applyRate} className="btn btn-primary" style={{ width: "100%", ...fontStyle }}>Set rate</button>
+            <button type="button" onClick={applyRate} className="btn btn-primary" style={{ width: "100%", ...fontStyle }}>{t("common.setRate")}</button>
           </div>
         </div>
       )}
@@ -252,7 +254,7 @@ export default function AddStudent() {
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
               <button type="button" onClick={() => setTimePickerOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>×</button>
             </div>
-            <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>Select time</p>
+            <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>{t("common.selectTime")}</p>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <select value={timePickerHour} onChange={(e) => setTimePickerHour(Number(e.target.value))} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, ...fontStyle }}>
@@ -273,8 +275,8 @@ export default function AddStudent() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button type="button" onClick={() => setTimePickerOpen(false)} style={{ padding: "10px 20px", background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", ...fontStyle }}>Cancel</button>
-              <button type="button" onClick={applyTime} className="btn btn-primary" style={{ padding: "10px 20px", ...fontStyle }}>OK</button>
+              <button type="button" onClick={() => setTimePickerOpen(false)} style={{ padding: "10px 20px", background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", ...fontStyle }}>{t("common.cancel")}</button>
+              <button type="button" onClick={applyTime} className="btn btn-primary" style={{ padding: "10px 20px", ...fontStyle }}>{t("common.ok")}</button>
             </div>
           </div>
         </div>

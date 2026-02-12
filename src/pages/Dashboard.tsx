@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
+import { useLanguage } from "@/context/LanguageContext";
 import LogoIcon from "@/components/LogoIcon";
 import {
   formatCurrency,
@@ -68,6 +69,7 @@ function addDays(d: Date, n: number): Date {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { data, addLesson, updateLesson } = useStoreContext();
+  const { t } = useLanguage();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
 
@@ -121,25 +123,25 @@ export default function Dashboard() {
         <h2 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0, color: "var(--text)" }}>{dashboardTitle}</h2>
       </div>
       <div className="hero-card" style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 16 }}>Earnings overview</div>
+        <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 16 }}>{t("earnings.overview")}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
           <div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>This week</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("dashboard.thisWeek")}</div>
             <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earned)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>This month</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("dashboard.thisMonth")}</div>
             <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earningsThisMonth)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>YTD</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("dashboard.ytd")}</div>
             <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earningsYTD)}</div>
           </div>
         </div>
       </div>
       <div className="float-card" style={{ display: "flex", alignItems: "center", flexWrap: "nowrap", gap: 10, marginBottom: 16, padding: "12px 16px" }}>
         <h3 className="headline-serif" style={{ fontSize: 17, fontWeight: 400, margin: 0, flexShrink: 0 }}>
-          {isToday ? "Today's lessons" : "Lessons"}
+          {isToday ? t("dashboard.todaysLessons") : t("dashboard.lessons")}
         </h3>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 1, marginLeft: "auto", minWidth: 0 }}>
           <button
@@ -166,7 +168,7 @@ export default function Dashboard() {
         </span>
       </div>
       {todaysStudents.length === 0 ? (
-        <p style={{ color: "var(--text-muted)", padding: 28, fontSize: 15, textAlign: "center", fontStyle: "italic" }}>No lessons scheduled for this day</p>
+        <p style={{ color: "var(--text-muted)", padding: 28, fontSize: 15, textAlign: "center", fontStyle: "italic" }}>{t("dashboard.noLessonsScheduled")}</p>
       ) : (
         todaysStudents.map((student) => {
           const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
@@ -183,7 +185,7 @@ export default function Dashboard() {
         })
       )}
       <div style={{ marginTop: 28, textAlign: "center" }}>
-        <Link to="/calendar" className="btn btn-primary pill" style={{ textDecoration: "none", borderRadius: "var(--radius-pill)" }}>View Calendar</Link>
+        <Link to="/calendar" className="btn btn-primary pill" style={{ textDecoration: "none", borderRadius: "var(--radius-pill)" }}>{t("dashboard.viewCalendar")}</Link>
       </div>
     </>
   );

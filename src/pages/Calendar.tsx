@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { formatCurrency, getStudentsForDay, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, toDateKey } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Student } from "@/types";
@@ -22,6 +23,7 @@ function getFiveDays(center: Date): Date[] {
 export default function Calendar() {
   const navigate = useNavigate();
   const { data, addLesson, updateLesson } = useStoreContext();
+  const { t } = useLanguage();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewCenter, setViewCenter] = useState(new Date());
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
@@ -75,11 +77,11 @@ export default function Calendar() {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, minHeight: 44 }}>
-        <Link to="/" style={{ color: "var(--text)", textDecoration: "none", fontSize: 15, display: "inline-flex", alignItems: "center" }}>← Back</Link>
-        <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0, lineHeight: 1 }}>Calendar</h1>
+        <Link to="/" style={{ color: "var(--text)", textDecoration: "none", fontSize: 15, display: "inline-flex", alignItems: "center" }}>← {t("common.back")}</Link>
+        <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0, lineHeight: 1 }}>{t("calendar.title")}</h1>
         <Link
           to="/add-student"
-          title="Add student"
+          title={t("students.addStudent")}
           style={{
             width: 40,
             height: 40,

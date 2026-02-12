@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useStoreContext } from "@/context/StoreContext";
+import { useLanguage } from "@/context/LanguageContext";
 import {
   formatCurrency,
   dedupeLessons,
@@ -25,6 +26,7 @@ function BarChart({
   dateKeys,
   onBarClick,
   angleXLabels = false,
+  noEarningsText = "No earnings",
 }: {
   data: number[];
   xLabels: string[];
@@ -33,6 +35,7 @@ function BarChart({
   dateKeys?: string[];
   onBarClick?: (dateKey: string) => void;
   angleXLabels?: boolean;
+  noEarningsText?: string;
 }) {
   const isEmpty = maxVal <= 0 || data.every((v) => v === 0);
   const ticks = isEmpty ? EMPTY_TICKS : getYAxisTicks(maxVal);
@@ -65,7 +68,7 @@ function BarChart({
           ))}
           {isEmpty && (
             <div style={{ position: "absolute", left: 0, right: 0, top: "37.5%", transform: "translateY(-50%)", display: "flex", justifyContent: "center", pointerEvents: "none" }}>
-              <span style={{ fontSize: 14, color: "var(--text-muted)" }}>No earnings</span>
+              <span style={{ fontSize: 14, color: "var(--text-muted)" }}>{noEarningsText}</span>
             </div>
           )}
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "space-around", gap: 4, alignItems: "flex-end", height: CHART_HEIGHT, padding: "0 4px" }}>
@@ -152,8 +155,16 @@ function BarChart({
   );
 }
 
+const TAB_KEYS: Record<(typeof TABS)[number], string> = {
+  Daily: "earnings.daily",
+  Weekly: "earnings.weekly",
+  Monthly: "earnings.monthly",
+  Students: "earnings.studentsTab",
+};
+
 export default function Earnings() {
   const { data } = useStoreContext();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Daily");
   const [dailyWeekOffset, setDailyWeekOffset] = useState(0);
   const [selectedDayDateKey, setSelectedDayDateKey] = useState<string | null>(null);
@@ -217,14 +228,14 @@ export default function Earnings() {
 
   return (
     <>
-      <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, marginBottom: 20 }}>Earnings</h1>
+      <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, marginBottom: 20 }}>{t("earnings.title")}</h1>
       <div style={{ display: "flex", flexWrap: "nowrap", gap: 8, marginBottom: 20 }}>
-        {TABS.map((t) => (
+        {TABS.map((tab) => (
           <button
-            key={t}
+            key={tab}
             type="button"
-            onClick={() => setActiveTab(t)}
-            className={activeTab === t ? "pill pill--active" : "pill"}
+            onClick={() => setActiveTab(tab)}
+            className={activeTab === tab ? "pill pill--active" : "pill"}
             style={{
               flex: "1 1 0",
               minWidth: 0,
@@ -235,7 +246,7 @@ export default function Earnings() {
               justifyContent: "center",
             }}
           >
-            {t}
+            {t(TAB_KEYS[tab])}
           </button>
         ))}
       </div>
@@ -253,6 +264,7 @@ export default function Earnings() {
                 data={weeklyData.map((w) => w.total)}
                 xLabels={weeklyData.map((w) => w.label)}
                 maxVal={maxWeekly}
+                noEarningsText={t("earnings.noEarnings")}
                 dateKeys={weeklyData.map((w) => w.startKey)}
                 onBarClick={(key) => setSelectedWeekStartKey((prev) => (prev === key ? null : key))}
                 angleXLabels
@@ -283,7 +295,7 @@ export default function Earnings() {
                 <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
                     <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Students</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.studentsTab")}</div>
                       <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{numStudents}</div>
                     </div>
                     <div>
@@ -291,7 +303,7 @@ export default function Earnings() {
                       <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Earnings</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.earningsYear")}</div>
                       <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{formatCurrency(totalEarned)}</div>
                     </div>
                   </div>
@@ -322,10 +334,10 @@ export default function Earnings() {
             <button type="button" onClick={() => { setMonthlyYearOffset((o) => o + 1); setSelectedMonthKey(null); }} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next year">›</button>
           </div>
           <div className="hero-card" style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 16 }}>Earnings overview</div>
+            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 16 }}>{t("earnings.overview")}</div>
             <div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
-                {displayYear === thisYear ? "Earnings – YTD" : `Earnings ${displayYear}`}
+                {displayYear === thisYear ? t("earnings.earningsYTD") : `${t("earnings.earningsYear")} ${displayYear}`}
               </div>
               <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>
                 {formatCurrency(displayYear === thisYear ? earningsYTD : earningsForDisplayYear)}
@@ -339,6 +351,7 @@ export default function Earnings() {
                   data={visibleMonthlyTotals}
                   xLabels={visibleMonthLabels}
                   maxVal={maxMonthly}
+                  noEarningsText={t("earnings.noEarnings")}
                   dateKeys={visibleMonthLabels.map((_, i) => `${displayYear}-${String(i + 1).padStart(2, "0")}`)}
                   onBarClick={(key) => setSelectedMonthKey((prev) => (prev === key ? null : key))}
                 />
@@ -383,7 +396,7 @@ export default function Earnings() {
                 <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
                     <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Students</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.studentsTab")}</div>
                       <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{numStudents}</div>
                     </div>
                     <div>
@@ -391,7 +404,7 @@ export default function Earnings() {
                       <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Earnings</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.earningsYear")}</div>
                       <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{formatCurrency(totalEarned)}</div>
                     </div>
                   </div>
@@ -435,6 +448,7 @@ export default function Earnings() {
               maxVal={maxDaily}
               dateKeys={dailyData.map((d) => d.dateKey)}
               onBarClick={(dateKey) => setSelectedDayDateKey((prev) => (prev === dateKey ? null : dateKey))}
+              noEarningsText={t("earnings.noEarnings")}
             />
           </div>
           {selectedDayDateKey && (() => {
@@ -456,7 +470,7 @@ export default function Earnings() {
                 <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
                     <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Students</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.studentsTab")}</div>
                       <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{numStudents}</div>
                     </div>
                     <div>
@@ -464,7 +478,7 @@ export default function Earnings() {
                       <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Earnings</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.earningsYear")}</div>
                       <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{formatCurrency(totalEarned)}</div>
                     </div>
                   </div>

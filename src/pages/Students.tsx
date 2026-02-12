@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
 import { formatCurrency } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
@@ -55,6 +56,7 @@ function sortStudentsByTime(students: Student[]): Student[] {
 
 export default function Students() {
   const { data } = useStoreContext();
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [dayFilter, setDayFilter] = useState<number | null>(null);
 
@@ -77,11 +79,11 @@ export default function Students() {
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0 }}>Students</h1>
+        <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0 }}>{t("students.title")}</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Link
             to="/add-student"
-            title="Add student"
+            title={t("students.addStudent")}
             style={{
               width: 40,
               height: 40,
@@ -118,11 +120,11 @@ export default function Students() {
             flexShrink: 0,
           }}
         >
-          All
+          {t("students.all")}
         </button>
         <input
           type="search"
-          placeholder="Search by name"
+          placeholder={t("students.searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="search-frosted"
@@ -149,7 +151,7 @@ export default function Students() {
       {filtered.length === 0 ? (
         <div className="float-card" style={{ padding: 28, textAlign: "center" }}>
           <p style={{ color: "var(--text-muted)", marginBottom: 8, fontSize: 15 }}>
-            {search ? "No students match your search" : dayFilter !== null ? `No students on ${DAY_LABELS[dayFilter!]}` : "No students yet. Tap + to add one."}
+            {search ? t("students.noMatch") : dayFilter !== null ? `${t("students.noStudentsOnDay")} ${DAY_LABELS[dayFilter!]}` : t("students.noStudentsYet")}
           </p>
           {hasSupabase() && data.user && !search && dayFilter === null && (
             <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>

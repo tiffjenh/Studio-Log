@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useStoreContext } from "./context/StoreContext";
+import { useLanguage } from "./context/LanguageContext";
 import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -14,8 +15,9 @@ import EditLesson from "./pages/EditLesson";
 
 function AuthGate() {
   const { data, loaded } = useStoreContext();
+  const { t } = useLanguage();
   const location = useLocation();
-  if (!loaded) return <div className="loading-screen">Loading…</div>;
+  if (!loaded) return <div className="loading-screen">{t("common.loading")}</div>;
   if (!data.user) {
     if (location.pathname === "/") return <Landing />;
     return <Navigate to="/" replace />;
@@ -25,7 +27,8 @@ function AuthGate() {
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <Routes>
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/" element={<AuthGate />}>
         <Route index element={<Dashboard />} />
@@ -39,5 +42,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }

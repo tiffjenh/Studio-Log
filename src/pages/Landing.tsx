@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
 import { signInSupabase, signUpSupabase } from "@/store/supabaseSync";
 import LogoIcon from "@/components/LogoIcon";
 
 export default function Landing() {
   const { setUser } = useStoreContext();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [error, setError] = useState("");
@@ -73,8 +75,8 @@ export default function Landing() {
               <LogoIcon size={28} />
             </div>
             <div className="landing__brand-text">
-              <h1 className="landing__title">Studio Log</h1>
-              <p className="landing__tagline">track lessons and earnings</p>
+              <h1 className="landing__title">{t("landing.title")}</h1>
+              <p className="landing__tagline">{t("landing.tagline")}</p>
             </div>
           </div>
 
@@ -85,14 +87,14 @@ export default function Landing() {
             className={`landing__tab ${mode === "login" ? "landing__tab--active" : ""}`}
             onClick={() => { setMode("login"); setError(""); }}
           >
-            Log in
+            {t("landing.logIn")}
           </button>
           <button
             type="button"
             className={`landing__tab ${mode === "signup" ? "landing__tab--active" : ""}`}
             onClick={() => { setMode("signup"); setError(""); }}
           >
-            Sign up
+            {t("landing.signUp")}
           </button>
         </div>
 
@@ -100,7 +102,7 @@ export default function Landing() {
           <form onSubmit={handleLogin} className="landing__form">
             <input
               type="email"
-              placeholder="Email"
+              placeholder={t("landing.email")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="landing__input"
@@ -108,7 +110,7 @@ export default function Landing() {
             />
             <input
               type="password"
-              placeholder="Password"
+              placeholder={t("landing.password")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="landing__input"
@@ -116,14 +118,14 @@ export default function Landing() {
             />
             {error ? <p className="landing__error">{error}</p> : null}
             <button type="submit" className="btn btn-primary landing__submit">
-              Log In
+              {t("landing.logInButton")}
             </button>
             <div className="landing__links">
               <Link to="/forgot-password" className="landing__link landing__link--muted">
-                Forgot password?
+                {t("landing.forgotPassword")}
               </Link>
               <button type="button" className="landing__link landing__link--muted" onClick={() => setMode("signup")}>
-                Don&apos;t have an account? Sign up
+                {t("landing.noAccount")}
               </button>
             </div>
           </form>
@@ -131,7 +133,7 @@ export default function Landing() {
           <form onSubmit={handleSignUp} className="landing__form">
             <input
               type="text"
-              placeholder="Name"
+              placeholder={t("landing.name")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="landing__input"
@@ -140,7 +142,7 @@ export default function Landing() {
             <div className="landing__input-wrap">
               <input
                 type="email"
-                placeholder="Email"
+                placeholder={t("landing.email")}
                 value={signupEmail}
                 onChange={(e) => setSignupEmail(e.target.value)}
                 className="landing__input"
@@ -150,7 +152,7 @@ export default function Landing() {
             </div>
             <input
               type="password"
-              placeholder="Password"
+              placeholder={t("landing.password")}
               value={signupPassword}
               onChange={(e) => setSignupPassword(e.target.value)}
               className="landing__input"
@@ -158,11 +160,11 @@ export default function Landing() {
             />
             {error ? <p className="landing__error">{error}</p> : null}
             <button type="submit" className="btn btn-primary landing__submit">
-              Sign Up
+              {t("landing.signUpButton")}
             </button>
             <div className="landing__links">
               <button type="button" className="landing__link" onClick={() => setMode("login")}>
-                Already have an account? Log in
+                {t("landing.haveAccount")}
               </button>
             </div>
           </form>

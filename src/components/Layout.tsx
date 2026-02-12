@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { NavLink, Outlet } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
 import ImportBanner from "@/components/ImportBanner";
 
@@ -37,15 +38,16 @@ const NavIcons = {
   ),
 };
 
-const navItems = [
-  { to: "/", label: "Dashboard", icon: NavIcons.dashboard },
-  { to: "/students", label: "Students", icon: NavIcons.students },
-  { to: "/earnings", label: "Earnings", icon: NavIcons.earnings },
-  { to: "/settings", label: "Settings", icon: NavIcons.settings },
+const navKeys = [
+  { to: "/", key: "nav.dashboard", icon: NavIcons.dashboard },
+  { to: "/students", key: "nav.students", icon: NavIcons.students },
+  { to: "/earnings", key: "nav.earnings", icon: NavIcons.earnings },
+  { to: "/settings", key: "nav.settings", icon: NavIcons.settings },
 ];
 
 export default function Layout() {
   const { loadError, reload } = useStoreContext();
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!hasSupabase()) return;
@@ -69,10 +71,10 @@ export default function Layout() {
       </main>
       {createPortal(
         <nav className="bottom-nav" aria-label="Main">
-          {navItems.map(({ to, label, icon }) => (
+          {navKeys.map(({ to, key, icon }) => (
             <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => (isActive ? "active" : "")}>
               <span className="bottom-nav__icon">{icon}</span>
-              <span className="bottom-nav__label">{label}</span>
+              <span className="bottom-nav__label">{t(key)}</span>
             </NavLink>
           ))}
         </nav>,

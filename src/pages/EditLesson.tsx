@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { formatCurrency } from "@/utils/earnings";
 import DatePicker from "@/components/DatePicker";
 import StudentAvatar from "@/components/StudentAvatar";
@@ -18,6 +19,7 @@ export default function EditLesson() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { data, updateLesson } = useStoreContext();
+  const { t } = useLanguage();
   const lesson = data.lessons.find((l) => l.id === id);
   const student = lesson ? data.students.find((s) => s.id === lesson.studentId) : null;
   const [lessonDate, setLessonDate] = useState(lesson?.date ?? "");
@@ -49,8 +51,8 @@ export default function EditLesson() {
 
   return (
     <>
-      <Link to="/" style={{ display: "inline-flex", marginBottom: 24, color: "var(--text)", textDecoration: "none" }}>← Back</Link>
-      <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, marginBottom: 24 }}>Edit Lesson</h1>
+      <Link to="/" style={{ display: "inline-flex", marginBottom: 24, color: "var(--text)", textDecoration: "none" }}>← {t("common.back")}</Link>
+      <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, marginBottom: 24 }}>{t("editLesson.title")}</h1>
       <form onSubmit={handleSave}>
         <div className="float-card" style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
@@ -90,7 +92,7 @@ export default function EditLesson() {
           onChange={(e) => setNote(e.target.value)}
           style={{ width: "100%", minHeight: 80, padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 24, fontSize: 16 }}
         />
-        <button type="submit" className="btn btn-primary" style={{ width: "100%" }}>Save</button>
+        <button type="submit" className="btn btn-primary" style={{ width: "100%" }}>{t("common.save")}</button>
       </form>
     </>
   );
