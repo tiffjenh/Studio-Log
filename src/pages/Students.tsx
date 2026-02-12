@@ -13,7 +13,11 @@ const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 const roundBtnStyle = {
   width: 40,
   height: 40,
-  borderRadius: 20,
+  minWidth: 40,
+  maxWidth: 40,
+  minHeight: 40,
+  maxHeight: 40,
+  borderRadius: "50%" as const,
   display: "flex",
   alignItems: "center" as const,
   justifyContent: "center" as const,
@@ -21,6 +25,8 @@ const roundBtnStyle = {
   cursor: "pointer" as const,
   fontSize: 14,
   fontWeight: 600,
+  padding: 0,
+  lineHeight: 1,
 };
 
 /** Parse timeOfDay string to minutes from midnight for sorting. Returns 9999 if unparseable (sorts last). */
@@ -158,7 +164,11 @@ export default function Students() {
             style={{
               width: 40,
               height: 40,
-              borderRadius: 20,
+              minWidth: 40,
+              maxWidth: 40,
+              minHeight: 40,
+              maxHeight: 40,
+              borderRadius: "50%",
               background: "var(--accent-gradient)",
               color: "white",
               display: "flex",
@@ -169,21 +179,14 @@ export default function Students() {
               lineHeight: 1,
               textDecoration: "none",
               flexShrink: 0,
+              padding: 0,
             }}
           >
             +
           </Link>
         </div>
       </div>
-      <input
-        type="search"
-        placeholder="Search by name"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="search-frosted"
-        style={{ marginBottom: 16 }}
-      />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
         <button
           type="button"
           onClick={() => setDayFilter(null)}
@@ -191,10 +194,21 @@ export default function Students() {
             ...roundBtnStyle,
             background: dayFilter === null ? "var(--accent-gradient)" : "rgba(201, 123, 148, 0.12)",
             color: dayFilter === null ? "white" : "var(--text)",
+            flexShrink: 0,
           }}
         >
           All
         </button>
+        <input
+          type="search"
+          placeholder="Search by name"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="search-frosted"
+          style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
+        />
+      </div>
+      <div style={{ display: "flex", flexWrap: "nowrap", gap: 10, marginBottom: 20 }}>
         {DAY_SHORT.map((label, i) => (
           <button
             key={i}
@@ -204,6 +218,7 @@ export default function Students() {
               ...roundBtnStyle,
               background: dayFilter === i ? "var(--accent-gradient)" : "rgba(201, 123, 148, 0.12)",
               color: dayFilter === i ? "white" : "var(--text)",
+              flexShrink: 0,
             }}
           >
             {label}
@@ -234,7 +249,7 @@ export default function Students() {
                 {students.map((s) => (
                   <Link key={s.id} to={`/students/${s.id}`} style={{ textDecoration: "none", color: "inherit" }}>
                     <div className="float-card" style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                      <div style={{ width: 48, height: 48, borderRadius: 24, background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
+                      <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
                         {s.firstName[0]}{s.lastName[0]}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>

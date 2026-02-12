@@ -40,7 +40,7 @@ function LessonRow({
   const { timeOfDay } = getEffectiveSchedule(student, dateKey);
   return (
     <div className="float-card" style={{ display: "flex", alignItems: "center", marginBottom: 12, cursor: "pointer", gap: 16 }} onClick={onEdit}>
-      <div style={{ width: 48, height: 48, borderRadius: 24, background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
+      <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
         {student.firstName[0]}{student.lastName[0]}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>

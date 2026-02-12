@@ -97,6 +97,13 @@ export async function signOutSupabase(): Promise<void> {
   if (supabase) await supabase.auth.signOut();
 }
 
+export async function updatePasswordSupabase(newPassword: string): Promise<{ error?: string }> {
+  if (!supabase) return { error: "Supabase not configured" };
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) return { error: error.message };
+  return {};
+}
+
 export async function loadFromSupabase(): Promise<AppData | null> {
   if (!hasSupabase() || !supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();

@@ -73,10 +73,35 @@ export default function Calendar() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <Link to="/" style={{ color: "var(--text)", textDecoration: "none", fontSize: 15 }}>← Back</Link>
-        <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0 }}>Calendar</h1>
-        <Link to="/add-student" style={{ color: "var(--text)", textDecoration: "none", fontSize: 24 }}>+</Link>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, minHeight: 44 }}>
+        <Link to="/" style={{ color: "var(--text)", textDecoration: "none", fontSize: 15, display: "inline-flex", alignItems: "center" }}>← Back</Link>
+        <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0, lineHeight: 1 }}>Calendar</h1>
+        <Link
+          to="/add-student"
+          title="Add student"
+          style={{
+            width: 40,
+            height: 40,
+            minWidth: 40,
+            maxWidth: 40,
+            minHeight: 40,
+            maxHeight: 40,
+            borderRadius: "50%",
+            background: "var(--accent-gradient)",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22,
+            fontWeight: 300,
+            lineHeight: 1,
+            textDecoration: "none",
+            flexShrink: 0,
+            padding: 0,
+          }}
+        >
+          +
+        </Link>
       </div>
       <div style={{ marginBottom: 16, position: "relative" }} ref={monthPickerRef}>
         <button
@@ -95,9 +120,9 @@ export default function Calendar() {
               <span style={{ fontWeight: 600 }}>{monthPickerView.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
               <button type="button" onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 1))} style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}>›</button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, textAlign: "center", marginBottom: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gridAutoRows: "32px", gap: 4, textAlign: "center", marginBottom: 8, alignItems: "center" }}>
               {DAYS_SHORT.map((label) => (
-                <div key={label} style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>{label}</div>
+                <div key={label} style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", lineHeight: 1 }}>{label}</div>
               ))}
               {(() => {
                 const year = monthPickerView.getFullYear();
@@ -119,7 +144,7 @@ export default function Calendar() {
                       type="button"
                       onClick={() => { setSelectedDate(date); setMonthPickerOpen(false); }}
                       style={{
-                        width: 36, height: 36, borderRadius: "50%", border: "none", cursor: "pointer", fontSize: 14,
+                        width: 32, minWidth: 32, height: 32, minHeight: 32, maxHeight: 32, padding: 0, borderRadius: "50%", border: "none", cursor: "pointer", fontSize: 14, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center",
                         background: isSelected ? "var(--primary)" : "transparent",
                         color: isSelected ? "white" : isCurrentMonth ? "var(--text)" : "var(--text-muted)",
                         opacity: isCurrentMonth ? 1 : 0.5,
@@ -168,6 +193,10 @@ export default function Calendar() {
         </div>
       </div>
       <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Schedule</h3>
+      <div className="float-card" style={{ marginBottom: 20, padding: 18 }}>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Today&apos;s earnings</div>
+        <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(todayEarnings)}</div>
+      </div>
       {todaysStudents.length === 0 ? (
         <p style={{ color: "var(--text-muted)" }}>No lessons scheduled</p>
       ) : (
@@ -181,7 +210,7 @@ export default function Calendar() {
           const display = duration >= 60 ? `${duration / 60} hour / ${formatCurrency(effectiveRate)}` : `${duration} mins ${formatCurrency(effectiveRate)}`;
           return (
             <div key={student.id} className="float-card" style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 24, background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 14, flexShrink: 0 }} onClick={() => handlePressLesson(student)}>
+              <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 14, flexShrink: 0 }} onClick={() => handlePressLesson(student)}>
                 {student.firstName[0]}{student.lastName[0]}
               </div>
               <div style={{ flex: 1 }} onClick={() => handlePressLesson(student)}>
@@ -196,10 +225,6 @@ export default function Calendar() {
           );
         })
       )}
-      <div className="float-card" style={{ marginTop: 24, padding: 18 }}>
-        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Today&apos;s earnings</div>
-        <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(todayEarnings)}</div>
-      </div>
     </>
   );
 }

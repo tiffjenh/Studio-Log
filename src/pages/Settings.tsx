@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { hasSupabase } from "@/lib/supabase";
+import { updatePasswordSupabase } from "@/store/supabaseSync";
 import { parseLessonCSV, parseLessonMatrixCSV, rowToLesson, type ImportResult } from "@/utils/csvImport";
 import { getLessonForStudentOnDate } from "@/utils/earnings";
 import type { Student } from "@/types";
@@ -19,7 +20,10 @@ export default function Settings() {
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
-  const [editing, setEditing] = useState<"name" | "email" | "phone" | null>(null);
+  const [editing, setEditing] = useState<"name" | "email" | "phone" | "password" | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   const handleSave = async (field: "name" | "email" | "phone") => {
     if (!user) return;
@@ -30,6 +34,30 @@ export default function Settings() {
     } else {
       setUser({ ...user, name: field === "name" ? name : user.name, email: field === "email" ? email : user.email, phone: field === "phone" ? phone : user.phone });
     }
+    setEditing(null);
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordError("");
+    if (!hasSupabase()) {
+      setPasswordError("Password change is only available when you're signed in with an account.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords don't match");
+      return;
+    }
+    const { error } = await updatePasswordSupabase(newPassword);
+    if (error) {
+      setPasswordError(error);
+      return;
+    }
+    setNewPassword("");
+    setConfirmPassword("");
     setEditing(null);
   };
 
@@ -257,8 +285,35 @@ export default function Settings() {
         </div>
         <div style={{ ...rowStyle, borderBottom: "none" }}>
           <span style={{ flex: 1 }}>Password</span>
-          <span style={{ flex: 2 }}>••••••••</span>
-          <button type="button" style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
+          {editing === "password" ? (
+            <div style={{ flex: 2, display: "flex", flexDirection: "column", gap: 8 }}>
+              <input
+                type="password"
+                placeholder="New password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                style={inputStyle}
+                autoFocus
+              />
+              <input
+                type="password"
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                style={inputStyle}
+              />
+              {passwordError && <span style={{ fontSize: 13, color: "#dc2626" }}>{passwordError}</span>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" onClick={handleChangePassword} style={{ padding: "8px 14px", color: "white", fontWeight: 600, background: "var(--accent-gradient)", border: "none", borderRadius: 8, cursor: "pointer" }}>Save</button>
+                <button type="button" onClick={() => { setEditing(null); setNewPassword(""); setConfirmPassword(""); setPasswordError(""); }} style={{ padding: "8px 14px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: "pointer" }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <span style={{ flex: 2 }}>••••••••</span>
+              <button type="button" onClick={() => { setPasswordError(""); setEditing("password"); }} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>Edit</button>
+            </>
+          )}
         </div>
       </div>
       <button type="button" className="btn btn-pink pill" style={{ width: "100%", marginBottom: 24, borderRadius: "var(--radius-pill)" }} onClick={handleLogOut}>Log Out</button>

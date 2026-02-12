@@ -332,7 +332,7 @@ export default function StudentDetail() {
                 <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400, lineHeight: 1.3 }}>{thisMonthLessons.length} out of {availableThisMonth} lessons</div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{monthLabel}</div>
               </div>
-              <div>
+              <div style={{ textAlign: "right" }}>
                 <div className="headline-serif" style={{ fontSize: 24, fontWeight: 400 }}>{formatCurrency(earningsThisMonth)}</div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>This month</div>
               </div>
@@ -340,46 +340,42 @@ export default function StudentDetail() {
                 <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400, lineHeight: 1.3 }}>{thisYearLessons.length} out of {availableThisYear} lessons</div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>YTD</div>
               </div>
-              <div>
+              <div style={{ textAlign: "right" }}>
                 <div className="headline-serif" style={{ fontSize: 24, fontWeight: 400 }}>{formatCurrency(earningsYTD)}</div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>YTD earnings</div>
               </div>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-            <div className="float-card" style={{ padding: 16 }}>
-              <div style={{ fontSize: 16, fontWeight: 600 }}>
-                {(() => {
-                  const todayKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
-                  const { dayOfWeek: d, timeOfDay: t } = getEffectiveSchedule(student, todayKey);
-                  return (
-                    <>
-                      {DAYS_FULL[d]}s
-                      {t && t !== "—" ? ` @ ${formatCompactTimeRange(t, student.durationMinutes)}` : ""}
-                    </>
-                  );
-                })()}
-              </div>
-              {student.scheduleChangeFromDate && (
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>
-                  From {new Date(student.scheduleChangeFromDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}: {DAYS_FULL[student.scheduleChangeDayOfWeek ?? 0]}s
-                  {student.scheduleChangeTimeOfDay && student.scheduleChangeTimeOfDay !== "—"
-                    ? ` @ ${formatCompactTimeRange(student.scheduleChangeTimeOfDay, student.scheduleChangeDurationMinutes ?? student.durationMinutes)}`
-                    : ""}
-                  {(student.scheduleChangeDurationMinutes != null || student.scheduleChangeRateCents != null)
-                    ? ` · ${formatDuration(student.scheduleChangeDurationMinutes ?? student.durationMinutes)}, ${formatCurrency(student.scheduleChangeRateCents ?? student.rateCents)}`
-                    : ""}
-                </div>
-              )}
-              {student.terminatedFromDate && (
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>Last lesson: {new Date(student.terminatedFromDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
-              )}
+          <div className="float-card" style={{ padding: 16, marginBottom: 24 }}>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>
+              {(() => {
+                const todayKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+                const { dayOfWeek: d, timeOfDay: t } = getEffectiveSchedule(student, todayKey);
+                return (
+                  <>
+                    {DAYS_FULL[d]}s
+                    {t && t !== "—" ? ` @ ${formatCompactTimeRange(t, student.durationMinutes)}` : ""}
+                  </>
+                );
+              })()}
             </div>
-            <div className="float-card" style={{ padding: 16 }}>
-              <div style={{ fontSize: 16, fontWeight: 600 }}>
-                {formatDuration(student.durationMinutes)}, {formatCurrency(student.rateCents)}
-              </div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginTop: 4 }}>
+              {formatDuration(student.durationMinutes)}, {formatCurrency(student.rateCents)}
             </div>
+            {student.scheduleChangeFromDate && (
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>
+                From {new Date(student.scheduleChangeFromDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}: {DAYS_FULL[student.scheduleChangeDayOfWeek ?? 0]}s
+                {student.scheduleChangeTimeOfDay && student.scheduleChangeTimeOfDay !== "—"
+                  ? ` @ ${formatCompactTimeRange(student.scheduleChangeTimeOfDay, student.scheduleChangeDurationMinutes ?? student.durationMinutes)}`
+                  : ""}
+                {(student.scheduleChangeDurationMinutes != null || student.scheduleChangeRateCents != null)
+                  ? ` · ${formatDuration(student.scheduleChangeDurationMinutes ?? student.durationMinutes)}, ${formatCurrency(student.scheduleChangeRateCents ?? student.rateCents)}`
+                  : ""}
+              </div>
+            )}
+            {student.terminatedFromDate && (
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>Last lesson: {new Date(student.terminatedFromDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+            )}
           </div>
         </>
       )}

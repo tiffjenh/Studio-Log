@@ -8,13 +8,12 @@ import LogoIcon from "@/components/LogoIcon";
 export default function Landing() {
   const { setUser } = useStoreContext();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"login" | "signup">("signup");
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [error, setError] = useState("");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
 
@@ -41,7 +40,7 @@ export default function Landing() {
     setError("");
     if (!name.trim() || !signupEmail.trim()) return;
     if (hasSupabase()) {
-      const result = await signUpSupabase(signupEmail.trim(), signupPassword, name.trim(), phone.trim() || undefined);
+      const result = await signUpSupabase(signupEmail.trim(), signupPassword, name.trim(), undefined);
       if ("error" in result) {
         setError(result.error);
         return;
@@ -50,7 +49,7 @@ export default function Landing() {
       navigate("/", { replace: true });
       return;
     }
-    setUser({ id: String(Date.now()), email: signupEmail.trim(), name: name.trim(), phone: phone.trim() || undefined });
+    setUser({ id: String(Date.now()), email: signupEmail.trim(), name: name.trim(), phone: undefined });
     navigate("/", { replace: true });
   };
 
@@ -73,7 +72,7 @@ export default function Landing() {
             <LogoIcon size={32} />
           </div>
           <h1 className="landing__title">Studio Log</h1>
-          <p className="landing__tagline">Track lessons and earnings. Simple.</p>
+          <p className="landing__tagline">track lessons and earnings</p>
         </div>
 
         {/* Tabs: Log in | Sign up */}
@@ -132,14 +131,6 @@ export default function Landing() {
               placeholder="Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="landing__input"
-              style={inputStyle}
-            />
-            <input
-              type="tel"
-              placeholder="Phone Number (optional)"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
               className="landing__input"
               style={inputStyle}
             />
