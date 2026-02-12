@@ -61,6 +61,7 @@ export default function Students() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState("");
   const [dayFilter, setDayFilter] = useState<number | null>(null);
+  const [importCsvOpen, setImportCsvOpen] = useState(false);
 
   let filtered = data.students.filter((s) =>
     (dayFilter === null || s.dayOfWeek === dayFilter) &&
@@ -169,7 +170,7 @@ export default function Students() {
               minHeight: 40,
               maxHeight: 40,
               borderRadius: "50%",
-              background: "var(--accent-gradient)",
+              background: "var(--avatar-gradient)",
               color: "white",
               display: "flex",
               alignItems: "center",
@@ -192,7 +193,7 @@ export default function Students() {
           onClick={() => setDayFilter(null)}
           style={{
             ...roundBtnStyle,
-            background: dayFilter === null ? "var(--accent-gradient)" : "rgba(201, 123, 148, 0.12)",
+            background: dayFilter === null ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
             color: dayFilter === null ? "white" : "var(--text)",
             flexShrink: 0,
           }}
@@ -249,7 +250,7 @@ export default function Students() {
                 {students.map((s) => (
                   <Link key={s.id} to={`/students/${s.id}`} style={{ textDecoration: "none", color: "inherit" }}>
                     <div className="float-card" style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                      <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
+                      <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--avatar-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
                         {s.firstName[0]}{s.lastName[0]}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -266,37 +267,48 @@ export default function Students() {
           ))}
         </div>
       )}
-      <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 12 }}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv"
-          onChange={handleImport}
-          style={{ display: "none" }}
-        />
+      <div style={{ marginTop: 24, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden", background: "#ffffff" }}>
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={importing}
-          className="pill"
-          style={{ padding: "12px 20px", cursor: importing ? "not-allowed" : "pointer" }}
-          title="Columns: first_name, last_name, rate, duration_minutes, day_of_week, time_of_day"
+          onClick={() => setImportCsvOpen((o) => !o)}
+          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", background: "#ffffff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--text)", fontFamily: "var(--font-sans)" }}
         >
-          {importing ? "Importing…" : "Import students from CSV"}
+          <span style={{ fontSize: 14 }}>{importCsvOpen ? "▼" : "▶"}</span>
+          Import students from CSV
         </button>
-        <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>
-          Columns: first_name, last_name, rate, duration_minutes, day_of_week, time_of_day (one student per row)
-        </p>
-        {importResult && (
-          <div style={{ fontSize: 14 }}>
-            <p style={{ margin: 0, fontWeight: 600 }}>Imported {importResult.imported} students, skipped {importResult.skipped}</p>
-            {importResult.errors.length > 0 && (
-              <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "var(--text-muted)", maxHeight: 100, overflowY: "auto" }}>
-                {importResult.errors.slice(0, 8).map((err, i) => (
-                  <li key={i}>{err}</li>
-                ))}
-                {importResult.errors.length > 8 && <li>…and {importResult.errors.length - 8} more</li>}
-              </ul>
+        {importCsvOpen && (
+          <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)" }}>
+            <p style={{ margin: "12px 0", fontSize: 12, color: "var(--text-muted)" }}>
+              Columns: first_name, last_name, rate, duration_minutes, day_of_week, time_of_day (one student per row)
+            </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleImport}
+              style={{ display: "none" }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="pill"
+              style={{ padding: "12px 20px", cursor: importing ? "not-allowed" : "pointer" }}
+            >
+              {importing ? "Importing…" : "Select CSV file"}
+            </button>
+            {importResult && (
+              <div style={{ marginTop: 12, fontSize: 14 }}>
+                <p style={{ margin: 0, fontWeight: 600 }}>Imported {importResult.imported} students, skipped {importResult.skipped}</p>
+                {importResult.errors.length > 0 && (
+                  <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "var(--text-muted)", maxHeight: 100, overflowY: "auto" }}>
+                    {importResult.errors.slice(0, 8).map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                    {importResult.errors.length > 8 && <li>…and {importResult.errors.length - 8} more</li>}
+                  </ul>
+                )}
+              </div>
             )}
           </div>
         )}

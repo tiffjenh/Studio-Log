@@ -245,7 +245,7 @@ export default function Calendar() {
           const display = duration >= 60 ? `${duration / 60} hour / ${formatCurrency(effectiveRate)}` : `${duration} mins ${formatCurrency(effectiveRate)}`;
           return (
             <div key={student.id} className="float-card" style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 14, flexShrink: 0 }} onClick={() => handlePressLesson(student)}>
+              <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--avatar-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 14, flexShrink: 0 }} onClick={() => handlePressLesson(student)}>
                 {student.firstName[0]}{student.lastName[0]}
               </div>
               <div style={{ flex: 1 }} onClick={() => handlePressLesson(student)}>

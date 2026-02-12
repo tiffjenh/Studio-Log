@@ -53,7 +53,7 @@ export default function EditLesson() {
       <form onSubmit={handleSave}>
         <div className="float-card" style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
-            <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 14, flexShrink: 0 }}>
+            <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--avatar-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, marginRight: 14, flexShrink: 0 }}>
               {student.firstName[0]}{student.lastName[0]}
             </div>
             <div>

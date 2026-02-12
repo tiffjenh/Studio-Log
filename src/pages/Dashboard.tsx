@@ -40,7 +40,7 @@ function LessonRow({
   const { timeOfDay } = getEffectiveSchedule(student, dateKey);
   return (
     <div className="float-card" style={{ display: "flex", alignItems: "center", marginBottom: 12, cursor: "pointer", gap: 16 }} onClick={onEdit}>
-      <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--accent-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
+      <div style={{ width: 48, height: 48, minWidth: 48, maxWidth: 48, minHeight: 48, maxHeight: 48, borderRadius: "50%", background: "var(--avatar-gradient)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 15, flexShrink: 0 }}>
         {student.firstName[0]}{student.lastName[0]}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -109,8 +109,8 @@ export default function Dashboard() {
 
   return (
     <>
-      <div style={{ textAlign: "center", marginBottom: 28 }}>
-        <div className="logo-gradient" style={{ width: 52, height: 52, borderRadius: 16, color: "white", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <div className="logo-gradient" style={{ width: 52, height: 52, borderRadius: 16, color: "white", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <LogoIcon size={28} />
         </div>
         <h2 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0, color: "var(--text)" }}>{dashboardTitle}</h2>
@@ -132,7 +132,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+      <div className="float-card" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16, padding: "14px 18px" }}>
         <h3 className="headline-serif" style={{ fontSize: 22, fontWeight: 400, margin: 0 }}>
           {isToday ? "Today's lessons" : "Lessons"}
         </h3>
@@ -161,7 +161,7 @@ export default function Dashboard() {
         </span>
       </div>
       {todaysStudents.length === 0 ? (
-        <p style={{ color: "var(--text-muted)", padding: 28, fontSize: 15 }}>No lessons scheduled for this day</p>
+        <p style={{ color: "var(--text-muted)", padding: 28, fontSize: 15, textAlign: "center", fontStyle: "italic" }}>No lessons scheduled for this day</p>
       ) : (
         todaysStudents.map((student) => {
           const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);

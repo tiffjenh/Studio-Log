@@ -20,9 +20,13 @@ export default function Settings() {
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [editing, setEditing] = useState<"name" | "email" | "password" | null>(null);
+  const [saveError, setSaveError] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [importMatrixOpen, setImportMatrixOpen] = useState(false);
+  const [importRowOpen, setImportRowOpen] = useState(false);
+  const [syncedToCloudOpen, setSyncedToCloudOpen] = useState(false);
 
   const handleSave = async (field: "name" | "email") => {
     if (!user) return;
@@ -31,14 +35,14 @@ export default function Settings() {
     } else if (field === "email" && hasSupabase()) {
       const { error } = await updateEmailSupabase(email.trim());
       if (error) {
-        setError(error);
+        setSaveError(error);
         return;
       }
       setUser({ ...user, email: email.trim() });
     } else {
       setUser({ ...user, name: field === "name" ? name : user.name, email: field === "email" ? email : user.email });
     }
-    setError("");
+    setSaveError("");
     setEditing(null);
   };
 
@@ -273,10 +277,11 @@ export default function Settings() {
           ) : (
             <span style={{ flex: 2 }}>{user.email}</span>
           )}
-          <button type="button" onClick={() => (editing === "email" ? handleSave("email") : setEditing("email"))} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
+          <button type="button" onClick={() => { if (editing === "email") handleSave("email"); else { setSaveError(""); setEditing("email"); } }} style={{ marginLeft: 8, color: "var(--primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
             {editing === "email" ? "Save" : "Edit"}
           </button>
         </div>
+        {saveError ? <p style={{ color: "#dc2626", marginTop: 8, marginBottom: 0 }}>{saveError}</p> : null}
         <div style={{ ...rowStyle, borderBottom: "none" }}>
           <span style={{ flex: 1 }}>Password</span>
           {editing === "password" ? (
@@ -311,91 +316,124 @@ export default function Settings() {
         </div>
       </div>
       <button type="button" className="btn btn-pink pill" style={{ width: "100%", marginBottom: 24, borderRadius: "var(--radius-pill)" }} onClick={handleLogOut}>Log Out</button>
-      <div className="float-card" style={{ marginBottom: 24, padding: 20 }}>
-        <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, margin: "0 0 12px", color: "var(--text-muted)" }}>Import lessons (attendance matrix)</h2>
-        <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--text-muted)" }}>
-          First row: student names. First column: dates (e.g. 1/1, 1/4). Put &quot;Y&quot; if they attended. Uses each student&apos;s rate. Students must already exist.
-        </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
-          <label style={{ fontSize: 14 }}>
-            Year for dates:
-            <input
-              type="number"
-              min={2020}
-              max={2030}
-              value={importYear}
-              onChange={(e) => setImportYear(parseInt(e.target.value, 10) || new Date().getFullYear())}
-              style={{ marginLeft: 8, width: 70, padding: 6, border: "1px solid var(--border)", borderRadius: 6 }}
-            />
-          </label>
-          <input
-            ref={matrixFileInputRef}
-            type="file"
-            accept=".csv"
-            onChange={handleMatrixImport}
-            style={{ display: "none" }}
-          />
-          <button
-            type="button"
-            onClick={() => matrixFileInputRef.current?.click()}
-            disabled={importing}
-            style={{ padding: "10px 16px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: importing ? "not-allowed" : "pointer" }}
-          >
-            {importing ? "Importing…" : "Import matrix"}
-          </button>
-        </div>
-        {importResult && (
-          <div style={{ marginTop: 12, fontSize: 14 }}>
-            <p style={{ margin: 0, fontWeight: 600 }}>Imported {importResult.imported} lessons, skipped {importResult.skipped}</p>
-            {importResult.errors.length > 0 && (
-              <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "var(--text-muted)", maxHeight: 120, overflowY: "auto" }}>
-                {importResult.errors.slice(0, 10).map((err, i) => (
-                  <li key={i}>{err}</li>
-                ))}
-                {importResult.errors.length > 10 && <li>…and {importResult.errors.length - 10} more</li>}
-              </ul>
+      <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
+        <button
+          type="button"
+          onClick={() => setImportMatrixOpen((o) => !o)}
+          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", background: "none", border: "none", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}
+        >
+          <span style={{ fontSize: 14 }}>{importMatrixOpen ? "▼" : "▶"}</span>
+          Import lessons (attendance matrix)
+        </button>
+        {importMatrixOpen && (
+          <div style={{ padding: "0 20px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)", fontSize: 13 }}>
+            <p style={{ margin: "12px 0", fontSize: 13, color: "var(--text-muted)" }}>
+              First row: student names. First column: dates (e.g. 1/1, 1/4). Put &quot;Y&quot; if they attended. Uses each student&apos;s rate. Students must already exist.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
+              <label style={{ fontSize: 14 }}>
+                Year for dates:
+                <input
+                  type="number"
+                  min={2020}
+                  max={2030}
+                  value={importYear}
+                  onChange={(e) => setImportYear(parseInt(e.target.value, 10) || new Date().getFullYear())}
+                  style={{ marginLeft: 8, width: 70, padding: 6, border: "1px solid var(--border)", borderRadius: 6 }}
+                />
+              </label>
+              <input
+                ref={matrixFileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleMatrixImport}
+                style={{ display: "none" }}
+              />
+              <button
+                type="button"
+                onClick={() => matrixFileInputRef.current?.click()}
+                disabled={importing}
+                style={{ padding: "10px 16px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: importing ? "not-allowed" : "pointer" }}
+              >
+                {importing ? "Importing…" : "Import matrix"}
+              </button>
+            </div>
+            {importResult && (
+              <div style={{ marginTop: 12, fontSize: 14 }}>
+                <p style={{ margin: 0, fontWeight: 600 }}>Imported {importResult.imported} lessons, skipped {importResult.skipped}</p>
+                {importResult.errors.length > 0 && (
+                  <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "var(--text-muted)", maxHeight: 120, overflowY: "auto" }}>
+                    {importResult.errors.slice(0, 10).map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                    {importResult.errors.length > 10 && <li>…and {importResult.errors.length - 10} more</li>}
+                  </ul>
+                )}
+              </div>
             )}
           </div>
         )}
       </div>
-      <div className="float-card" style={{ marginBottom: 24, padding: 20 }}>
-        <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, margin: "0 0 12px", color: "var(--text-muted)" }}>Import lessons (row format)</h2>
-        <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--text-muted)" }}>
-          CSV needs: <code>first_name</code>, <code>last_name</code>, <code>date</code> (YYYY-MM-DD or M/D/YYYY), <code>duration_minutes</code>, <code>amount</code> (dollars) or <code>amount_cents</code>. Optional: <code>completed</code>, <code>note</code>. Students must already exist.
-        </p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv"
-          onChange={handleImport}
-          style={{ display: "none" }}
-        />
+      <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={importing}
-          style={{ padding: "10px 16px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: importing ? "not-allowed" : "pointer" }}
+          onClick={() => setImportRowOpen((o) => !o)}
+          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", background: "none", border: "none", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}
         >
-          {importing ? "Importing…" : "Import CSV"}
+          <span style={{ fontSize: 14 }}>{importRowOpen ? "▼" : "▶"}</span>
+          Import lessons (row format)
         </button>
+        {importRowOpen && (
+          <div style={{ padding: "0 20px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)", fontSize: 13 }}>
+            <p style={{ margin: "12px 0", fontSize: 13, color: "var(--text-muted)" }}>
+              CSV needs: <code>first_name</code>, <code>last_name</code>, <code>date</code> (YYYY-MM-DD or M/D/YYYY), <code>duration_minutes</code>, <code>amount</code> (dollars) or <code>amount_cents</code>. Optional: <code>completed</code>, <code>note</code>. Students must already exist.
+            </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleImport}
+              style={{ display: "none" }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              style={{ padding: "10px 16px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: importing ? "not-allowed" : "pointer" }}
+            >
+              {importing ? "Importing…" : "Import CSV"}
+            </button>
+          </div>
+        )}
       </div>
       {hasSupabase() && (
-        <div className="float-card" style={{ marginBottom: 24, padding: 20 }}>
-          <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, margin: "0 0 8px", color: "var(--text-muted)" }}>Synced to cloud</h2>
-          <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--text-muted)" }}>
-            Logged in as <strong>{user.email}</strong>. Data is shared across devices when you use this account.
-          </p>
-          <p style={{ margin: "0 0 12px", fontSize: 11, color: "var(--text-muted)", fontFamily: "monospace", wordBreak: "break-all" }}>
-            User ID: {user.id}
-          </p>
+        <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
           <button
             type="button"
-            onClick={async () => { setRefreshing(true); await reload(); setRefreshing(false); }}
-            disabled={refreshing}
-            style={{ padding: "8px 16px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: "pointer" }}
+            onClick={() => setSyncedToCloudOpen((o) => !o)}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", background: "none", border: "none", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}
           >
-            {refreshing ? "Refreshing…" : "Refresh data"}
+            <span style={{ fontSize: 14 }}>{syncedToCloudOpen ? "▼" : "▶"}</span>
+            Synced to cloud
           </button>
+          {syncedToCloudOpen && (
+            <div style={{ padding: "0 20px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)", fontSize: 13 }}>
+              <p style={{ margin: "12px 0", fontSize: 13, color: "var(--text-muted)" }}>
+                Logged in as <strong>{user.email}</strong>. Data is shared across devices when you use this account.
+              </p>
+              <p style={{ margin: "0 0 12px", fontSize: 11, color: "var(--text-muted)", fontFamily: "monospace", wordBreak: "break-all" }}>
+                User ID: {user.id}
+              </p>
+              <button
+                type="button"
+                onClick={async () => { setRefreshing(true); await reload(); setRefreshing(false); }}
+                disabled={refreshing}
+                style={{ padding: "8px 16px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: "pointer" }}
+              >
+                {refreshing ? "Refreshing…" : "Refresh data"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </>

@@ -94,7 +94,7 @@ function BarChart({
                       width: "75%",
                       height: barHeight,
                       minHeight: v > 0 ? 6 : 0,
-                      background: "var(--accent-gradient)",
+                      background: "var(--avatar-gradient)",
                       borderRadius: 6,
                     }}
                   />
@@ -266,7 +266,7 @@ export default function Earnings() {
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <strong>{startFormatted} – {endFormatted}</strong>
-                  <button type="button" onClick={() => setSelectedWeekStartKey(null)} style={{ fontSize: 12, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
+                  <button type="button" onClick={() => setSelectedWeekStartKey(null)} style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
                 </div>
                 <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
@@ -289,9 +289,9 @@ export default function Earnings() {
                     const student = data.students.find((s) => s.id === l.studentId);
                     return (
                       <div key={l.id} className="card-list-item" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20 }}>
-                        <span>{student ? `${student.firstName} ${student.lastName}` : "—"}</span>
-                        <span style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>{formatDuration(l.durationMinutes)}</span>
-                        <span style={{ fontWeight: 600, textAlign: "right" }}>{formatCurrency(l.amountCents)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)" }}>{student ? `${student.firstName} ${student.lastName}` : "—"}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "center" }}>{formatDuration(l.durationMinutes)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "right" }}>{formatCurrency(l.amountCents)}</span>
                       </div>
                     );
                   })}
@@ -378,7 +378,7 @@ export default function Earnings() {
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <strong>{monthFormatted}</strong>
-                  <button type="button" onClick={() => setSelectedMonthKey(null)} style={{ fontSize: 12, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
+                  <button type="button" onClick={() => setSelectedMonthKey(null)} style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
                 </div>
                 <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
@@ -401,9 +401,9 @@ export default function Earnings() {
                     const student = data.students.find((s) => s.id === studentId);
                     return (
                       <div key={studentId} className="card-list-item" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20 }}>
-                        <span>{student ? `${student.firstName} ${student.lastName}` : "—"}</span>
-                        <span style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>{formatHours(minutes)} hrs</span>
-                        <span style={{ fontWeight: 600, textAlign: "right" }}>{formatCurrency(cents)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)" }}>{student ? `${student.firstName} ${student.lastName}` : "—"}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "center" }}>{formatHours(minutes)} hrs</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "right" }}>{formatCurrency(cents)}</span>
                       </div>
                     );
                   })}
@@ -451,7 +451,7 @@ export default function Earnings() {
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <strong>{dateFormatted}</strong>
-                  <button type="button" onClick={() => setSelectedDayDateKey(null)} style={{ fontSize: 12, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
+                  <button type="button" onClick={() => setSelectedDayDateKey(null)} style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
                 </div>
                 <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
@@ -474,9 +474,9 @@ export default function Earnings() {
                     const student = data.students.find((s) => s.id === l.studentId);
                     return (
                       <div key={l.id} className="card-list-item" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20 }}>
-                        <span>{student ? `${student.firstName} ${student.lastName}` : "—"}</span>
-                        <span style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>{formatDuration(l.durationMinutes)}</span>
-                        <span style={{ fontWeight: 600, textAlign: "right" }}>{formatCurrency(l.amountCents)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)" }}>{student ? `${student.firstName} ${student.lastName}` : "—"}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "center" }}>{formatDuration(l.durationMinutes)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "right" }}>{formatCurrency(l.amountCents)}</span>
                       </div>
                     );
                   })}
