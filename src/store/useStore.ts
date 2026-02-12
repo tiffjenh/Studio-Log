@@ -26,6 +26,21 @@ function stripSeedData(parsed: AppData): AppData {
   return parsed;
 }
 
+/** One lesson per (studentId, date). If duplicates exist, keep the one with completed: true so earnings and toggles stay correct. */
+function dedupeLessonsByStudentDate(lessons: Lesson[]): Lesson[] {
+  const byKey = new Map<string, Lesson>();
+  for (const l of lessons) {
+    const key = `${l.studentId}|${l.date}`;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, l);
+    } else if (l.completed && !existing.completed) {
+      byKey.set(key, l);
+    }
+  }
+  return [...byKey.values()];
+}
+
 export function useStore() {
   const [data, setData] = useState<AppData>(defaultData);
   const [loaded, setLoaded] = useState(false);
@@ -36,7 +51,10 @@ export function useStore() {
     setLoadError(null);
     if (hasSupabase()) {
       try {
-        const appData = await loadFromSupabase();
+        const raw = await loadFromSupabase();
+        const appData = raw
+          ? { ...raw, lessons: dedupeLessonsByStudentDate(raw.lessons) }
+          : null;
         setData(appData ?? initialData);
         const d = appData ?? initialData;
         if (d.user && d.students.length === 0 && d.lessons.length === 0) {
@@ -65,8 +83,12 @@ export function useStore() {
       if (raw) {
         const parsed = JSON.parse(raw) as AppData;
         const cleaned = stripSeedData(parsed);
-        setData(cleaned);
-        if (cleaned !== parsed) localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        const lessons = dedupeLessonsByStudentDate(cleaned.lessons);
+        const final = lessons.length !== cleaned.lessons.length ? { ...cleaned, lessons } : cleaned;
+        setData(final);
+        if (cleaned !== parsed || lessons.length !== cleaned.lessons.length) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(final));
+        }
       } else {
         setData(initialData);
       }

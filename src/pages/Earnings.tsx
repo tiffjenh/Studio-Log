@@ -3,6 +3,7 @@ import { useStoreContext } from "@/context/StoreContext";
 import {
   formatCurrency,
   dedupeLessons,
+  filterLessonsOnScheduledDay,
   getMonthBounds,
   toDateKey,
   getWeeksInMonth,
@@ -162,8 +163,11 @@ export default function Earnings() {
   const [monthlyYearOffset, setMonthlyYearOffset] = useState(0);
   const [studentsYearOffset, setStudentsYearOffset] = useState(0);
   const now = new Date();
-  // Earnings only count lessons that are completed (toggled on Dashboard/Calendar or imported via CSV). Bars match toggles.
-  const completedLessons = dedupeLessons(data.lessons.filter((l) => l.completed));
+  // Earnings only count completed lessons on each student's scheduled day (avoids wrong-day and double-count).
+  const completedLessons = filterLessonsOnScheduledDay(
+    dedupeLessons(data.lessons.filter((l) => l.completed)),
+    data.students
+  );
   const thisYear = now.getFullYear();
   const studentsDisplayYear = thisYear + studentsYearOffset;
   const todayKey = toDateKey(now);
@@ -175,7 +179,7 @@ export default function Earnings() {
   const weeklyMonthDate = new Date(now.getFullYear(), now.getMonth() + weeklyMonthOffset, 1);
   const weeklyYear = weeklyMonthDate.getFullYear();
   const weeklyMonth = weeklyMonthDate.getMonth();
-  const weeklyData = getWeeksInMonth(data.lessons, weeklyYear, weeklyMonth);
+  const weeklyData = getWeeksInMonth(completedLessons, weeklyYear, weeklyMonth);
   const weeklyMonthTitle = weeklyMonthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   const displayYear = thisYear + monthlyYearOffset;

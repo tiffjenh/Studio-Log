@@ -13,6 +13,8 @@ import {
   getEffectiveRateCents,
   getLessonForStudentOnDate,
   toDateKey,
+  dedupeLessons,
+  filterLessonsOnScheduledDay,
 } from "@/utils/earnings";
 import type { Lesson, Student } from "@/types";
 
@@ -72,18 +74,22 @@ export default function Dashboard() {
 
   const dateKey = toDateKey(selectedDate);
   const dayOfWeek = selectedDate.getDay();
-  const earned = earnedThisWeek(data.lessons, today);
+  const countableLessons = filterLessonsOnScheduledDay(
+    dedupeLessons(data.lessons.filter((l) => l.completed)),
+    data.students
+  );
+  const earned = earnedThisWeek(countableLessons, today);
   const studioOwnerName = data.user?.name?.trim().split(/\s+/)[0] ?? null;
   const dashboardTitle = studioOwnerName ? `${studioOwnerName}'s Studio Log` : "Studio Log";
 
   const { start: monthStart, end: monthEnd } = getMonthBounds(today);
   const monthStartKey = toDateKey(monthStart);
   const monthEndKey = toDateKey(monthEnd);
-  const earningsThisMonth = earnedInDateRange(data.lessons, monthStartKey, monthEndKey);
+  const earningsThisMonth = earnedInDateRange(countableLessons, monthStartKey, monthEndKey);
 
   const year = today.getFullYear();
   const ytdEndKey = toDateKey(today);
-  const earningsYTD = earnedInDateRange(data.lessons, `${year}-01-01`, ytdEndKey);
+  const earningsYTD = earnedInDateRange(countableLessons, `${year}-01-01`, ytdEndKey);
 
   const todaysStudents = getStudentsForDay(data.students, dayOfWeek, dateKey);
   const isToday = toDateKey(selectedDate) === toDateKey(today);

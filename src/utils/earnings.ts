@@ -117,6 +117,24 @@ export function getLessonForStudentOnDate(lessons: Lesson[], studentId: string, 
   return lessons.find((l) => l.studentId === studentId && l.date === dateKey);
 }
 
+/** Day of week (0–6) for a YYYY-MM-DD date key. */
+function getDayOfWeekFromDateKey(dateKey: string): number {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1).getDay();
+}
+
+/** Keep only lessons that fall on the student's scheduled day for that date. Avoids double-counting and wrong-day earnings (e.g. make-up logged on wrong day). */
+export function filterLessonsOnScheduledDay(lessons: Lesson[], students: Student[]): Lesson[] {
+  const byId = new Map(students.map((s) => [s.id, s]));
+  return lessons.filter((l) => {
+    const student = byId.get(l.studentId);
+    if (!student) return false;
+    const lessonDay = getDayOfWeekFromDateKey(l.date);
+    const scheduledDay = getEffectiveSchedule(student, l.date).dayOfWeek;
+    return lessonDay === scheduledDay;
+  });
+}
+
 const DAY_ABBREV = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function getWeeklyTotals(
