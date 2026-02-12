@@ -334,7 +334,7 @@ export default function StudentDetail() {
             <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 12 }}>Progress & earnings</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
               <div>
-                <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400, lineHeight: 1.3 }}>{thisMonthLessons.length} out of {availableThisMonth} lessons</div>
+                <div className="headline-serif" style={{ fontSize: 15, fontWeight: 400, lineHeight: 1.3 }}>{thisMonthLessons.length} out of {availableThisMonth} lessons</div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{monthLabel}</div>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -342,7 +342,7 @@ export default function StudentDetail() {
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>This month</div>
               </div>
               <div>
-                <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400, lineHeight: 1.3 }}>{thisYearLessons.length} out of {availableThisYear} lessons</div>
+                <div className="headline-serif" style={{ fontSize: 15, fontWeight: 400, lineHeight: 1.3 }}>{thisYearLessons.length} out of {availableThisYear} lessons</div>
                 <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>YTD</div>
               </div>
               <div style={{ textAlign: "right" }}>

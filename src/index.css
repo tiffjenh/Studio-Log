@@ -69,12 +69,13 @@ input, select, textarea {
   min-height: calc(100dvh - var(--nav-height) - var(--safe-bottom));
 }
 
-/* Bottom nav - mobile & tablet */
+/* Bottom nav - mobile & tablet; portal-rendered to body so fixed stays at viewport bottom */
 .bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
+  width: 100%;
   height: calc(var(--nav-height) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
   background: rgba(255, 255, 255, 0.92);
@@ -88,6 +89,9 @@ input, select, textarea {
   max-width: 900px;
   margin: 0 auto;
   box-shadow: 0 -4px 24px rgba(201, 123, 148, 0.04);
+  /* Keep fixed bar at viewport bottom on mobile (avoid float when URL bar resizes) */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 .bottom-nav a {
@@ -436,7 +440,7 @@ input, select, textarea {
   .bottom-nav {
     max-width: 900px;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
     border-radius: 16px 16px 0 0;
     box-shadow: 0 -2px 10px rgba(0,0,0,0.06);
   }

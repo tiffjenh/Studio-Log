@@ -109,8 +109,8 @@ export default function Dashboard() {
 
   return (
     <>
-      <div style={{ textAlign: "center", marginBottom: 28 }}>
-        <div className="logo-gradient" style={{ width: 52, height: 52, borderRadius: 16, color: "white", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <div className="logo-gradient" style={{ width: 52, height: 52, borderRadius: 16, color: "white", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <LogoIcon size={28} />
         </div>
         <h2 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0, color: "var(--text)" }}>{dashboardTitle}</h2>

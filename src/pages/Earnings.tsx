@@ -417,14 +417,14 @@ export default function Earnings() {
       {activeTab === "Daily" && (
         <>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+            <div className="hero-card" style={{ flex: "0 0 auto", width: "fit-content", padding: "12px 16px" }}>
+              <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 4 }}>{dailyRangeStart}–{dailyRangeEnd} week total</div>
+              <div className="headline-serif" style={{ fontSize: 26, fontWeight: 400 }}>{formatCurrency(dailyWeekTotal)}</div>
+            </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, paddingBottom: 2 }}>
               <button type="button" onClick={() => setDailyWeekOffset((o) => o - 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Previous week">‹</button>
               <span style={{ fontSize: 15, color: "var(--text-muted)" }}>{dailyRangeStart}–{dailyRangeEnd}</span>
               <button type="button" onClick={() => setDailyWeekOffset((o) => o + 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next week">›</button>
-            </div>
-            <div className="hero-card" style={{ flex: "0 0 auto", width: "fit-content", padding: "12px 16px", marginLeft: "auto" }}>
-              <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 4 }}>{dailyRangeStart}–{dailyRangeEnd} week total</div>
-              <div className="headline-serif" style={{ fontSize: 26, fontWeight: 400 }}>{formatCurrency(dailyWeekTotal)}</div>
             </div>
           </div>
           <div className="float-card" style={{ marginBottom: 24 }}>

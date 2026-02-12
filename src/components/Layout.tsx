@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { NavLink, Outlet } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { hasSupabase } from "@/lib/supabase";
@@ -65,14 +66,17 @@ export default function Layout() {
         <ImportBanner />
         <Outlet />
       </main>
-      <nav className="bottom-nav" aria-label="Main">
-        {navItems.map(({ to, label, icon }) => (
-          <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => (isActive ? "active" : "")}>
-            <span className="bottom-nav__icon">{icon}</span>
-            <span className="bottom-nav__label">{label}</span>
-          </NavLink>
-        ))}
-      </nav>
+      {createPortal(
+        <nav className="bottom-nav" aria-label="Main">
+          {navItems.map(({ to, label, icon }) => (
+            <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => (isActive ? "active" : "")}>
+              <span className="bottom-nav__icon">{icon}</span>
+              <span className="bottom-nav__label">{label}</span>
+            </NavLink>
+          ))}
+        </nav>,
+        document.body
+      )}
     </>
   );
 }
