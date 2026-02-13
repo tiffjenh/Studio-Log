@@ -18,6 +18,7 @@ import {
   filterLessonsOnScheduledDay,
 } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
+import VoiceButton from "@/components/VoiceButton";
 import type { Lesson, Student } from "@/types";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -187,6 +188,7 @@ export default function Dashboard() {
       <div style={{ marginTop: 28, textAlign: "center" }}>
         <Link to="/calendar" className="btn btn-primary pill" style={{ textDecoration: "none", borderRadius: "var(--radius-pill)" }}>{t("dashboard.viewCalendar")}</Link>
       </div>
+      <VoiceButton dateKey={dateKey} dayOfWeek={dayOfWeek} />
     </>
   );
 }
