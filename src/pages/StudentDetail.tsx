@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatCurrency, getEffectiveSchedule, getEffectiveSchedules, getAllScheduledDays, getDayOfWeekFromDateKey, getLessonForStudentOnDate, getEffectiveDurationMinutes, getEffectiveRateCents, toDateKey } from "@/utils/earnings";
+import { formatCurrency, getEffectiveSchedules, getAllScheduledDays, getDayOfWeekFromDateKey, getLessonForStudentOnDate, getEffectiveDurationMinutes, getEffectiveRateCents, toDateKey } from "@/utils/earnings";
 import { getCurrencyByCode, getStoredCurrencyCode } from "@/utils/currencies";
 import DatePicker from "@/components/DatePicker";
 import StudentAvatar from "@/components/StudentAvatar";
@@ -145,10 +145,6 @@ export default function StudentDetail() {
   const [error, setError] = useState("");
   const [firstName, setFirstName] = useState(student?.firstName ?? "");
   const [lastName, setLastName] = useState(student?.lastName ?? "");
-  const [durationMinutes, setDurationMinutes] = useState(student?.durationMinutes ?? 60);
-  const [rateDollars, setRateDollars] = useState(student ? String((student.rateCents / 100).toFixed(2)) : "");
-  const [dayOfWeek, setDayOfWeek] = useState(student?.dayOfWeek ?? 1);
-  const [timeOfDay, setTimeOfDay] = useState(student?.timeOfDay ?? "");
 
   // Schedule entries (replaces multi-day selectedDays/perDay)
   const buildInitialEntries = (s: Student) => {
@@ -223,12 +219,6 @@ export default function StudentDetail() {
   const [terminatedFromDate, setTerminatedFromDate] = useState(student?.terminatedFromDate ?? "");
   const [changeScheduleOpen, setChangeScheduleOpen] = useState(false);
   const [terminateStudentOpen, setTerminateStudentOpen] = useState(false);
-  const [rateModalOpen, setRateModalOpen] = useState(false);
-  const [rateKeypadValue, setRateKeypadValue] = useState("");
-  const [timePickerOpen, setTimePickerOpen] = useState(false);
-  const [timePickerHour, setTimePickerHour] = useState(5);
-  const [timePickerMinute, setTimePickerMinute] = useState(0);
-  const [timePickerAmPm, setTimePickerAmPm] = useState<"AM" | "PM">("PM");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
@@ -236,10 +226,6 @@ export default function StudentDetail() {
       setEditing(false);
       setFirstName(student.firstName);
       setLastName(student.lastName);
-      setDurationMinutes(student.durationMinutes);
-      setRateDollars(String((student.rateCents / 100).toFixed(2)));
-      setDayOfWeek(student.dayOfWeek);
-      setTimeOfDay(student.timeOfDay);
       setScheduleEntries(buildInitialEntries(student));
       setScheduleChangeFromDate(student.scheduleChangeFromDate ?? "");
       setSchedChangeEntries(buildInitialSchedChangeEntries(student));
@@ -252,10 +238,6 @@ export default function StudentDetail() {
   const syncFormFromStudent = () => {
     setFirstName(student.firstName);
     setLastName(student.lastName);
-    setDurationMinutes(student.durationMinutes);
-    setRateDollars(String((student.rateCents / 100).toFixed(2)));
-    setDayOfWeek(student.dayOfWeek);
-    setTimeOfDay(student.timeOfDay);
     setScheduleEntries(buildInitialEntries(student));
     setScheduleChangeFromDate(student.scheduleChangeFromDate ?? "");
     setSchedChangeEntries(buildInitialSchedChangeEntries(student));
@@ -360,11 +342,6 @@ export default function StudentDetail() {
   const inputStyle: React.CSSProperties = { width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, ...fontStyle };
   const labelStyle: React.CSSProperties = { display: "block", marginBottom: 8, fontWeight: 600, ...fontStyle };
   const rowStyle: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16, minWidth: 0 };
-
-  const openRateModal = () => { setRateKeypadValue(rateDollars || ""); setRateModalOpen(true); };
-  const applyRate = () => { const v = rateKeypadValue.trim(); if (v !== "" && !Number.isNaN(Number(v))) setRateDollars(v); setRateModalOpen(false); };
-  const openTimePicker = () => { const p = parseTimeOfDay(timeOfDay); setTimePickerHour(p.hour); setTimePickerMinute(p.minute); setTimePickerAmPm(p.amPm); setTimePickerOpen(true); };
-  const applyTime = () => { const displayHour = timePickerHour; const displayMin = String(timePickerMinute).padStart(2, "0"); setTimeOfDay(`${displayHour}:${displayMin} ${timePickerAmPm}`); setTimePickerOpen(false); };
 
   // (schedule change rate/time modals are handled via openSchedChangeRateModal / openSchedChangeTimePicker above)
 
