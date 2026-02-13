@@ -391,17 +391,6 @@ export default function Settings() {
           )}
         </div>
       </div>
-      <div className="float-card" style={{ marginBottom: 24 }}>
-        <label style={{ display: "block", marginBottom: 8, fontWeight: 600, fontFamily: "var(--font-sans)" }}>{t("settings.defaultCurrency")}</label>
-        <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>{t("settings.defaultCurrencyHint")}</p>
-        <button
-          type="button"
-          onClick={openCurrencyModal}
-          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", textAlign: "left", cursor: "pointer", fontSize: 14, fontFamily: "var(--font-sans)" }}
-        >
-          {getCurrencyByCode(defaultCurrencyCode)?.symbol ?? "$"} {defaultCurrencyCode} – {getCurrencyByCode(defaultCurrencyCode)?.name ?? "US Dollar"}
-        </button>
-      </div>
       <div style={{ textAlign: "center", marginBottom: 24 }}>
         <button type="button" className="pill" style={{ width: "auto", padding: "10px 20px", marginBottom: 8, borderRadius: "var(--radius-pill)", background: "transparent", border: "2px solid #fff", color: "var(--text)", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }} onClick={handleLogOut}>{t("settings.logOut")}</button>
         <div>
