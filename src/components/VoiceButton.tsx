@@ -64,7 +64,7 @@ type Phase = "idle" | "listening" | "processing" | "result" | "error";
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function VoiceButton({ dateKey, dayOfWeek }: { dateKey: string; dayOfWeek: number }) {
+export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { dateKey: string; dayOfWeek: number; onDateChange?: (date: Date) => void }) {
   const { data, addLesson, updateLesson } = useStoreContext();
   const [phase, setPhase] = useState<Phase>("idle");
   const [transcript, setTranscript] = useState("");
@@ -160,30 +160,70 @@ export default function VoiceButton({ dateKey, dayOfWeek }: { dateKey: string; d
       setTranscript(text);
       setPhase("processing");
 
-      const todaysStudents = getStudentsForDay(data.students, dayOfWeek, dateKey);
-      const scheduled = buildScheduledLessons(todaysStudents, dateKey, dayOfWeek);
+      // First pass: parse with current date to detect date navigation
       const allStudents = buildAllStudentList(data.students);
-      const voiceResult = processVoiceTranscript(text, scheduled, allStudents, dateKey);
+      let voiceResult = processVoiceTranscript(text, [], allStudents, dateKey);
+
+      // If user navigated to a different date, re-resolve students for that date
+      const targetDateKey = voiceResult.navigated_date ?? dateKey;
+      const targetDate = new Date(targetDateKey + "T12:00:00");
+      const targetDayOfWeek = targetDate.getDay();
+
+      // Navigate the dashboard to the new date
+      if (voiceResult.navigated_date && onDateChange) {
+        onDateChange(targetDate);
+      }
+
+      // Re-run with the correct date's scheduled students
+      const targetStudents = getStudentsForDay(data.students, targetDayOfWeek, targetDateKey);
+      const scheduled = buildScheduledLessons(targetStudents, targetDateKey);
+      voiceResult = processVoiceTranscript(text, scheduled, allStudents, dateKey);
+      // Preserve navigated_date
+      if (voiceResult.navigated_date && onDateChange) {
+        // Already navigated above
+      }
       setResult(voiceResult);
 
-      if (voiceResult.intent === "clarify") {
-        setFeedback(voiceResult.clarifying_question);
+      const feedbackLines: string[] = [];
+
+      // Show date navigation feedback
+      if (voiceResult.navigated_date) {
+        const navDate = new Date(voiceResult.navigated_date + "T12:00:00");
+        const formatted = navDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+        feedbackLines.push(`Navigated to ${formatted}`);
+      }
+
+      if (voiceResult.intent === "clarify" && voiceResult.actions.length === 0) {
+        if (voiceResult.navigated_date && voiceResult.unmatched_mentions.length === 0) {
+          // Just a date navigation, no attendance
+          setFeedback(feedbackLines.join("\n") || "Done!");
+        } else {
+          setFeedback(voiceResult.clarifying_question);
+        }
         setPhase("result");
       } else {
         // Apply actions
-        const lines = await applyActions(voiceResult.actions, voiceResult.actions[0]?.date ?? dateKey);
-        setFeedback(lines.join("\n") || "Done!");
+        const actionDate = voiceResult.navigated_date ?? (voiceResult.actions[0]?.date ?? dateKey);
+        const lines = await applyActions(voiceResult.actions, actionDate);
+        feedbackLines.push(...lines);
+        setFeedback(feedbackLines.join("\n") || "Done!");
         setPhase("result");
       }
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === "no-speech") {
-        setFeedback("No speech detected. Try again.");
+        setFeedback("No speech detected. Tap the mic and try again.");
       } else if (event.error === "not-allowed") {
-        setFeedback("Microphone access denied. Please allow microphone access in your browser settings.");
+        setFeedback("Microphone access denied. Please allow microphone in your browser settings.");
+      } else if (event.error === "network") {
+        setFeedback("Voice recognition needs an internet connection. Please check your Wi-Fi or cellular data and try again.");
+      } else if (event.error === "audio-capture") {
+        setFeedback("No microphone found. Please connect a microphone and try again.");
+      } else if (event.error === "aborted") {
+        setFeedback("Voice input was cancelled.");
       } else {
-        setFeedback(`Error: ${event.error}`);
+        setFeedback(`Something went wrong (${event.error}). Please try again.`);
       }
       setPhase("error");
     };

@@ -52,6 +52,8 @@ export interface VoiceResult {
   actions: VoiceAction[];
   clarifying_question: string | null;
   unmatched_mentions: UnmatchedMention[];
+  /** If the user requested navigation to a specific date, this will be set (YYYY-MM-DD). */
+  navigated_date: string | null;
 }
 
 export interface ScheduledLesson {
@@ -84,24 +86,122 @@ function detectLanguages(text: string): DetectedLanguage[] {
 /*  Date parsing                                                       */
 /* ------------------------------------------------------------------ */
 
-const YESTERDAY_PATTERNS = /\b(yesterday|ayer)\b|昨天/i;
+const MONTH_MAP: Record<string, number> = {
+  january: 0, jan: 0, febrero: 1, february: 1, feb: 1, march: 2, mar: 2, marzo: 2,
+  april: 3, apr: 3, abril: 3, may: 4, mayo: 4, june: 5, jun: 5, junio: 5,
+  july: 6, jul: 6, julio: 6, august: 7, aug: 7, agosto: 7,
+  september: 8, sep: 8, sept: 8, septiembre: 8, october: 9, oct: 9, octubre: 9,
+  november: 10, nov: 10, noviembre: 10, december: 11, dec: 11, diciembre: 11,
+};
+
+const DAY_NAME_MAP: Record<string, number> = {
+  sunday: 0, sun: 0, domingo: 0,
+  monday: 1, mon: 1, lunes: 1,
+  tuesday: 2, tue: 2, tues: 2, martes: 2,
+  wednesday: 3, wed: 3, miercoles: 3, miércoles: 3,
+  thursday: 4, thu: 4, thurs: 4, jueves: 4,
+  friday: 5, fri: 5, viernes: 5,
+  saturday: 6, sat: 6, sabado: 6, sábado: 6,
+};
 
 interface DateInfo {
   date: string; // YYYY-MM-DD
   isExplicitNonToday: boolean;
 }
 
+function toYMD(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function parseDate(text: string, todayKey: string): DateInfo {
-  if (YESTERDAY_PATTERNS.test(text)) {
-    const d = new Date(todayKey + "T12:00:00");
+  const today = new Date(todayKey + "T12:00:00");
+  const lower = text.toLowerCase();
+
+  // Yesterday / 昨天 / ayer
+  if (/\b(yesterday|ayer)\b|昨天/.test(lower)) {
+    const d = new Date(today);
     d.setDate(d.getDate() - 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return { date: `${y}-${m}-${day}`, isExplicitNonToday: true };
+    return { date: toYMD(d), isExplicitNonToday: true };
   }
+
+  // "last Monday", "last Tuesday" etc.
+  const lastDayMatch = lower.match(/\blast\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\b/);
+  if (lastDayMatch) {
+    const targetDay = DAY_NAME_MAP[lastDayMatch[1]];
+    if (targetDay != null) {
+      const d = new Date(today);
+      // Go back to find the most recent occurrence of that day (always in the past)
+      const diff = (today.getDay() - targetDay + 7) % 7 || 7;
+      d.setDate(d.getDate() - diff);
+      return { date: toYMD(d), isExplicitNonToday: true };
+    }
+  }
+
+  // "Monday February 9", "Feb 9", "February 9th", "Monday Feb 9"
+  // Pattern: optional day name + month name + day number
+  const monthDayMatch = lower.match(
+    /(?:(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\s+)?(?:go\s+to\s+)?(?:(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\s+)?(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/
+  );
+  if (monthDayMatch) {
+    const month = MONTH_MAP[monthDayMatch[1]];
+    const day = parseInt(monthDayMatch[2], 10);
+    if (month != null && day >= 1 && day <= 31) {
+      // Use current year, or previous year if the date is far in the future
+      let year = today.getFullYear();
+      const candidate = new Date(year, month, day);
+      // If the date is more than 6 months in the future, assume previous year
+      if (candidate.getTime() - today.getTime() > 180 * 24 * 60 * 60 * 1000) {
+        year--;
+      }
+      const d = new Date(year, month, day);
+      const key = toYMD(d);
+      return { date: key, isExplicitNonToday: key !== todayKey };
+    }
+  }
+
+  // "go to Monday", "on Wednesday" — day name without a month (find nearest past/future occurrence)
+  const gotoDay = lower.match(/(?:go\s+to|on)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\b/);
+  if (gotoDay) {
+    const targetDay = DAY_NAME_MAP[gotoDay[1]];
+    if (targetDay != null) {
+      const d = new Date(today);
+      // Find the nearest occurrence (past first, then future)
+      const backDiff = (today.getDay() - targetDay + 7) % 7;
+      if (backDiff === 0) {
+        // It's today
+        return { date: todayKey, isExplicitNonToday: false };
+      }
+      d.setDate(d.getDate() - backDiff);
+      return { date: toYMD(d), isExplicitNonToday: true };
+    }
+  }
+
+  // Bare day name at the start of the sentence (e.g. "Monday, waffles came")
+  const bareDayMatch = lower.match(/^(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if (bareDayMatch) {
+    const targetDay = DAY_NAME_MAP[bareDayMatch[1]];
+    if (targetDay != null && targetDay !== today.getDay()) {
+      const d = new Date(today);
+      const backDiff = (today.getDay() - targetDay + 7) % 7 || 7;
+      d.setDate(d.getDate() - backDiff);
+      return { date: toYMD(d), isExplicitNonToday: true };
+    }
+  }
+
   // Default to today
   return { date: todayKey, isExplicitNonToday: false };
+}
+
+/**
+ * Strip date-related phrases from the transcript so they don't interfere with name extraction.
+ */
+function stripDatePhrases(text: string): string {
+  return text
+    .replace(/\b(?:go\s+to|on)\s+(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\b/gi, " ")
+    .replace(/\blast\s+(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\b/gi, " ")
+    .replace(/\b(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday)\s+(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+\d{1,2}(?:st|nd|rd|th)?\b/gi, " ")
+    .replace(/\b(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+\d{1,2}(?:st|nd|rd|th)?\b/gi, " ")
+    .replace(/\b(?:go\s+to)\b/gi, " ");
 }
 
 /* ------------------------------------------------------------------ */
@@ -321,8 +421,8 @@ function matchStudentName(
  * Strategy: strip known non-name words, then split on connectors ("and", "y", "和", commas).
  */
 function extractNameSegments(text: string): string[] {
-  // Remove attendance verbs and filler words
-  let cleaned = text;
+  // Remove date phrases first
+  let cleaned = stripDatePhrases(text);
   const stripPatterns = [
     // English
     /\b(came|attended|was\s+here|showed\s+up|present|didn'?t\s+come|absent|no[\s-]show|wasn'?t\s+here|didn'?t\s+attend|didn'?t\s+show|skipped|missed|today|yesterday|this\s+morning|this\s+afternoon|did|had|took|lesson|lessons?|class)\b/gi,
@@ -333,8 +433,10 @@ function extractNameSegments(text: string): string[] {
     // Duration/rate words
     /\d+\s*(minutes?|mins?|hours?|hrs?|minutos?|horas?|dollars?|bucks?|dólares?|分钟|小时|块|元)\b/gi,
     /\$[\d.]+/g,
+    // Day/month names that might remain after date phrase stripping
+    /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday|january|february|march|april|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/gi,
     // Filler
-    /\b(the|a|an|el|la|los|las|de|del|了|的|和|都)\b/gi,
+    /\b(the|a|an|to|for|on|at|in|el|la|los|las|de|del|了|的|和|都)\b/gi,
   ];
   for (const p of stripPatterns) {
     cleaned = cleaned.replace(p, " ");
@@ -370,6 +472,7 @@ export function processVoiceTranscript(
       actions: [],
       clarifying_question: "I didn't catch that. Could you say that again?",
       unmatched_mentions: [],
+      navigated_date: null,
     };
   }
 
@@ -471,13 +574,8 @@ export function processVoiceTranscript(
     clarifyQuestion = clarifyQuestion ?? "I didn't understand. Could you say that again?";
   }
 
-  // If date is not today, confirm
-  if (isExplicitNonToday && actions.length > 0 && !needsClarification) {
-    const dateObj = new Date(date + "T12:00:00");
-    const formatted = dateObj.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-    clarifyQuestion = `Got it — logging for ${formatted} (not today). Confirm?`;
-    intent = "clarify";
-  }
+  // navigated_date is set if user mentioned a specific date (even today explicitly)
+  const navigated_date = isExplicitNonToday ? date : null;
 
   return {
     language_detected: languages,
@@ -485,6 +583,7 @@ export function processVoiceTranscript(
     actions,
     clarifying_question: clarifyQuestion,
     unmatched_mentions: unmatched,
+    navigated_date,
   };
 }
 

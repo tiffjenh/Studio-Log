@@ -188,7 +188,7 @@ export default function Dashboard() {
       <div style={{ marginTop: 28, textAlign: "center" }}>
         <Link to="/calendar" className="btn btn-primary pill" style={{ textDecoration: "none", borderRadius: "var(--radius-pill)" }}>{t("dashboard.viewCalendar")}</Link>
       </div>
-      <VoiceButton dateKey={dateKey} dayOfWeek={dayOfWeek} />
+      <VoiceButton dateKey={dateKey} dayOfWeek={dayOfWeek} onDateChange={setSelectedDate} />
     </>
   );
 }
