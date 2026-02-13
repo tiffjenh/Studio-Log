@@ -18,6 +18,8 @@ function rowToStudent(r: Record<string, unknown>): Student {
     scheduleChangeRateCents: r.schedule_change_rate_cents != null ? (r.schedule_change_rate_cents as number) : undefined,
     terminatedFromDate: (r.terminated_from_date as string) || undefined,
     avatarIcon: (r.avatar_icon as string) || undefined,
+    additionalSchedules: r.additional_schedules ? (typeof r.additional_schedules === "string" ? JSON.parse(r.additional_schedules as string) : r.additional_schedules as Student["additionalSchedules"]) : undefined,
+    scheduleChangeAdditionalSchedules: r.schedule_change_additional_schedules ? (typeof r.schedule_change_additional_schedules === "string" ? JSON.parse(r.schedule_change_additional_schedules as string) : r.schedule_change_additional_schedules as Student["scheduleChangeAdditionalSchedules"]) : undefined,
   };
 }
 
@@ -159,6 +161,8 @@ export async function addStudentSupabase(uid: string, student: Omit<Student, "id
       schedule_change_rate_cents: student.scheduleChangeRateCents ?? null,
       terminated_from_date: student.terminatedFromDate ?? null,
       avatar_icon: student.avatarIcon ?? null,
+      additional_schedules: student.additionalSchedules?.length ? JSON.stringify(student.additionalSchedules) : null,
+      schedule_change_additional_schedules: student.scheduleChangeAdditionalSchedules?.length ? JSON.stringify(student.scheduleChangeAdditionalSchedules) : null,
     })
     .select()
     .single();
@@ -182,6 +186,8 @@ export async function updateStudentSupabase(uid: string, id: string, updates: Pa
   if (updates.scheduleChangeDurationMinutes !== undefined) row.schedule_change_duration_minutes = updates.scheduleChangeDurationMinutes ?? null;
   if (updates.scheduleChangeRateCents !== undefined) row.schedule_change_rate_cents = updates.scheduleChangeRateCents ?? null;
   if (updates.terminatedFromDate !== undefined) row.terminated_from_date = updates.terminatedFromDate || null;
+  if (updates.additionalSchedules !== undefined) row.additional_schedules = updates.additionalSchedules?.length ? JSON.stringify(updates.additionalSchedules) : null;
+  if (updates.scheduleChangeAdditionalSchedules !== undefined) row.schedule_change_additional_schedules = updates.scheduleChangeAdditionalSchedules?.length ? JSON.stringify(updates.scheduleChangeAdditionalSchedules) : null;
   if (updates.avatarIcon !== undefined) row.avatar_icon = updates.avatarIcon || null;
   if (Object.keys(row).length) await supabase.from("students").update(row).eq("id", id).eq("user_id", uid);
 }

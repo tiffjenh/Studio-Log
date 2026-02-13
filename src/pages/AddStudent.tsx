@@ -4,11 +4,12 @@ import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { parseStudentCSV, rowToStudent } from "@/utils/csvImport";
 import { getCurrencyByCode, getStoredCurrencyCode } from "@/utils/currencies";
-import type { Student } from "@/types";
+import type { DaySchedule, Student } from "@/types";
 
 const DURATIONS = [30, 45, 60, 90, 120];
 const DURATION_LABELS: Record<number, string> = { 30: "30 min", 45: "45 min", 60: "1 hr", 90: "1.5 hr", 120: "2 hr" };
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function parseTimeOfDay(s: string): { hour: number; minute: number; amPm: "AM" | "PM" } {
   const t = s.trim();
@@ -32,38 +33,70 @@ export default function AddStudent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [durationMinutes, setDurationMinutes] = useState(60);
-  const [rateDollars, setRateDollars] = useState("");
-  const [dayOfWeek, setDayOfWeek] = useState(1);
-  const [timeOfDay, setTimeOfDay] = useState("");
   const [error, setError] = useState("");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
+
+  // Schedule entries: each entry has its own day, duration, rate, time
+  const [scheduleEntries, setScheduleEntries] = useState<{ id: number; dayOfWeek: number; durationMinutes: number; rateDollars: string; timeOfDay: string }[]>([
+    { id: 1, dayOfWeek: 1, durationMinutes: 60, rateDollars: "", timeOfDay: "" },
+  ]);
+  let nextEntryId = scheduleEntries.length > 0 ? Math.max(...scheduleEntries.map((e) => e.id)) + 1 : 1;
+
+  // Rate modal
   const [rateModalOpen, setRateModalOpen] = useState(false);
-  const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [rateModalDay, setRateModalDay] = useState(0);
   const [rateKeypadValue, setRateKeypadValue] = useState("");
+
+  // Time picker
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [timePickerDay, setTimePickerDay] = useState(0);
   const [timePickerHour, setTimePickerHour] = useState(5);
   const [timePickerMinute, setTimePickerMinute] = useState(0);
   const [timePickerAmPm, setTimePickerAmPm] = useState<"AM" | "PM">("PM");
 
+  const addScheduleEntry = () => {
+    setScheduleEntries((prev) => [...prev, { id: nextEntryId, dayOfWeek: 1, durationMinutes: 60, rateDollars: "", timeOfDay: "" }]);
+  };
+  const removeScheduleEntry = (id: number) => {
+    setScheduleEntries((prev) => prev.length <= 1 ? prev : prev.filter((e) => e.id !== id));
+  };
+  const updateEntry = (id: number, field: string, value: string | number) => {
+    setScheduleEntries((prev) => prev.map((e) => e.id === id ? { ...e, [field]: value } : e));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!firstName.trim() || !lastName.trim() || !rateDollars.trim()) return;
-    const trimmed = timeOfDay.trim();
-    if (trimmed && trimmed !== "—" && !/am|pm/i.test(trimmed)) {
-      setError("Time must include AM or PM (e.g. 5:00 PM)");
-      return;
+    if (!firstName.trim() || !lastName.trim()) return;
+
+    for (let i = 0; i < scheduleEntries.length; i++) {
+      if (!scheduleEntries[i].rateDollars.trim()) {
+        setError(`Please set a rate for lesson ${i + 1}.`);
+        return;
+      }
     }
-    const rateCents = Math.round(parseFloat(rateDollars) * 100) || 0;
+
+    const primary = scheduleEntries[0];
+    const primaryRateCents = Math.round(parseFloat(primary.rateDollars) * 100) || 0;
+    const primaryTime = primary.timeOfDay.trim() || "\u2014";
+
+    const additionalSchedules: DaySchedule[] = scheduleEntries.slice(1).map((entry) => ({
+      dayOfWeek: entry.dayOfWeek,
+      timeOfDay: entry.timeOfDay.trim() || "\u2014",
+      durationMinutes: entry.durationMinutes,
+      rateCents: Math.round(parseFloat(entry.rateDollars) * 100) || 0,
+    }));
+
     const student: Student = {
       id: `s_${Date.now()}`,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      durationMinutes,
-      rateCents,
-      dayOfWeek,
-      timeOfDay: trimmed || "—",
+      durationMinutes: primary.durationMinutes,
+      rateCents: primaryRateCents,
+      dayOfWeek: primary.dayOfWeek,
+      timeOfDay: primaryTime,
+      additionalSchedules: additionalSchedules.length > 0 ? additionalSchedules : undefined,
     };
     try {
       await addStudent(student);
@@ -134,40 +167,44 @@ export default function AddStudent() {
   const fontStyle = { fontFamily: "var(--font-sans)" };
   const inputStyle: React.CSSProperties = { width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, ...fontStyle };
   const labelStyle: React.CSSProperties = { display: "block", marginBottom: 8, fontWeight: 600, ...fontStyle };
-  const rowStyle: React.CSSProperties = { display: "flex", flexWrap: "nowrap", gap: 6, marginBottom: 16, minWidth: 0 };
+  const rowStyle: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16, minWidth: 0 };
+  const currencySymbol = getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$";
 
-  const openRateModal = () => {
-    setRateKeypadValue(rateDollars || "");
+  // rateModalDay / timePickerDay now store the entry ID (not day index)
+  const openRateModal = (entryId: number) => {
+    setRateModalDay(entryId);
+    const entry = scheduleEntries.find((e) => e.id === entryId);
+    setRateKeypadValue(entry?.rateDollars || "");
     setRateModalOpen(true);
   };
   const applyRate = () => {
     const v = rateKeypadValue.trim();
-    if (v !== "" && !Number.isNaN(Number(v))) setRateDollars(v);
+    if (v !== "" && !Number.isNaN(Number(v))) updateEntry(rateModalDay, "rateDollars", v);
     setRateModalOpen(false);
   };
-  const openTimePicker = () => {
-    const parsed = parseTimeOfDay(timeOfDay);
+  const openTimePicker = (entryId: number) => {
+    setTimePickerDay(entryId);
+    const entry = scheduleEntries.find((e) => e.id === entryId);
+    const parsed = parseTimeOfDay(entry?.timeOfDay || "");
     setTimePickerHour(parsed.hour);
     setTimePickerMinute(parsed.minute);
     setTimePickerAmPm(parsed.amPm);
     setTimePickerOpen(true);
   };
   const applyTime = () => {
-    const displayHour = timePickerHour;
-    const displayMin = String(timePickerMinute).padStart(2, "0");
-    setTimeOfDay(`${displayHour}:${displayMin} ${timePickerAmPm}`);
+    updateEntry(timePickerDay, "timeOfDay", `${timePickerHour}:${String(timePickerMinute).padStart(2, "0")} ${timePickerAmPm}`);
     setTimePickerOpen(false);
   };
 
   return (
     <>
-      <Link to="/students" style={{ display: "inline-flex", marginBottom: 24, color: "var(--text)", textDecoration: "none", ...fontStyle }}>← {t("common.back")}</Link>
+      <Link to="/students" style={{ display: "inline-flex", marginBottom: 24, color: "var(--text)", textDecoration: "none", ...fontStyle }}>&larr; {t("common.back")}</Link>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, ...fontStyle }}>{t("addStudent.title")}</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} />
           <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} className="pill" style={{ minHeight: 40, ...fontStyle }} title={t("students.importStudents")}>
-            {importing ? "…" : t("students.importStudents")}
+            {importing ? "..." : t("students.importStudents")}
           </button>
         </div>
       </div>
@@ -176,10 +213,8 @@ export default function AddStudent() {
           <p style={{ margin: 0, fontWeight: 600 }}>Imported {importResult.imported} students, skipped {importResult.skipped}</p>
           {importResult.errors.length > 0 && (
             <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "var(--text-muted)", maxHeight: 100, overflowY: "auto" }}>
-              {importResult.errors.slice(0, 8).map((err, i) => (
-                <li key={i}>{err}</li>
-              ))}
-              {importResult.errors.length > 8 && <li>…and {importResult.errors.length - 8} more</li>}
+              {importResult.errors.slice(0, 8).map((err, i) => (<li key={i}>{err}</li>))}
+              {importResult.errors.length > 8 && <li>...and {importResult.errors.length - 8} more</li>}
             </ul>
           )}
         </div>
@@ -189,36 +224,46 @@ export default function AddStudent() {
         <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t("addStudent.firstName")} style={inputStyle} required />
         <label style={labelStyle}>{t("addStudent.lastName")}</label>
         <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder={t("addStudent.lastName")} style={inputStyle} required />
-        <label style={labelStyle}>{t("addStudent.lessonDuration")}</label>
-        <div style={rowStyle}>
-          {DURATIONS.map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setDurationMinutes(m)}
-              className={durationMinutes === m ? "pill pill--active" : "pill"}
-              style={{ padding: "8px 12px", fontSize: 14, flexShrink: 0, ...fontStyle }}
-            >
-              {DURATION_LABELS[m]}
+
+        {/* Schedule entries */}
+        {scheduleEntries.map((entry) => (
+          <div key={entry.id} style={{ marginBottom: 20, padding: 16, borderRadius: 12, border: "1px solid var(--border)", background: "var(--bg)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontWeight: 700, fontSize: 15, ...fontStyle }}>{DAYS_FULL[entry.dayOfWeek]} Lesson</span>
+              {scheduleEntries.length > 1 && (
+                <button type="button" onClick={() => removeScheduleEntry(entry.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#dc2626", padding: "4px 8px", fontWeight: 600, ...fontStyle }}>Delete Day</button>
+              )}
+            </div>
+            <label style={labelStyle}>{t("addStudent.dayOfWeek")}</label>
+            <div style={rowStyle}>
+              {DAY_SHORT.map((label, i) => (
+                <button key={i} type="button" onClick={() => updateEntry(entry.id, "dayOfWeek", i)} className={entry.dayOfWeek === i ? "pill pill--active" : "pill"} style={{ padding: "8px 10px", fontSize: 13, flexShrink: 0, ...fontStyle }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label style={labelStyle}>{t("addStudent.lessonDuration")}</label>
+            <div style={rowStyle}>
+              {DURATIONS.map((m) => (
+                <button key={m} type="button" onClick={() => updateEntry(entry.id, "durationMinutes", m)} className={entry.durationMinutes === m ? "pill pill--active" : "pill"} style={{ padding: "8px 12px", fontSize: 14, flexShrink: 0, ...fontStyle }}>
+                  {DURATION_LABELS[m]}
+                </button>
+              ))}
+            </div>
+            <label style={labelStyle}>{t("common.rate")}</label>
+            <button type="button" onClick={() => openRateModal(entry.id)} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+              {entry.rateDollars ? `${currencySymbol}${entry.rateDollars}` : `${currencySymbol}0`}
             </button>
-          ))}
-        </div>
-        <label style={labelStyle}>{t("common.rate")}</label>
-        <button type="button" onClick={openRateModal} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
-          {rateDollars ? `${getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$"}${rateDollars}` : (getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$") + "0"}
-        </button>
-        <label style={labelStyle}>{t("addStudent.dayOfWeek")}</label>
-        <div style={rowStyle}>
-          {DAY_SHORT.map((label, i) => (
-            <button key={i} type="button" onClick={() => setDayOfWeek(i)} className={dayOfWeek === i ? "pill pill--active" : "pill"} style={{ padding: "8px 10px", fontSize: 13, flexShrink: 0, ...fontStyle }}>
-              {label}
+            <label style={labelStyle}>{t("common.time")}</label>
+            <button type="button" onClick={() => openTimePicker(entry.id)} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 0, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+              {entry.timeOfDay || "5:00 PM"}
             </button>
-          ))}
-        </div>
-        <label style={labelStyle}>{t("common.time")}</label>
-        <button type="button" onClick={openTimePicker} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
-          {timeOfDay || "5:00 PM"}
+          </div>
+        ))}
+        <button type="button" onClick={addScheduleEntry} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--text-muted)", marginBottom: 20, ...fontStyle }}>
+          + Day
         </button>
+
         {error ? <p style={{ color: "#dc2626", marginBottom: 16, ...fontStyle }}>{error}</p> : null}
         <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 24, ...fontStyle }}>{t("common.save")}</button>
       </form>
@@ -227,21 +272,19 @@ export default function AddStudent() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setRateModalOpen(false)}>
           <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-              <button type="button" onClick={() => setRateModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>×</button>
+              <button type="button" onClick={() => setRateModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>&times;</button>
             </div>
-            <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text-muted)" }}>{t("common.rate")} ({t("common.currencySetInSettings")})</p>
+            <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text-muted)" }}>{scheduleEntries.length > 1 ? `${DAY_SHORT[scheduleEntries.find((e) => e.id === rateModalDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}{t("common.rate")}</p>
             <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 16, color: "var(--text)" }}>
-              {(getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$")}{rateKeypadValue || "0"}
+              {currencySymbol}{rateKeypadValue || "0"}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                <button key={n} type="button" onClick={() => setRateKeypadValue((v) => v + n)} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>
-                  {n}
-                </button>
+                <button key={n} type="button" onClick={() => setRateKeypadValue((v) => v + n)} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>{n}</button>
               ))}
               <button type="button" onClick={() => setRateKeypadValue((v) => (v.includes(".") ? v : v + "."))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, cursor: "pointer", ...fontStyle }}>.</button>
               <button type="button" onClick={() => setRateKeypadValue((v) => v + "0")} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>0</button>
-              <button type="button" onClick={() => setRateKeypadValue((v) => v.slice(0, -1))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "rgba(180, 160, 180, 0.12)", fontSize: 18, cursor: "pointer", ...fontStyle }}>←</button>
+              <button type="button" onClick={() => setRateKeypadValue((v) => v.slice(0, -1))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "rgba(180, 160, 180, 0.12)", fontSize: 18, cursor: "pointer", ...fontStyle }}>&larr;</button>
             </div>
             <button type="button" onClick={applyRate} className="btn btn-primary" style={{ width: "100%", ...fontStyle }}>{t("common.setRate")}</button>
           </div>
@@ -252,21 +295,17 @@ export default function AddStudent() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setTimePickerOpen(false)}>
           <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-              <button type="button" onClick={() => setTimePickerOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>×</button>
+              <button type="button" onClick={() => setTimePickerOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>&times;</button>
             </div>
-            <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>{t("common.selectTime")}</p>
+            <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>{scheduleEntries.length > 1 ? `${DAY_SHORT[scheduleEntries.find((e) => e.id === timePickerDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}{t("common.selectTime")}</p>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <select value={timePickerHour} onChange={(e) => setTimePickerHour(Number(e.target.value))} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, ...fontStyle }}>
-                  {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (
-                    <option key={h} value={h}>{h}</option>
-                  ))}
+                  {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (<option key={h} value={h}>{h}</option>))}
                 </select>
                 <span style={{ fontSize: 18, fontWeight: 600 }}>:</span>
                 <select value={timePickerMinute} onChange={(e) => setTimePickerMinute(Number(e.target.value))} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, ...fontStyle }}>
-                  {Array.from({ length: 60 }, (_, i) => i).map((m) => (
-                    <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
-                  ))}
+                  {Array.from({ length: 60 }, (_, i) => i).map((m) => (<option key={m} value={m}>{String(m).padStart(2, "0")}</option>))}
                 </select>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>

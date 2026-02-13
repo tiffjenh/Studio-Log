@@ -1,4 +1,20 @@
-import type { Lesson, Student } from "@/types";
+import type { DaySchedule, Lesson, Student } from "@/types";
+
+/** Get all scheduled days for a student (primary + additional). */
+export function getAllScheduledDays(student: Student): DaySchedule[] {
+  const primary: DaySchedule = {
+    dayOfWeek: student.dayOfWeek,
+    timeOfDay: student.timeOfDay,
+    durationMinutes: student.durationMinutes,
+    rateCents: student.rateCents,
+  };
+  return [primary, ...(student.additionalSchedules ?? [])];
+}
+
+/** Find the schedule entry for a specific day of week, or undefined. */
+export function getScheduleForDay(student: Student, dayOfWeek: number): DaySchedule | undefined {
+  return getAllScheduledDays(student).find((s) => s.dayOfWeek === dayOfWeek);
+}
 
 export function formatCurrency(cents: number): string {
   return "$" + (cents / 100).toFixed(0);
@@ -66,22 +82,45 @@ export function potentialThisWeek(students: Student[], ref: Date): number {
   let total = 0;
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const dayNum = d.getDay();
-    students.filter((s) => s.dayOfWeek === dayNum).forEach((s) => { total += s.rateCents; });
+    for (const s of students) {
+      const sched = getScheduleForDay(s, dayNum);
+      if (sched) total += sched.rateCents;
+    }
   }
   return total;
 }
 
-/** Effective day and time for a student on a given date (respects schedule change from date). */
-export function getEffectiveSchedule(student: Student, dateKey: string): { dayOfWeek: number; timeOfDay: string } {
+/** All effective scheduled days for a student on a given date (respects schedule change from date). */
+export function getEffectiveSchedules(student: Student, dateKey: string): DaySchedule[] {
   const from = student.scheduleChangeFromDate;
   if (from && dateKey >= from && student.scheduleChangeDayOfWeek != null && student.scheduleChangeTimeOfDay != null) {
-    return { dayOfWeek: student.scheduleChangeDayOfWeek, timeOfDay: student.scheduleChangeTimeOfDay };
+    const primary: DaySchedule = {
+      dayOfWeek: student.scheduleChangeDayOfWeek,
+      timeOfDay: student.scheduleChangeTimeOfDay,
+      durationMinutes: student.scheduleChangeDurationMinutes ?? student.durationMinutes,
+      rateCents: student.scheduleChangeRateCents ?? student.rateCents,
+    };
+    return [primary, ...(student.scheduleChangeAdditionalSchedules ?? [])];
   }
-  return { dayOfWeek: student.dayOfWeek, timeOfDay: student.timeOfDay };
+  return getAllScheduledDays(student);
+}
+
+/** Effective day and time for a student on a given date (respects schedule change from date).
+ *  For multi-day students, returns the schedule matching the date's day-of-week when possible. */
+export function getEffectiveSchedule(student: Student, dateKey: string): { dayOfWeek: number; timeOfDay: string } {
+  const schedules = getEffectiveSchedules(student, dateKey);
+  const dateDow = getDayOfWeekFromDateKey(dateKey);
+  const match = schedules.find((s) => s.dayOfWeek === dateDow);
+  if (match) return { dayOfWeek: match.dayOfWeek, timeOfDay: match.timeOfDay };
+  return { dayOfWeek: schedules[0].dayOfWeek, timeOfDay: schedules[0].timeOfDay };
 }
 
 /** Effective lesson duration (minutes) for a student on a given date. */
 export function getEffectiveDurationMinutes(student: Student, dateKey: string): number {
+  const schedules = getEffectiveSchedules(student, dateKey);
+  const dateDow = getDayOfWeekFromDateKey(dateKey);
+  const match = schedules.find((s) => s.dayOfWeek === dateDow);
+  if (match) return match.durationMinutes;
   const from = student.scheduleChangeFromDate;
   if (from && dateKey >= from && student.scheduleChangeDurationMinutes != null) {
     return student.scheduleChangeDurationMinutes;
@@ -91,6 +130,10 @@ export function getEffectiveDurationMinutes(student: Student, dateKey: string): 
 
 /** Effective lesson rate (cents) for a student on a given date. */
 export function getEffectiveRateCents(student: Student, dateKey: string): number {
+  const schedules = getEffectiveSchedules(student, dateKey);
+  const dateDow = getDayOfWeekFromDateKey(dateKey);
+  const match = schedules.find((s) => s.dayOfWeek === dateDow);
+  if (match) return match.rateCents;
   const from = student.scheduleChangeFromDate;
   if (from && dateKey >= from && student.scheduleChangeRateCents != null) {
     return student.scheduleChangeRateCents;
@@ -98,18 +141,27 @@ export function getEffectiveRateCents(student: Student, dateKey: string): number
   return student.rateCents;
 }
 
-/** Students who have a lesson on the given day. Pass dateKey to respect schedule changes and termination. */
+/** Students who have a lesson on the given day. Pass dateKey to respect schedule changes and termination.
+ *  Now supports multi-day students (primary + additional schedules). */
 export function getStudentsForDay(students: Student[], dayOfWeek: number, dateKey?: string): Student[] {
   return students
     .filter((s) => {
       if (s.terminatedFromDate && dateKey && dateKey > s.terminatedFromDate) return false;
-      const { dayOfWeek: d } = dateKey ? getEffectiveSchedule(s, dateKey) : { dayOfWeek: s.dayOfWeek };
-      return d === dayOfWeek;
+      if (dateKey) {
+        return getEffectiveSchedules(s, dateKey).some((sched) => sched.dayOfWeek === dayOfWeek);
+      }
+      return getAllScheduledDays(s).some((sched) => sched.dayOfWeek === dayOfWeek);
     })
     .sort((a, b) => {
-      const ta = dateKey ? getEffectiveSchedule(a, dateKey).timeOfDay : a.timeOfDay;
-      const tb = dateKey ? getEffectiveSchedule(b, dateKey).timeOfDay : b.timeOfDay;
-      return ta > tb ? 1 : -1;
+      const getTime = (s: Student) => {
+        if (dateKey) {
+          const sched = getEffectiveSchedules(s, dateKey).find((sc) => sc.dayOfWeek === dayOfWeek);
+          return sched?.timeOfDay ?? s.timeOfDay;
+        }
+        const sched = getAllScheduledDays(s).find((sc) => sc.dayOfWeek === dayOfWeek);
+        return sched?.timeOfDay ?? s.timeOfDay;
+      };
+      return getTime(a) > getTime(b) ? 1 : -1;
     });
 }
 
@@ -123,15 +175,15 @@ export function getDayOfWeekFromDateKey(dateKey: string): number {
   return new Date(y, (m ?? 1) - 1, d ?? 1).getDay();
 }
 
-/** Keep only lessons that fall on the student's scheduled day for that date. Avoids double-counting and wrong-day earnings (e.g. make-up logged on wrong day). */
+/** Keep only lessons that fall on one of the student's scheduled days for that date. Avoids double-counting and wrong-day earnings (e.g. make-up logged on wrong day). */
 export function filterLessonsOnScheduledDay(lessons: Lesson[], students: Student[]): Lesson[] {
   const byId = new Map(students.map((s) => [s.id, s]));
   return lessons.filter((l) => {
     const student = byId.get(l.studentId);
     if (!student) return false;
     const lessonDay = getDayOfWeekFromDateKey(l.date);
-    const scheduledDay = getEffectiveSchedule(student, l.date).dayOfWeek;
-    return lessonDay === scheduledDay;
+    const scheduledDays = getEffectiveSchedules(student, l.date).map((s) => s.dayOfWeek);
+    return scheduledDays.includes(lessonDay);
   });
 }
 

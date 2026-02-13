@@ -173,6 +173,8 @@ export default function Earnings() {
   const [weeklyMonthOffset, setWeeklyMonthOffset] = useState(0);
   const [monthlyYearOffset, setMonthlyYearOffset] = useState(0);
   const [studentsYearOffset, setStudentsYearOffset] = useState(0);
+  const [studentsSearch, setStudentsSearch] = useState("");
+  const [studentsSort, setStudentsSort] = useState<"az" | "za" | "high" | "low">("az");
   const now = new Date();
   // Earnings only count completed lessons on each student's scheduled day (avoids wrong-day and double-count).
   const completedLessons = filterLessonsOnScheduledDay(
@@ -357,13 +359,23 @@ export default function Earnings() {
                 />
               </div>
               <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
-                {visibleMonthLabels.map((label, i) => (
-                  <div key={i} className="card-list-item" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20 }}>
-                    <span>{label}</span>
-                    <span style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>{visibleMonthlyHours[i] % 1 === 0 ? visibleMonthlyHours[i] : visibleMonthlyHours[i].toFixed(1)} hrs</span>
-                    <span style={{ fontWeight: 600, textAlign: "right" }}>{formatCurrency(visibleMonthlyTotals[i])}</span>
-                  </div>
-                ))}
+                {visibleMonthLabels.map((label, i) => {
+                  const monthKey = `${displayYear}-${String(i + 1).padStart(2, "0")}`;
+                  const isSelected = selectedMonthKey === monthKey;
+                  return (
+                    <div
+                      key={i}
+                      role="button"
+                      onClick={() => setSelectedMonthKey((prev) => (prev === monthKey ? null : monthKey))}
+                      className="card-list-item"
+                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20, cursor: "pointer", background: isSelected ? "var(--bg-hover, rgba(0,0,0,0.03))" : undefined }}
+                    >
+                      <span>{label}</span>
+                      <span style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>{visibleMonthlyHours[i] % 1 === 0 ? visibleMonthlyHours[i] : visibleMonthlyHours[i].toFixed(1)} hrs</span>
+                      <span style={{ fontWeight: 600, textAlign: "right" }}>{formatCurrency(visibleMonthlyTotals[i])}</span>
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}
@@ -501,28 +513,79 @@ export default function Earnings() {
         </>
       )}
 
-      {activeTab === "Students" && (
-        <>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => setStudentsYearOffset((o) => o - 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Previous year">‹</button>
-            <h2 className="headline-serif" style={{ fontSize: 20, fontWeight: 400, margin: 0 }}>
-              {studentsDisplayYear} earnings{studentsDisplayYear === thisYear ? " YTD" : ""}
-            </h2>
-            <button type="button" onClick={() => setStudentsYearOffset((o) => o + 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next year">›</button>
-          </div>
-          <div className="float-card" style={{ padding: 0, overflow: "hidden" }}>
-            {data.students.map((s) => {
-              const total = lessonsForStudentsYear.filter((l) => l.studentId === s.id).reduce((a, l) => a + l.amountCents, 0);
-              return (
+      {activeTab === "Students" && (() => {
+        const studentTotals = data.students.map((s) => ({
+          student: s,
+          total: lessonsForStudentsYear.filter((l) => l.studentId === s.id).reduce((a, l) => a + l.amountCents, 0),
+        }));
+        const q = studentsSearch.trim().toLowerCase();
+        const filtered = q
+          ? studentTotals.filter(({ student: s }) =>
+              `${s.firstName} ${s.lastName}`.toLowerCase().includes(q)
+            )
+          : studentTotals;
+        const sorted = [...filtered].sort((a, b) => {
+          switch (studentsSort) {
+            case "az":
+              return a.student.lastName.localeCompare(b.student.lastName) || a.student.firstName.localeCompare(b.student.firstName);
+            case "za":
+              return b.student.lastName.localeCompare(a.student.lastName) || b.student.firstName.localeCompare(a.student.firstName);
+            case "high":
+              return b.total - a.total;
+            case "low":
+              return a.total - b.total;
+            default:
+              return 0;
+          }
+        });
+        return (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+              <button type="button" onClick={() => setStudentsYearOffset((o) => o - 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Previous year">&#8249;</button>
+              <h2 className="headline-serif" style={{ fontSize: 20, fontWeight: 400, margin: 0 }}>
+                {studentsDisplayYear} earnings{studentsDisplayYear === thisYear ? " YTD" : ""}
+              </h2>
+              <button type="button" onClick={() => setStudentsYearOffset((o) => o + 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next year">&#8250;</button>
+            </div>
+            {/* Search + Sort on one line */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
+              <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={studentsSearch}
+                  onChange={(e) => setStudentsSearch(e.target.value)}
+                  style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 14, borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", fontFamily: "var(--font-sans)" }}
+                />
+              </div>
+              <select
+                value={studentsSort}
+                onChange={(e) => setStudentsSort(e.target.value as "az" | "za" | "high" | "low")}
+                style={{ padding: "8px 8px", fontSize: 14, borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", fontFamily: "var(--font-sans)", color: "var(--text)", cursor: "pointer", flexShrink: 0, WebkitAppearance: "none", MozAppearance: "none", appearance: "none", backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23666' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center", paddingRight: 24 }}
+              >
+                <option value="az">A–Z</option>
+                <option value="za">Z–A</option>
+                <option value="high">High–Low</option>
+                <option value="low">Low–High</option>
+              </select>
+            </div>
+            <div className="float-card" style={{ padding: 0, overflow: "hidden" }}>
+              {sorted.length === 0 && (
+                <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>No students found</div>
+              )}
+              {sorted.map(({ student: s, total }) => (
                 <div key={s.id} className="card-list-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 20, paddingRight: 20 }}>
                   <span>{s.firstName} {s.lastName}</span>
                   <span style={{ fontWeight: 600 }}>{formatCurrency(total)}</span>
                 </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+              ))}
+            </div>
+          </>
+        );
+      })()}
     </>
   );
 }

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
-import { formatCurrency } from "@/utils/earnings";
+import { formatCurrency, getAllScheduledDays } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Student } from "@/types";
 
@@ -61,7 +61,7 @@ export default function Students() {
   const [dayFilter, setDayFilter] = useState<number | null>(null);
 
   let filtered = data.students.filter((s) =>
-    (dayFilter === null || s.dayOfWeek === dayFilter) &&
+    (dayFilter === null || getAllScheduledDays(s).some((sched) => sched.dayOfWeek === dayFilter)) &&
     (!search.trim() || `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase()))
   );
 
@@ -69,7 +69,7 @@ export default function Students() {
     dayFilter === null
       ? DAY_LABELS.map((_, dayIndex) => ({
           dayIndex,
-          students: sortStudentsByTime(filtered.filter((s) => s.dayOfWeek === dayIndex)),
+          students: sortStudentsByTime(filtered.filter((s) => getAllScheduledDays(s).some((sched) => sched.dayOfWeek === dayIndex))),
         })).filter((g) => g.students.length > 0)
       : [{ dayIndex: dayFilter, students: sortStudentsByTime(filtered) }];
 
@@ -176,7 +176,7 @@ export default function Students() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
                         <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{durationStr(s)} / {formatCurrency(s.rateCents)}</div>
-                        <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{DAY_LABELS[s.dayOfWeek]}{s.timeOfDay && s.timeOfDay !== "—" ? ` at ${s.timeOfDay}` : ""}</div>
+                        <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{getAllScheduledDays(s).map((sched) => DAY_LABELS[sched.dayOfWeek]).join(", ")}{s.timeOfDay && s.timeOfDay !== "\u2014" ? ` at ${s.timeOfDay}` : ""}</div>
                       </div>
                       <span style={{ color: "var(--text-muted)", fontSize: 18 }}>›</span>
                     </div>
