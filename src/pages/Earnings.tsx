@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -11,6 +11,7 @@ import {
   getDailyTotalsForWeek,
   getYAxisTicks,
 } from "@/utils/earnings";
+import type { Lesson } from "@/types";
 
 const TABS = ["Daily", "Weekly", "Monthly", "Students"] as const;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -175,6 +176,10 @@ export default function Earnings() {
   const [studentsYearOffset, setStudentsYearOffset] = useState(0);
   const [studentsSearch, setStudentsSearch] = useState("");
   const [studentsSort, setStudentsSort] = useState<"az" | "za" | "high" | "low">("az");
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [dlYear, setDlYear] = useState(0); // 0 = unset; will init on open
+  const [dlFormat, setDlFormat] = useState<"csv" | "pdf">("csv");
+  const [dlDelivery, setDlDelivery] = useState<"device" | "email">("device");
   const now = new Date();
   // Earnings only count completed lessons on each student's scheduled day (avoids wrong-day and double-count).
   const completedLessons = filterLessonsOnScheduledDay(
@@ -228,9 +233,277 @@ export default function Earnings() {
   const maxWeekly = Math.max(...weeklyData.map((w) => w.total), 1);
   const maxDaily = Math.max(...dailyData.map((d) => d.total), 1);
 
+  // ── Download helpers ──────────────────────────────────────────────
+  const yearsWithData = [...new Set(completedLessons.map((l) => parseInt(l.date.substring(0, 4))))].sort((a, b) => b - a);
+  if (yearsWithData.length === 0) yearsWithData.push(thisYear);
+  if (!yearsWithData.includes(thisYear)) yearsWithData.unshift(thisYear);
+
+  const openDownloadModal = useCallback(() => {
+    setDlYear(thisYear);
+    setDlFormat("csv");
+    setDlDelivery("device");
+    setDownloadOpen(true);
+  }, [thisYear]);
+
+  function buildLessonsForYear(year: number): Lesson[] {
+    return completedLessons
+      .filter((l) => l.date.startsWith(String(year)))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  function generateCSV(year: number): string {
+    const yearLessons = buildLessonsForYear(year);
+    const rows: string[][] = [["Date", "Student", "Duration (min)", "Amount ($)"]];
+    for (const l of yearLessons) {
+      const s = data.students.find((st) => st.id === l.studentId);
+      const name = s ? `${s.firstName} ${s.lastName}` : "Unknown";
+      rows.push([l.date, name, String(l.durationMinutes), (l.amountCents / 100).toFixed(2)]);
+    }
+    const totalAmount = yearLessons.reduce((s, l) => s + l.amountCents, 0);
+    const totalMinutes = yearLessons.reduce((s, l) => s + l.durationMinutes, 0);
+    rows.push([]);
+    rows.push(["Summary"]);
+    rows.push(["Total Lessons", String(yearLessons.length)]);
+    rows.push(["Total Hours", (totalMinutes / 60).toFixed(1)]);
+    rows.push(["Total Earnings", `$${(totalAmount / 100).toFixed(2)}`]);
+    return rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+  }
+
+  function generatePDFWindow(year: number) {
+    const yearLessons = buildLessonsForYear(year);
+    const totalAmount = yearLessons.reduce((s, l) => s + l.amountCents, 0);
+    const totalMinutes = yearLessons.reduce((s, l) => s + l.durationMinutes, 0);
+    // group by month
+    const months = new Map<string, Lesson[]>();
+    for (const l of yearLessons) {
+      const mk = l.date.substring(0, 7);
+      const arr = months.get(mk) ?? [];
+      arr.push(l);
+      months.set(mk, arr);
+    }
+    let tableRows = "";
+    for (const [mk, lessons] of months) {
+      const [y2, m2] = mk.split("-").map(Number);
+      const monthName = new Date(y2, m2 - 1).toLocaleDateString("en-US", { month: "long" });
+      const mTotal = lessons.reduce((s, l) => s + l.amountCents, 0);
+      const mMin = lessons.reduce((s, l) => s + l.durationMinutes, 0);
+      tableRows += `<tr style="background:#f5f5f5;font-weight:600"><td colspan="2">${monthName}</td><td>${(mMin / 60).toFixed(1)} hrs</td><td style="text-align:right">${formatCurrency(mTotal)}</td></tr>`;
+      for (const l of lessons) {
+        const st = data.students.find((ss) => ss.id === l.studentId);
+        const nm = st ? `${st.firstName} ${st.lastName}` : "Unknown";
+        tableRows += `<tr><td>${l.date}</td><td>${nm}</td><td>${l.durationMinutes} min</td><td style="text-align:right">${formatCurrency(l.amountCents)}</td></tr>`;
+      }
+    }
+    const html = `<!DOCTYPE html><html><head><title>Earnings Report ${year}</title><style>
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:40px;max-width:800px;margin:0 auto}
+h1{font-size:24px;margin-bottom:4px}
+.summary{display:flex;gap:32px;margin:16px 0 24px}
+.summary .lb{font-size:12px;color:#888}
+.summary .vl{font-size:20px;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px 12px;border-bottom:1px solid #eee;text-align:left}
+th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #ddd}
+.ft{margin-top:24px;font-size:12px;color:#888}
+@media print{body{padding:20px}}
+</style></head><body>
+<h1>Earnings Report &#8212; ${year}</h1>
+<div class="summary">
+<div><div class="lb">Total Lessons</div><div class="vl">${yearLessons.length}</div></div>
+<div><div class="lb">Total Hours</div><div class="vl">${(totalMinutes / 60).toFixed(1)}</div></div>
+<div><div class="lb">Total Earnings</div><div class="vl">${formatCurrency(totalAmount)}</div></div>
+</div>
+<table><thead><tr><th>Date</th><th>Student</th><th>Duration</th><th style="text-align:right">Amount</th></tr></thead><tbody>${tableRows}</tbody></table>
+<div class="ft">Generated on ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</div>
+<script>window.onload=function(){window.print()}<\/script>
+</body></html>`;
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); }
+  }
+
+  function handleDownload() {
+    if (dlFormat === "csv") {
+      const csv = generateCSV(dlYear);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `earnings-${dlYear}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      generatePDFWindow(dlYear);
+    }
+    if (dlDelivery === "email" && data.user?.email) {
+      const subject = encodeURIComponent(`Earnings Report ${dlYear}`);
+      const body = encodeURIComponent(`Here is my earnings report for ${dlYear}.\n\nPlease see the attached file.`);
+      setTimeout(() => {
+        window.open(`mailto:${data.user!.email}?subject=${subject}&body=${body}`, "_self");
+      }, dlFormat === "pdf" ? 600 : 100);
+    }
+    setDownloadOpen(false);
+  }
+
   return (
     <>
-      <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, marginBottom: 20 }}>{t("earnings.title")}</h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0 }}>{t("earnings.title")}</h1>
+        <button
+          type="button"
+          onClick={openDownloadModal}
+          aria-label="Download earnings"
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Download modal overlay */}
+      {downloadOpen && (
+        <div
+          onClick={() => setDownloadOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--card, #fff)", borderRadius: 16, padding: 28, width: "100%", maxWidth: 360, boxShadow: "0 12px 40px rgba(0,0,0,0.18)" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 600, margin: 0, fontFamily: "var(--font-sans)" }}>Download Earnings</h2>
+              <button
+                type="button"
+                onClick={() => setDownloadOpen(false)}
+                style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "var(--text)", lineHeight: 1 }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Year */}
+            <label style={{ display: "block", marginBottom: 16 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Year</span>
+              <select
+                value={dlYear}
+                onChange={(e) => setDlYear(Number(e.target.value))}
+                style={{ width: "100%", padding: "10px 12px", fontSize: 15, borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", fontFamily: "var(--font-sans)", color: "var(--text)" }}
+              >
+                {yearsWithData.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </label>
+
+            {/* Format */}
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Format</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                {(["csv", "pdf"] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    type="button"
+                    onClick={() => setDlFormat(fmt)}
+                    style={{
+                      flex: 1,
+                      padding: "10px 0",
+                      fontSize: 15,
+                      fontWeight: 600,
+                      fontFamily: "var(--font-sans)",
+                      borderRadius: 10,
+                      border: dlFormat === fmt ? "2px solid var(--text)" : "1px solid var(--border)",
+                      background: dlFormat === fmt ? "var(--text)" : "var(--card)",
+                      color: dlFormat === fmt ? "var(--card, #fff)" : "var(--text)",
+                      cursor: "pointer",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {fmt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Delivery */}
+            <div style={{ marginBottom: 24 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Deliver to</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setDlDelivery("device")}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 14px",
+                    fontSize: 15,
+                    fontFamily: "var(--font-sans)",
+                    borderRadius: 10,
+                    border: dlDelivery === "device" ? "2px solid var(--text)" : "1px solid var(--border)",
+                    background: "var(--card)",
+                    color: "var(--text)",
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download to device
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDlDelivery("email")}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 14px",
+                    fontSize: 15,
+                    fontFamily: "var(--font-sans)",
+                    borderRadius: 10,
+                    border: dlDelivery === "email" ? "2px solid var(--text)" : "1px solid var(--border)",
+                    background: "var(--card)",
+                    color: "var(--text)",
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                    <path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7" />
+                  </svg>
+                  Email to {data.user?.email ? data.user.email : "profile"}
+                </button>
+              </div>
+            </div>
+
+            {/* Action button */}
+            <button
+              type="button"
+              onClick={handleDownload}
+              style={{
+                width: "100%",
+                padding: "12px 0",
+                fontSize: 16,
+                fontWeight: 600,
+                fontFamily: "var(--font-sans)",
+                borderRadius: 12,
+                border: "none",
+                background: "var(--text)",
+                color: "var(--card, #fff)",
+                cursor: "pointer",
+              }}
+            >
+              {dlDelivery === "email" ? "Download & Open Email" : "Download"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", flexWrap: "nowrap", gap: 8, marginBottom: 20 }}>
         {TABS.map((tab) => (
           <button
