@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useStoreContext } from "./context/StoreContext";
 import { useLanguage } from "./context/LanguageContext";
@@ -12,6 +13,18 @@ import Earnings from "./pages/Earnings";
 import Settings from "./pages/Settings";
 import Calendar from "./pages/Calendar";
 import EditLesson from "./pages/EditLesson";
+
+/** Toggle body class so login/forgot-password pages don't reserve space for the bottom nav (removes purple bar). */
+function BodyNavClass() {
+  const location = useLocation();
+  const { data } = useStoreContext();
+  const noNav = location.pathname === "/forgot-password" || (location.pathname === "/" && !data.user);
+  useEffect(() => {
+    document.body.classList.toggle("no-bottom-nav", noNav);
+    return () => document.body.classList.remove("no-bottom-nav");
+  }, [noNav]);
+  return null;
+}
 
 function AuthGate() {
   const { data, loaded } = useStoreContext();
@@ -28,6 +41,7 @@ function AuthGate() {
 export default function App() {
   return (
     <>
+      <BodyNavClass />
       <Routes>
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/" element={<AuthGate />}>

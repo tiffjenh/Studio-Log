@@ -70,6 +70,11 @@ body {
   padding-bottom: calc(var(--nav-height) + var(--safe-bottom));
 }
 
+/* Login and forgot-password have no bottom nav; avoid reserved purple bar */
+body.no-bottom-nav {
+  padding-bottom: 0;
+}
+
 /* Touch-friendly targets */
 button,
 a,
