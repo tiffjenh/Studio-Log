@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
@@ -14,6 +14,7 @@ export default function Settings() {
   const { data, setUser, updateUserProfile, addLesson, updateLesson } = useStoreContext();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importYear, setImportYear] = useState(new Date().getFullYear());
@@ -25,7 +26,21 @@ export default function Settings() {
   const [editing, setEditing] = useState<"name" | "email" | "password" | null>(null);
   const [saveError, setSaveError] = useState("");
   const [emailChangeMessage, setEmailChangeMessage] = useState<"success" | null>(null);
+  const [emailJustConfirmed, setEmailJustConfirmed] = useState(false);
   const [newPassword, setNewPassword] = useState("");
+
+  // After returning from the email-change confirmation link, show success and sync email from store.
+  useEffect(() => {
+    if (searchParams.get("email_updated") !== "1" || !user?.email) return;
+    setEmail(user.email);
+    setEmailJustConfirmed(true);
+    setEmailChangeMessage(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("email_updated");
+      return next;
+    }, { replace: true });
+  }, [searchParams, user?.email]);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [importDataOpen, setImportDataOpen] = useState(false);
@@ -353,7 +368,12 @@ export default function Settings() {
           </button>
         </div>
         {saveError ? <p style={{ color: "#dc2626", marginTop: 8, marginBottom: 0 }}>{saveError}</p> : null}
-        {emailChangeMessage === "success" && editing !== "email" && (
+        {emailJustConfirmed && (
+          <p style={{ marginTop: 8, marginBottom: 0, fontSize: 14, color: "var(--success, green)" }}>
+            Your email has been updated to <strong>{user.email}</strong>.
+          </p>
+        )}
+        {emailChangeMessage === "success" && editing !== "email" && !emailJustConfirmed && (
           <p style={{ marginTop: 8, marginBottom: 0, fontSize: 14, color: "var(--text-muted)" }}>
             Check the inbox for <strong>{email.trim()}</strong> (and spam folder). Click the link in the email from Supabase to confirm the change. Your email here will update after you confirm. If you don’t see it, wait a minute and try again (rate limit: one request per 60 seconds).
           </p>

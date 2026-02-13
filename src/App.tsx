@@ -1,7 +1,8 @@
-import { useEffect } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useStoreContext } from "./context/StoreContext";
 import { useLanguage } from "./context/LanguageContext";
+import { supabase, hasSupabase, isAuthCallbackUrl, clearAuthCallbackHash } from "./lib/supabase";
 import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -26,6 +27,43 @@ function BodyNavClass() {
   return null;
 }
 
+/**
+ * When user lands from Supabase email-change (or recovery) link, the URL has tokens in the hash.
+ * Supabase client picks them up and fires SIGNED_IN. We reload the store and send them to Settings.
+ * Also handles the case where the initial load already restored the session from the URL.
+ */
+function AuthCallbackHandler() {
+  const { data, loaded, reload } = useStoreContext();
+  const navigate = useNavigate();
+  const handled = useRef(false);
+
+  useEffect(() => {
+    if (!hasSupabase() || !supabase) return;
+
+    const onAuth = async (event: string) => {
+      if (event !== "SIGNED_IN" || !isAuthCallbackUrl()) return;
+      if (handled.current) return;
+      handled.current = true;
+      clearAuthCallbackHash();
+      await reload();
+      navigate("/settings?email_updated=1", { replace: true });
+    };
+
+    const { data: sub } = supabase.auth.onAuthStateChange(onAuth);
+    return () => sub.subscription.unsubscribe();
+  }, [reload, navigate]);
+
+  // If we already have a user and the URL still has callback params, session was restored on load.
+  useEffect(() => {
+    if (!loaded || !data.user || !isAuthCallbackUrl() || handled.current) return;
+    handled.current = true;
+    clearAuthCallbackHash();
+    navigate("/settings?email_updated=1", { replace: true });
+  }, [loaded, data.user, navigate]);
+
+  return null;
+}
+
 function AuthGate() {
   const { data, loaded } = useStoreContext();
   const { t } = useLanguage();
@@ -42,6 +80,7 @@ export default function App() {
   return (
     <>
       <BodyNavClass />
+      <AuthCallbackHandler />
       <Routes>
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/" element={<AuthGate />}>

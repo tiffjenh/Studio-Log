@@ -98,6 +98,14 @@ export async function signOutSupabase(): Promise<void> {
   if (supabase) await supabase.auth.signOut();
 }
 
+/** Resend signup confirmation email. Use when user gets "Email not confirmed" on login. */
+export async function resendConfirmationSupabase(email: string): Promise<{ error?: string }> {
+  if (!supabase) return { error: "Supabase not configured" };
+  const { error } = await supabase.auth.resend({ type: "signup", email: email.trim() });
+  if (error) return { error: error.message };
+  return {};
+}
+
 export async function updatePasswordSupabase(newPassword: string): Promise<{ error?: string }> {
   if (!supabase) return { error: "Supabase not configured" };
   const { error } = await supabase.auth.updateUser({ password: newPassword });
