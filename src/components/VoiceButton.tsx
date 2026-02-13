@@ -1,24 +1,32 @@
 /**
- * VoiceButton — microphone button that records speech, processes it through the
- * voice assistant parser, and applies attendance / edit actions.
+ * VoiceButton — microphone button that records speech, sends it to the
+ * LLM-backed /api/voice endpoint, and applies attendance / edit actions.
  *
- * Uses the Web Speech API (SpeechRecognition) for on-device speech-to-text.
+ * Uses the Web Speech API (SpeechRecognition) for on-device speech-to-text,
+ * then calls the serverless function for NLP interpretation.
+ *
+ * Falls back to the local rule-based parser if the API is unavailable.
  */
 
 import { useState, useRef, useCallback } from "react";
 import { useStoreContext } from "@/context/StoreContext";
 import {
+  buildVoiceContext,
+  callVoiceAPI,
+  type VoiceAPIResult,
+  type VoiceAPIAction,
+} from "@/utils/voiceApi";
+import {
   processVoiceTranscript,
   buildScheduledLessons,
   buildAllStudentList,
-  type VoiceResult,
-  type VoiceAction,
 } from "@/utils/voiceAssistant";
 import {
   getStudentsForDay,
   getLessonForStudentOnDate,
   getEffectiveDurationMinutes,
   getEffectiveRateCents,
+  toDateKey,
 } from "@/utils/earnings";
 
 /* ------------------------------------------------------------------ */
@@ -64,26 +72,277 @@ type Phase = "idle" | "listening" | "processing" | "result" | "error";
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { dateKey: string; dayOfWeek: number; onDateChange?: (date: Date) => void }) {
+export default function VoiceButton({
+  dateKey,
+  dayOfWeek,
+  onDateChange,
+}: {
+  dateKey: string;
+  dayOfWeek: number;
+  onDateChange?: (date: Date) => void;
+}) {
   const { data, addLesson, updateLesson } = useStoreContext();
   const [phase, setPhase] = useState<Phase>("idle");
   const [transcript, setTranscript] = useState("");
-  const [result, setResult] = useState<VoiceResult | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [unmatchedItems, setUnmatchedItems] = useState<{ text: string; reason: string }[]>([]);
   const [showPanel, setShowPanel] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
-  const supported = typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const supported =
+    typeof window !== "undefined" &&
+    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
-  /* ---- Apply actions to the store ---- */
-  const applyActions = useCallback(
-    async (actions: VoiceAction[], targetDate: string) => {
+  /* ---- Helper: find student name by id ---- */
+  const studentName = useCallback(
+    (id: string) => {
+      const s = data.students.find((st) => st.id === id);
+      return s ? `${s.firstName} ${s.lastName}` : "Unknown";
+    },
+    [data.students]
+  );
+
+  /* ---- Apply LLM API actions ---- */
+  const applyAPIActions = useCallback(
+    async (actions: VoiceAPIAction[], apiResult: VoiceAPIResult) => {
       const lines: string[] = [];
+
       for (const action of actions) {
+        switch (action.type) {
+          case "navigate_to_date": {
+            if (onDateChange) {
+              const d = new Date(action.date + "T12:00:00");
+              onDateChange(d);
+              const formatted = d.toLocaleDateString("en-US", {
+                weekday: "long",
+                month: "short",
+                day: "numeric",
+              });
+              lines.push(`Navigated to ${formatted}`);
+            }
+            break;
+          }
+
+          case "navigate_to_tab": {
+            // Navigation to tabs can be handled by parent; for now just note it
+            lines.push(`Navigate to ${action.tab}`);
+            break;
+          }
+
+          case "set_attendance": {
+            const targetDate = action.date;
+            const existing = getLessonForStudentOnDate(
+              data.lessons,
+              action.student_id,
+              targetDate
+            );
+            if (existing) {
+              await updateLesson(existing.id, { completed: action.present });
+            } else {
+              const student = data.students.find((s) => s.id === action.student_id);
+              if (student) {
+                await addLesson({
+                  studentId: student.id,
+                  date: targetDate,
+                  durationMinutes: getEffectiveDurationMinutes(student, targetDate),
+                  amountCents: getEffectiveRateCents(student, targetDate),
+                  completed: action.present,
+                });
+              }
+            }
+            const name = studentName(action.student_id);
+            lines.push(action.present ? `✓ ${name} — attended` : `✗ ${name} — absent`);
+            break;
+          }
+
+          case "set_attendance_bulk": {
+            // Handle single date or range
+            const dates: string[] = [];
+            if (action.date) {
+              dates.push(action.date);
+            } else if (action.range) {
+              // Generate all dates in range
+              const start = new Date(action.range.start_date + "T12:00:00");
+              const end = new Date(action.range.end_date + "T12:00:00");
+              const d = new Date(start);
+              while (d <= end) {
+                dates.push(toDateKey(d));
+                d.setDate(d.getDate() + 1);
+              }
+            }
+
+            let totalMarked = 0;
+            for (const dt of dates) {
+              const dow = new Date(dt + "T12:00:00").getDay();
+              const dayStudents = getStudentsForDay(data.students, dow, dt);
+              for (const student of dayStudents) {
+                const existing = getLessonForStudentOnDate(data.lessons, student.id, dt);
+                if (existing) {
+                  await updateLesson(existing.id, { completed: action.present });
+                } else {
+                  await addLesson({
+                    studentId: student.id,
+                    date: dt,
+                    durationMinutes: getEffectiveDurationMinutes(student, dt),
+                    amountCents: getEffectiveRateCents(student, dt),
+                    completed: action.present,
+                  });
+                }
+                totalMarked++;
+              }
+            }
+
+            if (dates.length === 1) {
+              lines.push(
+                action.present
+                  ? `✓ All ${totalMarked} students marked attended`
+                  : `✗ All ${totalMarked} students marked absent`
+              );
+            } else {
+              lines.push(
+                action.present
+                  ? `✓ ${totalMarked} lessons marked attended (${dates.length} days)`
+                  : `✗ ${totalMarked} lessons marked absent (${dates.length} days)`
+              );
+            }
+            break;
+          }
+
+          case "clear_attendance": {
+            const existing = getLessonForStudentOnDate(
+              data.lessons,
+              action.student_id,
+              action.date
+            );
+            if (existing) {
+              await updateLesson(existing.id, { completed: false });
+            }
+            lines.push(`↩ ${studentName(action.student_id)} — cleared`);
+            break;
+          }
+
+          case "set_duration": {
+            const existing = getLessonForStudentOnDate(
+              data.lessons,
+              action.student_id,
+              action.date
+            );
+            if (existing) {
+              await updateLesson(existing.id, { durationMinutes: action.duration_minutes });
+            } else {
+              const student = data.students.find((s) => s.id === action.student_id);
+              if (student) {
+                await addLesson({
+                  studentId: student.id,
+                  date: action.date,
+                  durationMinutes: action.duration_minutes,
+                  amountCents: getEffectiveRateCents(student, action.date),
+                  completed: true,
+                });
+              }
+            }
+            lines.push(`${studentName(action.student_id)} — ${action.duration_minutes} min`);
+            break;
+          }
+
+          case "set_rate": {
+            const rateCents = Math.round(action.rate * 100);
+            const existing = getLessonForStudentOnDate(
+              data.lessons,
+              action.student_id,
+              action.date
+            );
+            if (existing) {
+              await updateLesson(existing.id, { amountCents: rateCents });
+            } else {
+              const student = data.students.find((s) => s.id === action.student_id);
+              if (student) {
+                await addLesson({
+                  studentId: student.id,
+                  date: action.date,
+                  durationMinutes: getEffectiveDurationMinutes(student, action.date),
+                  amountCents: rateCents,
+                  completed: true,
+                });
+              }
+            }
+            lines.push(`${studentName(action.student_id)} — $${action.rate}`);
+            break;
+          }
+
+          case "set_time": {
+            // Time changes aren't directly supported via lesson update yet;
+            // just acknowledge it
+            lines.push(`${studentName(action.student_id)} — time set to ${action.start_time}`);
+            break;
+          }
+        }
+      }
+
+      // Handle query intent — show info from resolved dates
+      if (apiResult.intent === "query" && actions.length === 0) {
+        // Basic query response: show today's summary
+        const scheduledCount = getStudentsForDay(data.students, dayOfWeek, dateKey).length;
+        lines.push(`You have ${scheduledCount} student${scheduledCount !== 1 ? "s" : ""} scheduled today.`);
+      }
+
+      return lines;
+    },
+    [data, addLesson, updateLesson, onDateChange, studentName, dayOfWeek, dateKey]
+  );
+
+  /* ---- Fallback: apply local parser actions ---- */
+  const applyLocalActions = useCallback(
+    async (text: string): Promise<{ feedback: string; unmatched: { text: string; reason: string }[] }> => {
+      const allStudents = buildAllStudentList(data.students);
+
+      // First pass: detect date
+      let voiceResult = processVoiceTranscript(text, [], allStudents, dateKey);
+      const targetDateKey = voiceResult.navigated_date ?? dateKey;
+      const targetDate = new Date(targetDateKey + "T12:00:00");
+      const targetDayOfWeek = targetDate.getDay();
+
+      if (voiceResult.navigated_date && onDateChange) {
+        onDateChange(targetDate);
+      }
+
+      // Second pass: with correct date's students
+      const targetStudents = getStudentsForDay(data.students, targetDayOfWeek, targetDateKey);
+      const scheduled = buildScheduledLessons(targetStudents, targetDateKey);
+      voiceResult = processVoiceTranscript(text, scheduled, allStudents, dateKey);
+
+      const feedbackLines: string[] = [];
+
+      if (voiceResult.navigated_date) {
+        const navDate = new Date(voiceResult.navigated_date + "T12:00:00");
+        const formatted = navDate.toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "short",
+          day: "numeric",
+        });
+        feedbackLines.push(`Navigated to ${formatted}`);
+      }
+
+      if (voiceResult.intent === "clarify" && voiceResult.actions.length === 0) {
+        if (voiceResult.navigated_date && voiceResult.unmatched_mentions.length === 0) {
+          return { feedback: feedbackLines.join("\n") || "Done!", unmatched: [] };
+        }
+        return {
+          feedback: voiceResult.clarifying_question || "I didn't understand that.",
+          unmatched: voiceResult.unmatched_mentions.map((u) => ({
+            text: u.spoken_name,
+            reason: u.reason,
+          })),
+        };
+      }
+
+      // Apply actions
+      const actionDate = voiceResult.navigated_date ?? (voiceResult.actions[0]?.date ?? dateKey);
+      for (const action of voiceResult.actions) {
         const student = data.students.find((s) => s.id === action.student_id);
         if (!student) continue;
         const name = `${student.firstName} ${student.lastName}`;
-        const existing = getLessonForStudentOnDate(data.lessons, student.id, targetDate);
+        const existing = getLessonForStudentOnDate(data.lessons, student.id, actionDate);
 
         if (action.type === "set_attendance") {
           if (existing) {
@@ -91,13 +350,13 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
           } else {
             await addLesson({
               studentId: student.id,
-              date: targetDate,
-              durationMinutes: getEffectiveDurationMinutes(student, targetDate),
-              amountCents: getEffectiveRateCents(student, targetDate),
+              date: actionDate,
+              durationMinutes: getEffectiveDurationMinutes(student, actionDate),
+              amountCents: getEffectiveRateCents(student, actionDate),
               completed: action.present,
             });
           }
-          lines.push(action.present ? `✓ ${name} — attended` : `✗ ${name} — absent`);
+          feedbackLines.push(action.present ? `✓ ${name} — attended` : `✗ ${name} — absent`);
         }
 
         if (action.type === "set_duration") {
@@ -106,13 +365,13 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
           } else {
             await addLesson({
               studentId: student.id,
-              date: targetDate,
+              date: actionDate,
               durationMinutes: action.duration_minutes,
-              amountCents: getEffectiveRateCents(student, targetDate),
+              amountCents: getEffectiveRateCents(student, actionDate),
               completed: true,
             });
           }
-          lines.push(`${name} — ${action.duration_minutes} min`);
+          feedbackLines.push(`${name} — ${action.duration_minutes} min`);
         }
 
         if (action.type === "set_rate") {
@@ -122,23 +381,31 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
           } else {
             await addLesson({
               studentId: student.id,
-              date: targetDate,
-              durationMinutes: getEffectiveDurationMinutes(student, targetDate),
+              date: actionDate,
+              durationMinutes: getEffectiveDurationMinutes(student, actionDate),
               amountCents: rateCents,
               completed: true,
             });
           }
-          lines.push(`${name} — $${action.rate}`);
+          feedbackLines.push(`${name} — $${action.rate}`);
         }
       }
-      return lines;
+
+      return {
+        feedback: feedbackLines.join("\n") || "Done!",
+        unmatched: voiceResult.unmatched_mentions.map((u) => ({
+          text: u.spoken_name,
+          reason: u.reason,
+        })),
+      };
     },
-    [data, addLesson, updateLesson]
+    [data, dateKey, dayOfWeek, addLesson, updateLesson, onDateChange]
   );
 
   /* ---- Start listening ---- */
   const startListening = useCallback(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
     const recognition = new SpeechRecognition();
@@ -150,8 +417,8 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
 
     setPhase("listening");
     setTranscript("");
-    setResult(null);
     setFeedback(null);
+    setUnmatchedItems([]);
     setShowPanel(true);
 
     recognition.onresult = async (event: SpeechRecognitionEvent) => {
@@ -160,53 +427,49 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
       setTranscript(text);
       setPhase("processing");
 
-      // First pass: parse with current date to detect date navigation
-      const allStudents = buildAllStudentList(data.students);
-      let voiceResult = processVoiceTranscript(text, [], allStudents, dateKey);
+      try {
+        // Try the LLM API first
+        const context = buildVoiceContext(data.students, data.lessons, dateKey);
+        const apiResult = await callVoiceAPI(text, context);
 
-      // If user navigated to a different date, re-resolve students for that date
-      const targetDateKey = voiceResult.navigated_date ?? dateKey;
-      const targetDate = new Date(targetDateKey + "T12:00:00");
-      const targetDayOfWeek = targetDate.getDay();
-
-      // Navigate the dashboard to the new date
-      if (voiceResult.navigated_date && onDateChange) {
-        onDateChange(targetDate);
-      }
-
-      // Re-run with the correct date's scheduled students
-      const targetStudents = getStudentsForDay(data.students, targetDayOfWeek, targetDateKey);
-      const scheduled = buildScheduledLessons(targetStudents, targetDateKey);
-      voiceResult = processVoiceTranscript(text, scheduled, allStudents, dateKey);
-      // Preserve navigated_date
-      if (voiceResult.navigated_date && onDateChange) {
-        // Already navigated above
-      }
-      setResult(voiceResult);
-
-      const feedbackLines: string[] = [];
-
-      // Show date navigation feedback
-      if (voiceResult.navigated_date) {
-        const navDate = new Date(voiceResult.navigated_date + "T12:00:00");
-        const formatted = navDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
-        feedbackLines.push(`Navigated to ${formatted}`);
-      }
-
-      if (voiceResult.intent === "clarify" && voiceResult.actions.length === 0) {
-        if (voiceResult.navigated_date && voiceResult.unmatched_mentions.length === 0) {
-          // Just a date navigation, no attendance
-          setFeedback(feedbackLines.join("\n") || "Done!");
-        } else {
-          setFeedback(voiceResult.clarifying_question);
+        // Navigate if needed (find navigate_to_date action)
+        const navAction = apiResult.actions.find(
+          (a): a is Extract<typeof a, { type: "navigate_to_date" }> =>
+            a.type === "navigate_to_date"
+        );
+        if (navAction && onDateChange) {
+          onDateChange(new Date(navAction.date + "T12:00:00"));
         }
-        setPhase("result");
-      } else {
+
+        // Handle clarify intent
+        if (apiResult.intent === "clarify") {
+          setFeedback(apiResult.clarifying_question || "Could you say that again?");
+          setUnmatchedItems(
+            (apiResult.unmatched_mentions || []).map((u) => ({
+              text: u.spoken_text,
+              reason: u.reason,
+            }))
+          );
+          setPhase("result");
+          return;
+        }
+
         // Apply actions
-        const actionDate = voiceResult.navigated_date ?? (voiceResult.actions[0]?.date ?? dateKey);
-        const lines = await applyActions(voiceResult.actions, actionDate);
-        feedbackLines.push(...lines);
-        setFeedback(feedbackLines.join("\n") || "Done!");
+        const lines = await applyAPIActions(apiResult.actions, apiResult);
+        setFeedback(lines.join("\n") || "Done!");
+        setUnmatchedItems(
+          (apiResult.unmatched_mentions || []).map((u) => ({
+            text: u.spoken_text,
+            reason: u.reason,
+          }))
+        );
+        setPhase("result");
+      } catch (_err) {
+        // API unavailable — fall back to local rule-based parser
+        console.warn("Voice API unavailable, using local parser:", _err);
+        const localResult = await applyLocalActions(text);
+        setFeedback(localResult.feedback);
+        setUnmatchedItems(localResult.unmatched);
         setPhase("result");
       }
     };
@@ -215,11 +478,17 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
       if (event.error === "no-speech") {
         setFeedback("No speech detected. Tap the mic and try again.");
       } else if (event.error === "not-allowed") {
-        setFeedback("Microphone access denied. Please allow microphone in your browser settings.");
+        setFeedback(
+          "Microphone access denied. Please allow microphone in your browser settings."
+        );
       } else if (event.error === "network") {
-        setFeedback("Voice recognition needs an internet connection. Please check your Wi-Fi or cellular data and try again.");
+        setFeedback(
+          "Voice recognition needs an internet connection. Please check your Wi-Fi or cellular data and try again."
+        );
       } else if (event.error === "audio-capture") {
-        setFeedback("No microphone found. Please connect a microphone and try again.");
+        setFeedback(
+          "No microphone found. Please connect a microphone and try again."
+        );
       } else if (event.error === "aborted") {
         setFeedback("Voice input was cancelled.");
       } else {
@@ -229,14 +498,11 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
     };
 
     recognition.onend = () => {
-      if (phase === "listening") {
-        // If ended without result, this is usually "no-speech"
-        // The onerror handler should have already fired
-      }
+      // If ended without result, onerror should have already fired
     };
 
     recognition.start();
-  }, [data, dateKey, dayOfWeek, applyActions, phase]);
+  }, [data, dateKey, applyAPIActions, applyLocalActions, onDateChange]);
 
   /* ---- Stop listening ---- */
   const stopListening = useCallback(() => {
@@ -249,8 +515,8 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
     setShowPanel(false);
     setPhase("idle");
     setTranscript("");
-    setResult(null);
     setFeedback(null);
+    setUnmatchedItems([]);
   }, []);
 
   if (!supported) return null;
@@ -291,7 +557,16 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
           </svg>
         ) : (
           /* Mic icon */
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
             <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
             <line x1="12" y1="19" x2="12" y2="23" />
@@ -320,14 +595,32 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
           }}
         >
           {/* Close button */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
             <span style={{ fontWeight: 700, fontSize: 16 }}>
-              {phase === "listening" ? "Listening..." : phase === "processing" ? "Processing..." : "Voice Input"}
+              {phase === "listening"
+                ? "Listening..."
+                : phase === "processing"
+                  ? "Processing..."
+                  : "Voice Input"}
             </span>
             <button
               type="button"
               onClick={closePanel}
-              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-muted)", padding: "4px 8px" }}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 20,
+                color: "var(--text-muted)",
+                padding: "4px 8px",
+              }}
             >
               &times;
             </button>
@@ -335,21 +628,44 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
 
           {/* Listening indicator */}
           {phase === "listening" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 0" }}>
-              <div style={{
-                width: 12, height: 12, borderRadius: "50%",
-                background: "#dc2626",
-                animation: "voicePulse 1.2s ease-in-out infinite",
-              }} />
-              <span style={{ fontSize: 15, color: "var(--text-muted)" }}>Say something like "Emily came today"</span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "16px 0",
+              }}
+            >
+              <div
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: "50%",
+                  background: "#dc2626",
+                  animation: "voicePulse 1.2s ease-in-out infinite",
+                }}
+              />
+              <span style={{ fontSize: 15, color: "var(--text-muted)" }}>
+                Say something like &quot;Emily came today&quot;
+              </span>
               <style>{`@keyframes voicePulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.3); } }`}</style>
             </div>
           )}
 
           {/* Processing */}
           {phase === "processing" && (
-            <div style={{ padding: "12px 0", color: "var(--text-muted)", fontSize: 14 }}>
-              {transcript && <p style={{ margin: "0 0 8px", fontStyle: "italic" }}>"{transcript}"</p>}
+            <div
+              style={{
+                padding: "12px 0",
+                color: "var(--text-muted)",
+                fontSize: 14,
+              }}
+            >
+              {transcript && (
+                <p style={{ margin: "0 0 8px", fontStyle: "italic" }}>
+                  &quot;{transcript}&quot;
+                </p>
+              )}
               <span>Processing...</span>
             </div>
           )}
@@ -358,22 +674,45 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
           {(phase === "result" || phase === "error") && (
             <div style={{ padding: "4px 0" }}>
               {transcript && (
-                <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--text-muted)", fontStyle: "italic" }}>
-                  "{transcript}"
+                <p
+                  style={{
+                    margin: "0 0 12px",
+                    fontSize: 14,
+                    color: "var(--text-muted)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  &quot;{transcript}&quot;
                 </p>
               )}
               {feedback && (
-                <div style={{ fontSize: 15, lineHeight: 1.6, whiteSpace: "pre-line" }}>
+                <div
+                  style={{
+                    fontSize: 15,
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-line",
+                  }}
+                >
                   {feedback}
                 </div>
               )}
-              {result && result.unmatched_mentions.length > 0 && (
-                <div style={{ marginTop: 12, fontSize: 13, color: "var(--text-muted)" }}>
-                  {result.unmatched_mentions.map((u, i) => (
+              {unmatchedItems.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 13,
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {unmatchedItems.map((u, i) => (
                     <div key={i}>
-                      {u.reason === "not_found" && `Could not find "${u.spoken_name}" in your students.`}
-                      {u.reason === "ambiguous" && `"${u.spoken_name}" matches multiple students.`}
-                      {u.reason === "not_scheduled_today" && `"${u.spoken_name}" is not scheduled today.`}
+                      {u.reason === "not_found" &&
+                        `Could not find "${u.text}" in your students.`}
+                      {u.reason === "ambiguous" &&
+                        `"${u.text}" matches multiple students.`}
+                      {(u.reason === "no_lessons_on_date" ||
+                        u.reason === "not_scheduled_today") &&
+                        `"${u.text}" is not scheduled on this date.`}
                     </div>
                   ))}
                 </div>
@@ -382,9 +721,17 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
                 <button
                   type="button"
-                  onClick={() => { closePanel(); setTimeout(startListening, 100); }}
+                  onClick={() => {
+                    closePanel();
+                    setTimeout(startListening, 100);
+                  }}
                   className="pill"
-                  style={{ padding: "10px 18px", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-sans)" }}
+                  style={{
+                    padding: "10px 18px",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    fontFamily: "var(--font-sans)",
+                  }}
                 >
                   Try again
                 </button>
@@ -392,7 +739,12 @@ export default function VoiceButton({ dateKey, dayOfWeek, onDateChange }: { date
                   type="button"
                   onClick={closePanel}
                   className="pill pill--active"
-                  style={{ padding: "10px 18px", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-sans)" }}
+                  style={{
+                    padding: "10px 18px",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    fontFamily: "var(--font-sans)",
+                  }}
                 >
                   Done
                 </button>
