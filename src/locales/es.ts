@@ -97,6 +97,7 @@ export default {
     daily: "Diario",
     weekly: "Semanal",
     monthly: "Mensual",
+    yearly: "Anual",
     studentsTab: "Estudiantes",
     earningsYTD: "Ingresos – año actual",
     earningsYear: "Ingresos",

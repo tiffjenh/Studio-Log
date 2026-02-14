@@ -13,7 +13,7 @@ import {
 } from "@/utils/earnings";
 import type { Lesson } from "@/types";
 
-const TABS = ["Daily", "Weekly", "Monthly", "Students"] as const;
+const TABS = ["Daily", "Weekly", "Monthly", "Yearly", "Students"] as const;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const CHART_HEIGHT = 160;
 
@@ -160,6 +160,7 @@ const TAB_KEYS: Record<(typeof TABS)[number], string> = {
   Daily: "earnings.daily",
   Weekly: "earnings.weekly",
   Monthly: "earnings.monthly",
+  Yearly: "earnings.yearly",
   Students: "earnings.studentsTab",
 };
 
@@ -174,6 +175,7 @@ export default function Earnings() {
   const [weeklyMonthOffset, setWeeklyMonthOffset] = useState(0);
   const [monthlyYearOffset, setMonthlyYearOffset] = useState(0);
   const [studentsYearOffset, setStudentsYearOffset] = useState(0);
+  const [selectedYearKey, setSelectedYearKey] = useState<string | null>(null);
   const [studentsSearch, setStudentsSearch] = useState("");
   const [studentsSort, setStudentsSort] = useState<"az" | "za" | "high" | "low">("az");
   const [downloadOpen, setDownloadOpen] = useState(false);
@@ -223,6 +225,27 @@ export default function Earnings() {
           .filter((l) => l.date >= `${thisYear}-01-01` && l.date <= toDateKey(now))
           .reduce((s, l) => s + l.amountCents, 0)
       : 0;
+
+  // ── Yearly data ──────────────────────────────────────────────
+  const allYears = [...new Set(completedLessons.map((l) => parseInt(l.date.substring(0, 4))))].sort();
+  if (allYears.length === 0) allYears.push(thisYear);
+  if (!allYears.includes(thisYear)) allYears.push(thisYear);
+  allYears.sort();
+  const yearlyTotals: number[] = [];
+  const yearlyHours: number[] = [];
+  const yearlyLabels: string[] = [];
+  for (const yr of allYears) {
+    const yrStr = String(yr);
+    const isCurrentYear = yr === thisYear;
+    const yrLessons = isCurrentYear
+      ? completedLessons.filter((l) => l.date >= `${yrStr}-01-01` && l.date <= todayKey)
+      : completedLessons.filter((l) => l.date.startsWith(yrStr));
+    yearlyTotals.push(yrLessons.reduce((s, l) => s + l.amountCents, 0));
+    yearlyHours.push(yrLessons.reduce((s, l) => s + l.durationMinutes, 0) / 60);
+    yearlyLabels.push(yrStr);
+  }
+  const maxYearly = Math.max(...yearlyTotals, 1);
+  const yearlyGrandTotal = yearlyTotals.reduce((s, v) => s + v, 0);
 
   const dailyData = getDailyTotalsForWeek(completedLessons, now, dailyWeekOffset);
   const dailyWeekTotal = dailyData.reduce((s, d) => s + d.total, 0);
@@ -705,6 +728,112 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            );
+          })()}
+        </>
+      )}
+
+      {activeTab === "Yearly" && (
+        <>
+          <div className="hero-card" style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 16 }}>{t("earnings.overview")}</div>
+            <div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>All-time earnings</div>
+              <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(yearlyGrandTotal)}</div>
+            </div>
+          </div>
+          {yearlyLabels.length > 0 && (
+            <>
+              <div className="float-card" style={{ marginBottom: 24 }}>
+                <BarChart
+                  data={yearlyTotals}
+                  xLabels={yearlyLabels}
+                  maxVal={maxYearly}
+                  noEarningsText={t("earnings.noEarnings")}
+                  dateKeys={yearlyLabels}
+                  onBarClick={(key) => setSelectedYearKey((prev) => (prev === key ? null : key))}
+                />
+              </div>
+              <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
+                {yearlyLabels.map((label, i) => {
+                  const isSelected = selectedYearKey === label;
+                  return (
+                    <div
+                      key={label}
+                      role="button"
+                      onClick={() => setSelectedYearKey((prev) => (prev === label ? null : label))}
+                      className="card-list-item"
+                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20, cursor: "pointer", background: isSelected ? "var(--bg-hover, rgba(0,0,0,0.03))" : undefined }}
+                    >
+                      <span>{label}{parseInt(label) === thisYear ? " (YTD)" : ""}</span>
+                      <span style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>{yearlyHours[i] % 1 === 0 ? yearlyHours[i] : yearlyHours[i].toFixed(1)} hrs</span>
+                      <span style={{ fontWeight: 600, textAlign: "right" }}>{formatCurrency(yearlyTotals[i])}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          {yearlyLabels.length === 0 && (
+            <div className="float-card" style={{ padding: 28, textAlign: "center", color: "var(--text-muted)" }}>No data to show yet.</div>
+          )}
+          {selectedYearKey && (() => {
+            const yr = parseInt(selectedYearKey);
+            const yrStr = selectedYearKey;
+            const isCurrentYear = yr === thisYear;
+            const yearLessons = isCurrentYear
+              ? completedLessons.filter((l) => l.date >= `${yrStr}-01-01` && l.date <= todayKey)
+              : completedLessons.filter((l) => l.date.startsWith(yrStr));
+            const byStudent = new Map<string, { minutes: number; cents: number }>();
+            for (const l of yearLessons) {
+              const cur = byStudent.get(l.studentId) ?? { minutes: 0, cents: 0 };
+              byStudent.set(l.studentId, { minutes: cur.minutes + l.durationMinutes, cents: cur.cents + l.amountCents });
+            }
+            const numStudents = byStudent.size;
+            const totalMinutes = yearLessons.reduce((s, l) => s + l.durationMinutes, 0);
+            const totalHours = totalMinutes / 60;
+            const totalEarned = yearLessons.reduce((s, l) => s + l.amountCents, 0);
+            const formatHours = (mins: number) => {
+              const h = mins / 60;
+              return h % 1 === 0 ? h : h.toFixed(1);
+            };
+            return (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <strong>{yrStr}{isCurrentYear ? " (YTD)" : ""}</strong>
+                  <button type="button" onClick={() => setSelectedYearKey(null)} style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
+                </div>
+                <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.studentsTab")}</div>
+                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{numStudents}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Hours</div>
+                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.earningsYear")}</div>
+                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{formatCurrency(totalEarned)}</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="float-card" style={{ padding: 0, overflow: "hidden" }}>
+                  {Array.from(byStudent.entries())
+                    .sort((a, b) => b[1].cents - a[1].cents)
+                    .map(([studentId, { minutes, cents }]) => {
+                      const student = data.students.find((s) => s.id === studentId);
+                      return (
+                        <div key={studentId} className="card-list-item" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20 }}>
+                          <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)" }}>{student ? `${student.firstName} ${student.lastName}` : "—"}</span>
+                          <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "center" }}>{formatHours(minutes)} hrs</span>
+                          <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "right" }}>{formatCurrency(cents)}</span>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             );

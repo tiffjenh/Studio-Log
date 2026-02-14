@@ -97,6 +97,7 @@ export default {
     daily: "每日",
     weekly: "每週",
     monthly: "每月",
+    yearly: "每年",
     studentsTab: "學生",
     earningsYTD: "收入 – 今年至今",
     earningsYear: "收入",
