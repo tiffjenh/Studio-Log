@@ -341,8 +341,6 @@ export default function StudentDetail() {
   const fontStyle = { fontFamily: "var(--font-sans)" };
   const inputStyle: React.CSSProperties = { width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, ...fontStyle };
   const labelStyle: React.CSSProperties = { display: "block", marginBottom: 8, fontWeight: 600, ...fontStyle };
-  const rowStyle: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16, minWidth: 0 };
-
   // (schedule change rate/time modals are handled via openSchedChangeRateModal / openSchedChangeTimePicker above)
 
   return (
@@ -379,15 +377,15 @@ export default function StudentDetail() {
                 )}
               </div>
               <label style={labelStyle}>Day of week</label>
-              <div style={rowStyle}>
+              <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
                 {DAY_SHORT.map((label, i) => (
-                  <button key={i} type="button" onClick={() => updateEntry(entry.id, "dayOfWeek", i)} className={entry.dayOfWeek === i ? "pill pill--active" : "pill"} style={{ padding: "8px 10px", fontSize: 13, flexShrink: 0, ...fontStyle }}>{label}</button>
+                  <button key={i} type="button" onClick={() => updateEntry(entry.id, "dayOfWeek", i)} className={entry.dayOfWeek === i ? "pill pill--active" : "pill"} style={{ flex: "1 1 0", minWidth: 0, padding: "8px 2px", fontSize: 13, textAlign: "center", ...fontStyle }}>{label}</button>
                 ))}
               </div>
               <label style={labelStyle}>Lesson duration</label>
-              <div style={rowStyle}>
+              <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
                 {DURATIONS.map((m) => (
-                  <button key={m} type="button" onClick={() => updateEntry(entry.id, "durationMinutes", m)} className={entry.durationMinutes === m ? "pill pill--active" : "pill"} style={{ padding: "8px 12px", fontSize: 14, flexShrink: 0, ...fontStyle }}>
+                  <button key={m} type="button" onClick={() => updateEntry(entry.id, "durationMinutes", m)} className={entry.durationMinutes === m ? "pill pill--active" : "pill"} style={{ flex: "1 1 0", minWidth: 0, padding: "8px 2px", fontSize: 13, textAlign: "center", ...fontStyle }}>
                     {DURATION_LABELS[m]}
                   </button>
                 ))}
@@ -451,15 +449,15 @@ export default function StudentDetail() {
                     )}
                   </div>
                   <label style={labelStyle}>{t("studentDetail.newDayOfWeek")}</label>
-                  <div style={rowStyle}>
+                  <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
                     {DAY_SHORT.map((label, i) => (
-                      <button key={i} type="button" onClick={() => updateSchedChangeEntry(entry.id, "dayOfWeek", i)} className={entry.dayOfWeek === i ? "pill pill--active" : "pill"} style={{ padding: "8px 10px", fontSize: 13, flexShrink: 0, ...fontStyle }}>{label}</button>
+                      <button key={i} type="button" onClick={() => updateSchedChangeEntry(entry.id, "dayOfWeek", i)} className={entry.dayOfWeek === i ? "pill pill--active" : "pill"} style={{ flex: "1 1 0", minWidth: 0, padding: "8px 2px", fontSize: 13, textAlign: "center", ...fontStyle }}>{label}</button>
                     ))}
                   </div>
                   <label style={labelStyle}>{t("studentDetail.newLessonDuration")}</label>
-                  <div style={rowStyle}>
+                  <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
                     {DURATIONS.map((m) => (
-                      <button key={m} type="button" onClick={() => updateSchedChangeEntry(entry.id, "durationMinutes", m)} className={entry.durationMinutes === m ? "pill pill--active" : "pill"} style={{ padding: "8px 12px", fontSize: 14, flexShrink: 0, ...fontStyle }}>
+                      <button key={m} type="button" onClick={() => updateSchedChangeEntry(entry.id, "durationMinutes", m)} className={entry.durationMinutes === m ? "pill pill--active" : "pill"} style={{ flex: "1 1 0", minWidth: 0, padding: "8px 2px", fontSize: 13, textAlign: "center", ...fontStyle }}>
                         {DURATION_LABELS[m]}
                       </button>
                     ))}

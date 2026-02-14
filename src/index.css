@@ -59,15 +59,20 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
+  /* Prevent white flash on iOS overscroll / bounce */
+  background-color: #e5e4f0;
 }
 
 body {
   margin: 0;
   font-family: var(--font-sans);
+  background-color: #e5e4f0;
   background: var(--pastel-bg);
   color: var(--text);
   min-height: 100dvh;
   padding-bottom: calc(var(--nav-height) + var(--safe-bottom));
+  /* Prevent overscroll bounce on iOS showing white */
+  overscroll-behavior-y: none;
 }
 
 /* Login and forgot-password have no bottom nav; avoid reserved purple bar */
