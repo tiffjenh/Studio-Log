@@ -71,8 +71,8 @@ export interface ScheduledLesson {
 /* ------------------------------------------------------------------ */
 
 const CJK_RANGE = /[\u4e00-\u9fff\u3400-\u4dbf]/;
-const SPANISH_WORDS = /\b(vino|asisti[óo]|asistieron|no\s+vino|estuvo\s+ausente|hoy|ayer|lección|lecciones|minutos|hora|horas|vino\s+hoy|también|todos|todas|clase)\b/i;
-const ENGLISH_WORDS = /\b(came|attended|absent|didn'?t\s+come|today|yesterday|lesson|minutes|hours?|present|showed\s+up|was\s+here|no\s+show)\b/i;
+const SPANISH_WORDS = /\b(vino|asisti[óo]|asistieron|no\s+vino|estuvo\s+ausente|hoy|ayer|mañana|lección|lecciones|minutos|hora|horas|vino\s+hoy|también|todos|todas|clase)\b/i;
+const ENGLISH_WORDS = /\b(came|attended|absent|didn'?t\s+come|today|yesterday|tomorrow|lesson|minutes|hours?|present|showed\s+up|was\s+here|no\s+show|everyone|everybody|all\s+students)\b/i;
 
 function detectLanguages(text: string): DetectedLanguage[] {
   const langs: DetectedLanguage[] = [];
@@ -87,12 +87,24 @@ function detectLanguages(text: string): DetectedLanguage[] {
 /* ------------------------------------------------------------------ */
 
 const MONTH_MAP: Record<string, number> = {
-  january: 0, jan: 0, febrero: 1, february: 1, feb: 1, march: 2, mar: 2, marzo: 2,
-  april: 3, apr: 3, abril: 3, may: 4, mayo: 4, june: 5, jun: 5, junio: 5,
-  july: 6, jul: 6, julio: 6, august: 7, aug: 7, agosto: 7,
-  september: 8, sep: 8, sept: 8, septiembre: 8, october: 9, oct: 9, octubre: 9,
-  november: 10, nov: 10, noviembre: 10, december: 11, dec: 11, diciembre: 11,
+  january: 0, jan: 0, enero: 0,
+  february: 1, feb: 1, febrero: 1,
+  march: 2, mar: 2, marzo: 2,
+  april: 3, apr: 3, abril: 3,
+  may: 4, mayo: 4,
+  june: 5, jun: 5, junio: 5,
+  july: 6, jul: 6, julio: 6,
+  august: 7, aug: 7, agosto: 7,
+  september: 8, sep: 8, sept: 8, septiembre: 8,
+  october: 9, oct: 9, octubre: 9,
+  november: 10, nov: 10, noviembre: 10,
+  december: 11, dec: 11, diciembre: 11,
 };
+
+const DAY_NAMES_FULL = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const DAY_NAMES_SHORT = ["sun", "mon", "tue", "tues", "wed", "thu", "thurs", "fri", "sat"];
+const DAY_NAMES_ALL = [...DAY_NAMES_FULL, ...DAY_NAMES_SHORT];
+const DAY_NAMES_PATTERN = DAY_NAMES_ALL.join("|");
 
 const DAY_NAME_MAP: Record<string, number> = {
   sunday: 0, sun: 0, domingo: 0,
@@ -124,13 +136,47 @@ function parseDate(text: string, todayKey: string): DateInfo {
     return { date: toYMD(d), isExplicitNonToday: true };
   }
 
-  // "last Monday", "last Tuesday" etc.
-  const lastDayMatch = lower.match(/\blast\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\b/);
+  // Tomorrow / 明天 / mañana
+  if (/\b(tomorrow|mañana)\b|明天/.test(lower)) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + 1);
+    return { date: toYMD(d), isExplicitNonToday: true };
+  }
+
+  // "next Monday", "next Tuesday" etc. — find the NEXT upcoming occurrence (always in the future)
+  const nextDayRe = new RegExp(`\\bnext\\s+(${DAY_NAMES_PATTERN})\\b`);
+  const nextDayMatch = lower.match(nextDayRe);
+  if (nextDayMatch) {
+    const targetDay = DAY_NAME_MAP[nextDayMatch[1]];
+    if (targetDay != null) {
+      const d = new Date(today);
+      const fwdDiff = (targetDay - today.getDay() + 7) % 7 || 7; // always at least 1 day forward
+      d.setDate(d.getDate() + fwdDiff);
+      return { date: toYMD(d), isExplicitNonToday: true };
+    }
+  }
+
+  // "this Monday", "this Tuesday" etc. — find the occurrence in the current week
+  const thisDayRe = new RegExp(`\\bthis\\s+(${DAY_NAMES_PATTERN})\\b`);
+  const thisDayMatch = lower.match(thisDayRe);
+  if (thisDayMatch) {
+    const targetDay = DAY_NAME_MAP[thisDayMatch[1]];
+    if (targetDay != null) {
+      const d = new Date(today);
+      const diff = targetDay - today.getDay();
+      d.setDate(d.getDate() + diff);
+      const key = toYMD(d);
+      return { date: key, isExplicitNonToday: key !== todayKey };
+    }
+  }
+
+  // "last Monday", "last Tuesday" etc. — most recent past occurrence
+  const lastDayRe = new RegExp(`\\blast\\s+(${DAY_NAMES_PATTERN})\\b`);
+  const lastDayMatch = lower.match(lastDayRe);
   if (lastDayMatch) {
     const targetDay = DAY_NAME_MAP[lastDayMatch[1]];
     if (targetDay != null) {
       const d = new Date(today);
-      // Go back to find the most recent occurrence of that day (always in the past)
       const diff = (today.getDay() - targetDay + 7) % 7 || 7;
       d.setDate(d.getDate() - diff);
       return { date: toYMD(d), isExplicitNonToday: true };
@@ -138,7 +184,6 @@ function parseDate(text: string, todayKey: string): DateInfo {
   }
 
   // "Monday February 9", "Feb 9", "February 9th", "Monday Feb 9"
-  // Pattern: optional day name + month name + day number
   const monthDayMatch = lower.match(
     /(?:(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\s+)?(?:go\s+to\s+)?(?:(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\s+)?(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/
   );
@@ -146,10 +191,8 @@ function parseDate(text: string, todayKey: string): DateInfo {
     const month = MONTH_MAP[monthDayMatch[1]];
     const day = parseInt(monthDayMatch[2], 10);
     if (month != null && day >= 1 && day <= 31) {
-      // Use current year, or previous year if the date is far in the future
       let year = today.getFullYear();
       const candidate = new Date(year, month, day);
-      // If the date is more than 6 months in the future, assume previous year
       if (candidate.getTime() - today.getTime() > 180 * 24 * 60 * 60 * 1000) {
         year--;
       }
@@ -159,19 +202,28 @@ function parseDate(text: string, todayKey: string): DateInfo {
     }
   }
 
-  // "go to Monday", "on Wednesday" — day name without a month (find nearest past/future occurrence)
-  const gotoDay = lower.match(/(?:go\s+to|on)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\b/);
+  // "go to Monday", "on Wednesday" — day name with prefix (nearest past occurrence by default)
+  const gotoDayRe = new RegExp(`(?:go\\s+to|on)\\s+(${DAY_NAMES_PATTERN})\\b`);
+  const gotoDay = lower.match(gotoDayRe);
   if (gotoDay) {
     const targetDay = DAY_NAME_MAP[gotoDay[1]];
     if (targetDay != null) {
-      const d = new Date(today);
-      // Find the nearest occurrence (past first, then future)
-      const backDiff = (today.getDay() - targetDay + 7) % 7;
-      if (backDiff === 0) {
-        // It's today
+      if (targetDay === today.getDay()) {
         return { date: todayKey, isExplicitNonToday: false };
       }
-      d.setDate(d.getDate() - backDiff);
+      // For "go to [day]", prefer the nearest occurrence (past first for "go to", future for navigation)
+      const d = new Date(today);
+      const backDiff = (today.getDay() - targetDay + 7) % 7;
+      if (backDiff === 0) {
+        return { date: todayKey, isExplicitNonToday: false };
+      }
+      // If the day is coming up soon (1-3 days forward), go forward; otherwise go back
+      const fwdDiff = (targetDay - today.getDay() + 7) % 7;
+      if (fwdDiff <= 3) {
+        d.setDate(d.getDate() + fwdDiff);
+      } else {
+        d.setDate(d.getDate() - backDiff);
+      }
       return { date: toYMD(d), isExplicitNonToday: true };
     }
   }
@@ -197,11 +249,68 @@ function parseDate(text: string, todayKey: string): DateInfo {
  */
 function stripDatePhrases(text: string): string {
   return text
+    // "go to next/this/last [day]", "next Tuesday", "this Monday", "last Friday"
+    .replace(/\b(?:go\s+to\s+)?(?:next|this|last)\s+(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\b/gi, " ")
     .replace(/\b(?:go\s+to|on)\s+(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\b/gi, " ")
-    .replace(/\blast\s+(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\b/gi, " ")
     .replace(/\b(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday)\s+(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+\d{1,2}(?:st|nd|rd|th)?\b/gi, " ")
     .replace(/\b(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+\d{1,2}(?:st|nd|rd|th)?\b/gi, " ")
+    .replace(/\b(?:tomorrow|yesterday|mañana|ayer)\b/gi, " ")
+    .replace(/明天|昨天/g, " ")
     .replace(/\b(?:go\s+to)\b/gi, " ");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Bulk attendance detection                                          */
+/* ------------------------------------------------------------------ */
+
+const BULK_ALL_PATTERNS = [
+  // English
+  /\b(?:all\s+(?:students?|of\s+them|of\s+the\s+students?))\b/i,
+  /\beveryone\b/i,
+  /\beverybody\b/i,
+  /\bmark\s+all\b/i,
+  /\ball\s+(?:attended|came|present|showed\s+up|were?\s+here)\b/i,
+  /\beveryone\s+(?:attended|came|showed\s+up|was\s+here)\b/i,
+  /\beverybody\s+(?:attended|came|showed\s+up|was\s+here)\b/i,
+  // Spanish
+  /\btodos\s+(?:vinieron|asistieron|llegaron)\b/i,
+  /\btodas\s+(?:vinieron|asistieron|llegaron)\b/i,
+  /\btodos\b/i,
+  /\btodas\b/i,
+  // Chinese
+  /所有学生/,
+  /全部/,
+  /都来了/,
+  /所有人/,
+];
+
+const BULK_ABSENT_PATTERNS = [
+  /\b(?:all|everyone|everybody)\s+(?:absent|didn'?t\s+come|no[\s-]show|missed|didn'?t\s+attend|didn'?t\s+show)\b/i,
+  /\bmark\s+(?:all|everyone|everybody)\s+(?:as\s+)?(?:absent|not\s+attended)\b/i,
+  /\bno\s+one\s+(?:came|showed\s+up|attended)\b/i,
+  /\bnobody\s+(?:came|showed\s+up|attended)\b/i,
+  /\bnadie\s+(?:vino|asisti[óo]|lleg[óo])\b/i,
+  /\btodos\s+(?:ausentes?|faltaron)\b/i,
+  /没有人来/,
+  /都没来/,
+  /全部缺席/,
+];
+
+/**
+ * Check if the transcript contains a "mark all / everyone" bulk pattern.
+ * Returns: "attended" | "absent" | null
+ */
+function detectBulkAttendance(text: string): "attended" | "absent" | null {
+  const lower = text.toLowerCase();
+  // Check absent patterns first (more specific)
+  for (const p of BULK_ABSENT_PATTERNS) {
+    if (p.test(lower)) return "absent";
+  }
+  // Check present/all patterns
+  for (const p of BULK_ALL_PATTERNS) {
+    if (p.test(lower)) return "attended";
+  }
+  return null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -219,6 +328,7 @@ const ABSENT_PATTERNS = [
   /\bdidn'?t\s+show/i,
   /\bskipped\b/i,
   /\bmissed\b/i,
+  /\bnot\s+attended\b/i,
   // Spanish
   /\bno\s+vino\b/i,
   /\bestuvo\s+ausente\b/i,
@@ -267,7 +377,7 @@ function parseDurations(text: string): ParsedDuration[] {
   for (const m of esHr) {
     results.push({ minutes: Math.round(parseFloat(m[1]) * 60), studentHint: text.slice(Math.max(0, m.index! - 40), m.index!) });
   }
-  // Chinese: "九十分钟", "90分钟", "一个半小时", "1.5小时"
+  // Chinese: "90分钟", "1.5小时"
   const zhMin = text.matchAll(/([\d]+)\s*分钟/g);
   for (const m of zhMin) {
     results.push({ minutes: parseInt(m[1], 10), studentHint: text.slice(Math.max(0, m.index! - 20), m.index!) });
@@ -425,16 +535,18 @@ function extractNameSegments(text: string): string[] {
   let cleaned = stripDatePhrases(text);
   const stripPatterns = [
     // English
-    /\b(came|attended|was\s+here|showed\s+up|present|didn'?t\s+come|absent|no[\s-]show|wasn'?t\s+here|didn'?t\s+attend|didn'?t\s+show|skipped|missed|today|yesterday|this\s+morning|this\s+afternoon|did|had|took|lesson|lessons?|class)\b/gi,
+    /\b(came|attended|was\s+here|showed\s+up|present|didn'?t\s+come|absent|no[\s-]show|wasn'?t\s+here|didn'?t\s+attend|didn'?t\s+show|skipped|missed|today|yesterday|tomorrow|this\s+morning|this\s+afternoon|did|had|took|lesson|lessons?|class|mark|set|change|as|not\s+attended)\b/gi,
+    // Bulk words (strip so they don't become name candidates)
+    /\b(all\s+students?|all\s+of\s+them|all\s+of\s+the\s+students?|everyone|everybody|nobody|no\s+one|mark\s+all)\b/gi,
     // Spanish
-    /\b(vino|asisti[óo]|asistieron|estuvo\s+ausente|no\s+vino|no\s+asisti[óo]|ausente|falt[óo]|hoy|ayer|esta\s+mañana|esta\s+tarde|lección|lecciones|clase|tuvieron?|tom[óo])\b/gi,
+    /\b(vino|asisti[óo]|asistieron|estuvo\s+ausente|no\s+vino|no\s+asisti[óo]|ausente|falt[óo]|hoy|ayer|mañana|esta\s+mañana|esta\s+tarde|lección|lecciones|clase|tuvieron?|tom[óo]|todos|todas|nadie|marcar)\b/gi,
     // Chinese attendance words
-    /今天|昨天|今早|今天早上|今天下午|来了|没来|缺席|没有来|没到|缺课|上课了|的课/g,
+    /今天|昨天|明天|今早|今天早上|今天下午|来了|没来|缺席|没有来|没到|缺课|上课了|的课|所有学生|所有人|全部|都来了|都没来/g,
     // Duration/rate words
     /\d+\s*(minutes?|mins?|hours?|hrs?|minutos?|horas?|dollars?|bucks?|dólares?|分钟|小时|块|元)\b/gi,
     /\$[\d.]+/g,
     // Day/month names that might remain after date phrase stripping
-    /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday|january|february|march|april|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/gi,
+    /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday|january|february|march|april|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|next|this|last)\b/gi,
     // Filler
     /\b(the|a|an|to|for|on|at|in|el|la|los|las|de|del|了|的|和|都)\b/gi,
   ];
@@ -478,6 +590,37 @@ export function processVoiceTranscript(
 
   const languages = detectLanguages(text);
   const { date, isExplicitNonToday } = parseDate(text, todayKey);
+  const navigated_date = isExplicitNonToday ? date : null;
+
+  // ── Check for bulk attendance ("all students", "everyone", etc.) ──
+  const bulkResult = detectBulkAttendance(text);
+  if (bulkResult !== null) {
+    const bulkPresent = bulkResult === "attended";
+    const absent = isAbsent(text);
+    const present = absent ? false : bulkPresent;
+
+    // Create individual set_attendance actions for each scheduled student
+    const actions: VoiceAction[] = scheduledLessons.map((lesson) => ({
+      type: "set_attendance" as const,
+      student_id: lesson.student_id,
+      date,
+      present,
+      confidence: 0.9,
+    }));
+
+    return {
+      language_detected: languages,
+      intent: "mark_attendance",
+      actions,
+      clarifying_question: scheduledLessons.length === 0
+        ? "No students are scheduled for this date."
+        : null,
+      unmatched_mentions: [],
+      navigated_date,
+    };
+  }
+
+  // ── Individual student matching ──
   const durations = parseDurations(text);
   const rates = parseRates(text);
   const nameSegments = extractNameSegments(text);
@@ -574,9 +717,6 @@ export function processVoiceTranscript(
     clarifyQuestion = clarifyQuestion ?? "I didn't understand. Could you say that again?";
   }
 
-  // navigated_date is set if user mentioned a specific date (even today explicitly)
-  const navigated_date = isExplicitNonToday ? date : null;
-
   return {
     language_detected: languages,
     intent,
@@ -592,7 +732,6 @@ export function processVoiceTranscript(
 /* ------------------------------------------------------------------ */
 
 export function buildScheduledLessons(students: Student[], dateKey: string, _dayOfWeek?: number): ScheduledLesson[] {
-  // Import is circular-safe because this only depends on types
   const results: ScheduledLesson[] = [];
   for (const s of students) {
     // Check termination
