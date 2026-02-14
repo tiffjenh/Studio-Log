@@ -28,6 +28,7 @@ function BarChart({
   onBarClick,
   angleXLabels = false,
   noEarningsText = "No earnings",
+  yAxisStepCents,
 }: {
   data: number[];
   xLabels: string[];
@@ -37,9 +38,20 @@ function BarChart({
   onBarClick?: (dateKey: string) => void;
   angleXLabels?: boolean;
   noEarningsText?: string;
+  /** When set, Y-axis uses this step in cents (e.g. 500000 = $5000). Used for yearly graph. */
+  yAxisStepCents?: number;
 }) {
   const isEmpty = maxVal <= 0 || data.every((v) => v === 0);
-  const ticks = isEmpty ? EMPTY_TICKS : getYAxisTicks(maxVal);
+  const ticks = isEmpty
+    ? EMPTY_TICKS
+    : yAxisStepCents != null
+      ? (() => {
+          const out: number[] = [0];
+          for (let v = yAxisStepCents; v <= Math.max(maxVal, yAxisStepCents); v += yAxisStepCents) out.push(v);
+          if (out[out.length - 1]! < maxVal) out.push(Math.ceil(maxVal / yAxisStepCents) * yAxisStepCents);
+          return out;
+        })()
+      : getYAxisTicks(maxVal);
   const topTick = Math.max(...ticks, 10000);
   const chartMax = isEmpty ? 20000 : topTick * 1.15;
   const showSubLabels = xSubLabels && xSubLabels.length === data.length;
@@ -754,6 +766,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                   noEarningsText={t("earnings.noEarnings")}
                   dateKeys={yearlyLabels}
                   onBarClick={(key) => setSelectedYearKey((prev) => (prev === key ? null : key))}
+                  yAxisStepCents={500000}
                 />
               </div>
               <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
