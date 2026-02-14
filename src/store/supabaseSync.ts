@@ -192,27 +192,31 @@ export async function addStudentSupabase(uid: string, student: Omit<Student, "id
   if (!supabase) throw new Error("Supabase not configured");
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Session expired. Please log out and log in again.");
+  // Build insert row with only required columns + optional columns that have values.
+  // This avoids 400 errors when optional columns haven't been added to the DB yet.
+  const row: Record<string, unknown> = {
+    user_id: uid,
+    first_name: student.firstName,
+    last_name: student.lastName,
+    duration_minutes: student.durationMinutes,
+    rate_cents: student.rateCents,
+    day_of_week: student.dayOfWeek,
+    time_of_day: student.timeOfDay,
+  };
+  if (student.location != null) row.location = student.location;
+  if (student.scheduleChangeFromDate != null) row.schedule_change_from_date = student.scheduleChangeFromDate;
+  if (student.scheduleChangeDayOfWeek != null) row.schedule_change_day_of_week = student.scheduleChangeDayOfWeek;
+  if (student.scheduleChangeTimeOfDay != null) row.schedule_change_time_of_day = student.scheduleChangeTimeOfDay;
+  if (student.scheduleChangeDurationMinutes != null) row.schedule_change_duration_minutes = student.scheduleChangeDurationMinutes;
+  if (student.scheduleChangeRateCents != null) row.schedule_change_rate_cents = student.scheduleChangeRateCents;
+  if (student.terminatedFromDate != null) row.terminated_from_date = student.terminatedFromDate;
+  if (student.avatarIcon != null) row.avatar_icon = student.avatarIcon;
+  if (student.additionalSchedules?.length) row.additional_schedules = JSON.stringify(student.additionalSchedules);
+  if (student.scheduleChangeAdditionalSchedules?.length) row.schedule_change_additional_schedules = JSON.stringify(student.scheduleChangeAdditionalSchedules);
+
   const { data, error } = await supabase
     .from("students")
-    .insert({
-      user_id: uid,
-      first_name: student.firstName,
-      last_name: student.lastName,
-      duration_minutes: student.durationMinutes,
-      rate_cents: student.rateCents,
-      day_of_week: student.dayOfWeek,
-      time_of_day: student.timeOfDay,
-      location: student.location ?? null,
-      schedule_change_from_date: student.scheduleChangeFromDate ?? null,
-      schedule_change_day_of_week: student.scheduleChangeDayOfWeek ?? null,
-      schedule_change_time_of_day: student.scheduleChangeTimeOfDay ?? null,
-      schedule_change_duration_minutes: student.scheduleChangeDurationMinutes ?? null,
-      schedule_change_rate_cents: student.scheduleChangeRateCents ?? null,
-      terminated_from_date: student.terminatedFromDate ?? null,
-      avatar_icon: student.avatarIcon ?? null,
-      additional_schedules: student.additionalSchedules?.length ? JSON.stringify(student.additionalSchedules) : null,
-      schedule_change_additional_schedules: student.scheduleChangeAdditionalSchedules?.length ? JSON.stringify(student.scheduleChangeAdditionalSchedules) : null,
-    })
+    .insert(row)
     .select()
     .single();
   if (error) throw error;
