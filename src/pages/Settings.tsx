@@ -256,9 +256,11 @@ export default function Settings() {
             if (id) imported++;
             else { skipped++; errors.push(`Failed: ${name} on ${date}`); }
           }
-        } catch {
+        } catch (err: unknown) {
           skipped++;
-          errors.push(`Failed: ${name} on ${date}`);
+          console.error(`Matrix import failed: ${name} on ${date}`, err);
+          const msg = err instanceof Error ? err.message : typeof err === "object" && err !== null && "message" in err ? String((err as Record<string, unknown>).message) : "unknown error";
+          errors.push(`Failed: ${name} on ${date} — ${msg}`);
         }
       }
 
