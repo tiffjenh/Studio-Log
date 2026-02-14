@@ -26,6 +26,7 @@ export default function Settings() {
   const [editing, setEditing] = useState<"name" | "email" | "password" | null>(null);
   const [saveError, setSaveError] = useState("");
   const [emailChangeMessage, setEmailChangeMessage] = useState<"success" | null>(null);
+  const [pendingNewEmail, setPendingNewEmail] = useState<string | null>(null);
   const [emailJustConfirmed, setEmailJustConfirmed] = useState(false);
   const [newPassword, setNewPassword] = useState("");
 
@@ -52,6 +53,7 @@ export default function Settings() {
 
   const handleSave = async (field: "name" | "email") => {
     if (!user) return;
+    setSaveError("");
     setEmailChangeMessage(null);
     if (field === "name" && hasSupabase()) {
       await updateUserProfile({ name });
@@ -69,6 +71,7 @@ export default function Settings() {
         setSaveError(error);
         return;
       }
+      setPendingNewEmail(newEmail);
       setEmailChangeMessage("success");
     } else {
       setUser({ ...user, name: field === "name" ? name : user.name, email: field === "email" ? email : user.email });
@@ -376,7 +379,7 @@ export default function Settings() {
         )}
         {emailChangeMessage === "success" && editing !== "email" && !emailJustConfirmed && (
           <p style={{ marginTop: 8, marginBottom: 0, fontSize: 14, color: "var(--text-muted)" }}>
-            Check the inbox for <strong>{user.email}</strong> (and spam folder). Click the verification link to confirm the email change. Your email will update to <strong>{email.trim()}</strong> after you confirm. If you don’t see it, wait a minute and try again (rate limit: one request per 60 seconds).
+            Check the inbox for <strong>{user.email}</strong> (and spam folder). Click the verification link to confirm the email change. Your login email will update to <strong>{pendingNewEmail || email.trim()}</strong> after you confirm. If you don’t see it, wait a minute and try again (rate limit: one request per 60 seconds).
           </p>
         )}
         <div style={{ ...rowStyle, borderBottom: "none" }}>
