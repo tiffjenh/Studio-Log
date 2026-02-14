@@ -16,6 +16,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importYear, setImportYear] = useState(new Date().getFullYear());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -109,6 +110,7 @@ export default function Settings() {
     if (!file) return;
     setImportResult(null);
     setImporting(true);
+    setImportProgress(null);
 
     try {
       const text = await file.text();
@@ -116,16 +118,20 @@ export default function Settings() {
       if (parsed.error) {
         setImportResult({ imported: 0, skipped: 0, errors: [parsed.error] });
         setImporting(false);
+        setImportProgress(null);
         e.target.value = "";
         return;
       }
 
+      const total = parsed.rows.length;
+      setImportProgress({ current: 0, total });
       const students = data.students;
       let imported = 0;
       let skipped = 0;
       const errors: string[] = [];
 
-      for (let i = 0; i < parsed.rows.length; i++) {
+      for (let i = 0; i < total; i++) {
+        setImportProgress({ current: i + 1, total });
         const lessonData = rowToLesson(parsed.rows[i]);
         if (!lessonData) {
           skipped++;
@@ -148,7 +154,7 @@ export default function Settings() {
           const existing = getLessonForStudentOnDate(data.lessons, student.id, lessonData.date);
           if (existing) {
             await updateLesson(existing.id, {
-              completed: true, // Imported lessons count in earnings; no need to toggle manually
+              completed: true,
               durationMinutes: lessonData.duration_minutes,
               amountCents: lessonData.amount_cents,
               note: lessonData.note,
@@ -160,7 +166,7 @@ export default function Settings() {
               date: lessonData.date,
               durationMinutes: lessonData.duration_minutes,
               amountCents: lessonData.amount_cents,
-              completed: true, // Imported lessons count in earnings; no need to toggle manually
+              completed: true,
               note: lessonData.note,
             });
             if (id) imported++;
@@ -169,9 +175,10 @@ export default function Settings() {
               errors.push(`Row ${i + 2}: Failed to save`);
             }
           }
-        } catch {
+        } catch (err: unknown) {
           skipped++;
-          errors.push(`Row ${i + 2}: Failed to save`);
+          const msg = err instanceof Error ? err.message : typeof err === "object" && err !== null && "message" in err ? String((err as Record<string, unknown>).message) : "Failed to save";
+          errors.push(`Row ${i + 2}: ${msg}`);
         }
       }
 
@@ -180,6 +187,7 @@ export default function Settings() {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
     } finally {
       setImporting(false);
+      setImportProgress(null);
       e.target.value = "";
     }
   };
@@ -216,6 +224,7 @@ export default function Settings() {
     if (!file) return;
     setImportResult(null);
     setImporting(true);
+    setImportProgress(null);
 
     try {
       const text = await file.text();
@@ -223,15 +232,20 @@ export default function Settings() {
       if (parsed.error) {
         setImportResult({ imported: 0, skipped: 0, errors: [parsed.error] });
         setImporting(false);
+        setImportProgress(null);
         e.target.value = "";
         return;
       }
 
+      const total = parsed.attendance.length;
+      setImportProgress({ current: 0, total });
       let imported = 0;
       let skipped = 0;
       const errors: string[] = [];
 
-      for (const { date, studentIndex } of parsed.attendance) {
+      for (let idx = 0; idx < total; idx++) {
+        setImportProgress({ current: idx + 1, total });
+        const { date, studentIndex } = parsed.attendance[idx];
         const name = parsed.studentNames[studentIndex];
         const student = name ? matchStudentByName(name) : undefined;
         if (!student) {
@@ -243,7 +257,7 @@ export default function Settings() {
         try {
           const existing = getLessonForStudentOnDate(data.lessons, student.id, date);
           if (existing) {
-            await updateLesson(existing.id, { completed: true }); // Imported = toggled on for earnings
+            await updateLesson(existing.id, { completed: true });
             imported++;
           } else {
             const id = await addLesson({
@@ -251,7 +265,7 @@ export default function Settings() {
               date,
               durationMinutes: student.durationMinutes,
               amountCents: student.rateCents,
-              completed: true, // Imported = toggled on for earnings
+              completed: true,
             });
             if (id) imported++;
             else { skipped++; errors.push(`Failed: ${name} on ${date}`); }
@@ -269,6 +283,7 @@ export default function Settings() {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
     } finally {
       setImporting(false);
+      setImportProgress(null);
       e.target.value = "";
     }
   };
@@ -281,6 +296,35 @@ export default function Settings() {
   };
 
   if (!user) return null;
+
+  const importProgressBar = importing && importProgress ? (
+    <div style={{ marginTop: 12, fontSize: 14, fontFamily: "var(--font-sans)" }}>
+      <p style={{ margin: "0 0 8px", fontWeight: 600 }}>Importing... {importProgress.current} of {importProgress.total}</p>
+      <div style={{ width: "100%", height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
+        <div style={{ width: `${importProgress.total > 0 ? Math.round((importProgress.current / importProgress.total) * 100) : 0}%`, height: "100%", borderRadius: 4, background: "#c97b94", transition: "width 0.2s ease" }} />
+      </div>
+    </div>
+  ) : null;
+
+  const importResultBanner = importResult && !importing ? (() => {
+    const success = importResult.imported > 0 && importResult.errors.length === 0;
+    const partial = importResult.imported > 0 && importResult.errors.length > 0;
+    const fail = importResult.imported === 0 && importResult.errors.length > 0;
+    const label = success ? "lessons" : "items";
+    return (
+      <div style={{ marginTop: 12, padding: 12, borderRadius: 10, fontSize: 14, fontFamily: "var(--font-sans)", background: success ? "#f0fdf4" : fail ? "#fef2f2" : "#fffbeb", border: `1px solid ${success ? "#bbf7d0" : fail ? "#fecaca" : "#fde68a"}` }}>
+        <p style={{ margin: 0, fontWeight: 700, color: success ? "#166534" : fail ? "#991b1b" : "#92400e" }}>
+          {success ? `Success! Imported ${importResult.imported} ${label}.` : partial ? `Partially imported: ${importResult.imported} added, ${importResult.skipped} skipped.` : `Import failed — ${importResult.skipped} item${importResult.skipped !== 1 ? "s" : ""} skipped.`}
+        </p>
+        {importResult.errors.length > 0 && (
+          <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: fail ? "#991b1b" : "#92400e", maxHeight: 120, overflowY: "auto", fontSize: 13 }}>
+            {importResult.errors.slice(0, 10).map((err, i) => (<li key={i} style={{ marginBottom: 2 }}>{err}</li>))}
+            {importResult.errors.length > 10 && <li>...and {importResult.errors.length - 10} more</li>}
+          </ul>
+        )}
+      </div>
+    );
+  })() : null;
 
   const rowStyle: React.CSSProperties = { display: "flex", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(201, 123, 148, 0.1)" };
   const inputStyle: React.CSSProperties = { flex: 2, padding: 6, fontSize: 15, border: "1px solid var(--border)", borderRadius: 8 };
@@ -469,19 +513,8 @@ export default function Settings() {
                 {importing ? t("common.loading") : t("settings.importMatrix")}
               </button>
             </div>
-            {importResult && (
-              <div style={{ marginTop: 12, fontSize: 14 }}>
-                <p style={{ margin: 0, fontWeight: 600 }}>Imported {importResult.imported} lessons, skipped {importResult.skipped}</p>
-                {importResult.errors.length > 0 && (
-                  <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "var(--text-muted)", maxHeight: 120, overflowY: "auto" }}>
-                    {importResult.errors.slice(0, 10).map((err, i) => (
-                      <li key={i}>{err}</li>
-                    ))}
-                    {importResult.errors.length > 10 && <li>…and {importResult.errors.length - 10} more</li>}
-                  </ul>
-                )}
-              </div>
-            )}
+            {importProgressBar}
+            {importResultBanner}
           </div>
         )}
       </div>
@@ -514,6 +547,8 @@ export default function Settings() {
             >
               {importing ? t("common.loading") : t("settings.importCsv")}
             </button>
+            {importProgressBar}
+            {importResultBanner}
           </div>
         )}
       </div>

@@ -35,6 +35,7 @@ export default function AddStudent() {
   const [lastName, setLastName] = useState("");
   const [error, setError] = useState("");
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
 
   // Schedule entries: each entry has its own day, duration, rate, time
@@ -112,20 +113,25 @@ export default function AddStudent() {
     if (!file) return;
     setImportResult(null);
     setImporting(true);
+    setImportProgress(null);
     try {
       const text = await file.text();
       const parsed = parseStudentCSV(text);
       if (parsed.error) {
         setImportResult({ imported: 0, skipped: 0, errors: [parsed.error] });
         setImporting(false);
+        setImportProgress(null);
         e.target.value = "";
         return;
       }
+      const total = parsed.rows.length;
+      setImportProgress({ current: 0, total });
       const existing = new Set(data.students.map((s) => `${s.firstName.toLowerCase()}|${s.lastName.toLowerCase()}`));
       let imported = 0;
       let skipped = 0;
       const errors: string[] = [];
-      for (let i = 0; i < parsed.rows.length; i++) {
+      for (let i = 0; i < total; i++) {
+        setImportProgress({ current: i + 1, total });
         const studentData = rowToStudent(parsed.rows[i]);
         if (!studentData) {
           skipped++;
@@ -166,6 +172,7 @@ export default function AddStudent() {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
     } finally {
       setImporting(false);
+      setImportProgress(null);
       e.target.value = "";
     }
   };
@@ -213,17 +220,32 @@ export default function AddStudent() {
           </button>
         </div>
       </div>
-      {importResult && (
-        <div style={{ marginBottom: 24, padding: 12, borderRadius: 12, background: "var(--card)", border: "1px solid var(--border)", fontSize: 14, ...fontStyle }}>
-          <p style={{ margin: 0, fontWeight: 600 }}>Imported {importResult.imported} students, skipped {importResult.skipped}</p>
-          {importResult.errors.length > 0 && (
-            <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: "var(--text-muted)", maxHeight: 100, overflowY: "auto" }}>
-              {importResult.errors.slice(0, 8).map((err, i) => (<li key={i}>{err}</li>))}
-              {importResult.errors.length > 8 && <li>...and {importResult.errors.length - 8} more</li>}
-            </ul>
-          )}
+      {importing && importProgress && (
+        <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, background: "var(--card)", border: "1px solid var(--border)", fontSize: 14, ...fontStyle }}>
+          <p style={{ margin: "0 0 10px", fontWeight: 600 }}>Importing students... {importProgress.current} of {importProgress.total}</p>
+          <div style={{ width: "100%", height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
+            <div style={{ width: `${Math.round((importProgress.current / importProgress.total) * 100)}%`, height: "100%", borderRadius: 4, background: "#c97b94", transition: "width 0.2s ease" }} />
+          </div>
         </div>
       )}
+      {importResult && !importing && (() => {
+        const success = importResult.imported > 0 && importResult.errors.length === 0;
+        const partial = importResult.imported > 0 && importResult.errors.length > 0;
+        const fail = importResult.imported === 0 && importResult.errors.length > 0;
+        return (
+          <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, fontSize: 14, ...fontStyle, background: success ? "#f0fdf4" : fail ? "#fef2f2" : "#fffbeb", border: `1px solid ${success ? "#bbf7d0" : fail ? "#fecaca" : "#fde68a"}` }}>
+            <p style={{ margin: 0, fontWeight: 700, color: success ? "#166534" : fail ? "#991b1b" : "#92400e" }}>
+              {success ? `Success! Imported ${importResult.imported} student${importResult.imported !== 1 ? "s" : ""}.` : partial ? `Partially imported: ${importResult.imported} added, ${importResult.skipped} skipped.` : `Import failed — ${importResult.skipped} student${importResult.skipped !== 1 ? "s" : ""} skipped.`}
+            </p>
+            {importResult.errors.length > 0 && (
+              <ul style={{ margin: "10px 0 0", paddingLeft: 20, color: fail ? "#991b1b" : "#92400e", maxHeight: 120, overflowY: "auto", fontSize: 13 }}>
+                {importResult.errors.slice(0, 8).map((err, i) => (<li key={i} style={{ marginBottom: 2 }}>{err}</li>))}
+                {importResult.errors.length > 8 && <li>...and {importResult.errors.length - 8} more</li>}
+              </ul>
+            )}
+          </div>
+        );
+      })()}
       <form onSubmit={handleSave}>
         <label style={labelStyle}>{t("addStudent.firstName")}</label>
         <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t("addStudent.firstName")} style={inputStyle} required />
