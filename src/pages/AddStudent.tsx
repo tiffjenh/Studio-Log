@@ -150,9 +150,15 @@ export default function AddStudent() {
           });
           existing.add(key);
           imported++;
-        } catch {
+        } catch (err: unknown) {
           skipped++;
-          errors.push(`Row ${i + 2}: Failed to save`);
+          console.error(`Import row ${i + 2} failed:`, err);
+          let msg = "Failed to save";
+          if (err instanceof Error) msg = err.message;
+          else if (typeof err === "object" && err !== null && "message" in err) msg = String((err as Record<string, unknown>).message);
+          else if (typeof err === "string") msg = err;
+          else msg = JSON.stringify(err) ?? "Unknown error";
+          errors.push(`Row ${i + 2}: ${msg}`);
         }
       }
       setImportResult({ imported, skipped, errors });
