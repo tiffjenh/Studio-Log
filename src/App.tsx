@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-
 import { useStoreContext } from "./context/StoreContext";
 import { useLanguage } from "./context/LanguageContext";
 import { supabase, hasSupabase, isAuthCallbackUrl, clearAuthCallbackHash } from "./lib/supabase";
+import { applyEmailChange } from "./store/supabaseSync";
 import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -45,6 +46,21 @@ function AuthCallbackHandler() {
       if (handled.current) return;
       handled.current = true;
       clearAuthCallbackHash();
+
+      // If the user clicked a magic-link to verify an email change, apply it now
+      const pendingEmail = localStorage.getItem("pendingEmailChange");
+      if (pendingEmail) {
+        const { error } = await applyEmailChange(pendingEmail);
+        localStorage.removeItem("pendingEmailChange");
+        if (!error) {
+          await reload();
+          navigate("/settings?email_updated=1", { replace: true });
+          return;
+        }
+        // If admin change failed, fall through to reload anyway
+        console.error("Email change failed:", error);
+      }
+
       await reload();
       navigate("/settings?email_updated=1", { replace: true });
     };
@@ -58,8 +74,19 @@ function AuthCallbackHandler() {
     if (!loaded || !data.user || !isAuthCallbackUrl() || handled.current) return;
     handled.current = true;
     clearAuthCallbackHash();
+
+    const pendingEmail = localStorage.getItem("pendingEmailChange");
+    if (pendingEmail) {
+      applyEmailChange(pendingEmail).then(({ error }) => {
+        localStorage.removeItem("pendingEmailChange");
+        if (error) console.error("Email change failed:", error);
+        reload().then(() => navigate("/settings?email_updated=1", { replace: true }));
+      });
+      return;
+    }
+
     navigate("/settings?email_updated=1", { replace: true });
-  }, [loaded, data.user, navigate]);
+  }, [loaded, data.user, navigate, reload]);
 
   return null;
 }

@@ -132,11 +132,60 @@ export async function updateProfileSupabase(uid: string, updates: { name?: strin
   await supabase.from("profiles").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", uid);
 }
 
-export async function updateEmailSupabase(newEmail: string): Promise<{ error?: string }> {
+/**
+ * Send a magic-link to the user's CURRENT (old) email to verify ownership
+ * before changing to a new email.  The new email is stored in localStorage
+ * so the callback handler can pick it up.
+ */
+export async function initiateEmailChange(
+  currentEmail: string,
+  newEmail: string,
+  redirectUrl: string,
+): Promise<{ error?: string }> {
   if (!supabase) return { error: "Supabase not configured" };
-  const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
-  if (error) return { error: error.message };
+
+  // Store the intended new email for the callback handler
+  localStorage.setItem("pendingEmailChange", newEmail.trim());
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email: currentEmail,
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: redirectUrl,
+    },
+  });
+  if (error) {
+    localStorage.removeItem("pendingEmailChange");
+    return { error: error.message };
+  }
   return {};
+}
+
+/**
+ * Call the admin API endpoint to apply the email change after the user
+ * verified ownership by clicking the magic link sent to their old email.
+ */
+export async function applyEmailChange(newEmail: string): Promise<{ error?: string }> {
+  if (!supabase) return { error: "Supabase not configured" };
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { error: "No active session" };
+
+  try {
+    const resp = await fetch("/api/change-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ newEmail }),
+    });
+    const json = await resp.json();
+    if (!resp.ok) return { error: json.error || "Failed to change email" };
+    return {};
+  } catch {
+    return { error: "Network error — please try again" };
+  }
 }
 
 export async function addStudentSupabase(uid: string, student: Omit<Student, "id">): Promise<Student> {

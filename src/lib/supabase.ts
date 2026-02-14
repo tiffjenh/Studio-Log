@@ -8,14 +8,15 @@ export const supabase =
     ? createClient(url, anonKey, { auth: { detectSessionInUrl: true } })
     : null;
 
-/** True if the current URL looks like a Supabase auth callback (e.g. email change or recovery). */
+/** True if the current URL looks like a Supabase auth callback (e.g. email change, recovery, or magic link). */
 export function isAuthCallbackUrl(): boolean {
   if (typeof window === "undefined") return false;
   const hash = window.location.hash || "";
   return (
     hash.includes("access_token=") ||
     hash.includes("type=email_change") ||
-    hash.includes("type=recovery")
+    hash.includes("type=recovery") ||
+    hash.includes("type=magiclink")
   );
 }
 
@@ -26,7 +27,8 @@ export function clearAuthCallbackHash(): void {
   if (
     hash.includes("access_token=") ||
     hash.includes("type=email_change") ||
-    hash.includes("type=recovery")
+    hash.includes("type=recovery") ||
+    hash.includes("type=magiclink")
   ) {
     const url = new URL(window.location.href);
     url.hash = "";

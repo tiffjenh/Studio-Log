@@ -4,7 +4,7 @@ import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { updatePasswordSupabase, updateEmailSupabase } from "@/store/supabaseSync";
+import { updatePasswordSupabase, initiateEmailChange } from "@/store/supabaseSync";
 import { parseLessonCSV, parseLessonMatrixCSV, rowToLesson, type ImportResult } from "@/utils/csvImport";
 import { filterCurrencies, getCurrencyByCode, getStoredCurrencyCode, setStoredCurrencyCode } from "@/utils/currencies";
 import { getLessonForStudentOnDate } from "@/utils/earnings";
@@ -61,13 +61,14 @@ export default function Settings() {
         setEditing(null);
         return;
       }
-      const { error } = await updateEmailSupabase(newEmail);
+      // Send a verification magic-link to the CURRENT (old) email.
+      // The new email will be applied after the user confirms via the link.
+      const redirectUrl = `${window.location.origin}/settings`;
+      const { error } = await initiateEmailChange(user.email, newEmail, redirectUrl);
       if (error) {
         setSaveError(error);
         return;
       }
-      // Supabase sends a confirmation link to the NEW email; the change only applies after they click it.
-      // Do not update local state yet — show instructions instead.
       setEmailChangeMessage("success");
     } else {
       setUser({ ...user, name: field === "name" ? name : user.name, email: field === "email" ? email : user.email });
@@ -375,7 +376,7 @@ export default function Settings() {
         )}
         {emailChangeMessage === "success" && editing !== "email" && !emailJustConfirmed && (
           <p style={{ marginTop: 8, marginBottom: 0, fontSize: 14, color: "var(--text-muted)" }}>
-            Check the inbox for <strong>{email.trim()}</strong> (and spam folder). Click the link in the email from Supabase to confirm the change. Your email here will update after you confirm. If you don’t see it, wait a minute and try again (rate limit: one request per 60 seconds).
+            Check the inbox for <strong>{user.email}</strong> (and spam folder). Click the verification link to confirm the email change. Your email will update to <strong>{email.trim()}</strong> after you confirm. If you don’t see it, wait a minute and try again (rate limit: one request per 60 seconds).
           </p>
         )}
         <div style={{ ...rowStyle, borderBottom: "none" }}>
