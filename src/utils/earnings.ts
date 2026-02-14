@@ -299,7 +299,8 @@ export function getYAxisTicks(maxCents: number): number[] {
   else if (max <= 20000) step = 5000;
   else if (max <= 50000) step = 10000;
   else if (max <= 100000) step = 20000;
-  else step = 50000;
+  else if (max <= 200000) step = 50000;
+  else step = 100000; // $1000 increments for large amounts
   const ticks: number[] = [0];
   for (let v = step; v <= max; v += step) ticks.push(v);
   if (ticks[ticks.length - 1] < max) ticks.push(Math.ceil(max / step) * step);

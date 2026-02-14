@@ -8,6 +8,7 @@ const srcRoot = path.resolve(__dirname, "src");
 
 export default defineConfig({
   plugins: [react()],
+  server: { port: 5174 },
   resolve: {
     alias: [
       { find: /^@\//, replacement: srcRoot + "/" },
