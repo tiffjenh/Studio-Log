@@ -251,6 +251,8 @@ export async function deleteStudentSupabase(uid: string, id: string): Promise<vo
   if (error) throw error;
 }
 
+const BULK_INSERT_CHUNK = 200;
+
 export async function addLessonSupabase(uid: string, lesson: Omit<Lesson, "id">): Promise<Lesson> {
   if (!supabase) throw new Error("Supabase not configured");
   const { data, error } = await supabase
@@ -268,6 +270,29 @@ export async function addLessonSupabase(uid: string, lesson: Omit<Lesson, "id">)
     .single();
   if (error) throw error;
   return rowToLesson(data as Record<string, unknown>);
+}
+
+/** Insert many lessons in chunks. Returns all created lessons. Use for matrix import so 2025/2026 don't fail partway. */
+export async function bulkInsertLessonsSupabase(uid: string, lessons: Omit<Lesson, "id">[]): Promise<Lesson[]> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const rows = lessons.map((l) => ({
+    user_id: uid,
+    student_id: l.studentId,
+    date: l.date,
+    duration_minutes: l.durationMinutes,
+    amount_cents: l.amountCents,
+    completed: l.completed ?? true,
+    note: l.note ?? null,
+  }));
+  const out: Lesson[] = [];
+  for (let i = 0; i < rows.length; i += BULK_INSERT_CHUNK) {
+    const chunk = rows.slice(i, i + BULK_INSERT_CHUNK);
+    const { data, error } = await supabase.from("lessons").insert(chunk).select();
+    if (error) throw error;
+    const list = (data ?? []) as Record<string, unknown>[];
+    for (const r of list) out.push(rowToLesson(r));
+  }
+  return out;
 }
 
 export async function updateLessonSupabase(uid: string, id: string, updates: Partial<Lesson>): Promise<void> {

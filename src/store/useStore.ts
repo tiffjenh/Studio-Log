@@ -8,6 +8,7 @@ import {
   updateStudentSupabase,
   deleteStudentSupabase,
   addLessonSupabase,
+  bulkInsertLessonsSupabase,
   updateLessonSupabase,
   deleteAllLessonsSupabase,
   updateProfileSupabase,
@@ -281,6 +282,22 @@ export function useStore() {
     [data, persist]
   );
 
+  /** Add many lessons in one go (bulk insert when Supabase). Used by matrix import so 2025/2026 don't fail partway. */
+  const addLessonsBulk = useCallback(
+    async (lessons: Omit<Lesson, "id">[]): Promise<Lesson[]> => {
+      if (lessons.length === 0) return [];
+      if (hasSupabase() && data.user) {
+        const created = await bulkInsertLessonsSupabase(data.user.id, lessons);
+        setData((prev) => ({ ...prev, lessons: [...prev.lessons, ...created] }));
+        return created;
+      }
+      const withIds = lessons.map((l, i) => ({ ...l, id: `l_${Date.now()}_${i}` }));
+      persist({ ...data, lessons: [...data.lessons, ...withIds] });
+      return withIds;
+    },
+    [data, persist]
+  );
+
   const clearAllLessons = useCallback(
     async (): Promise<void> => {
       if (hasSupabase() && data.user) {
@@ -375,6 +392,7 @@ export function useStore() {
     updateStudent,
     deleteStudent,
     addLesson,
+    addLessonsBulk,
     updateLesson,
     clearAllLessons,
     updateUserProfile,

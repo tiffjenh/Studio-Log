@@ -9,10 +9,10 @@ import { parseLessonMatrixCSV, type ImportResult } from "@/utils/csvImport";
 import { downloadCsv, getMatrixTemplateCsv } from "@/utils/importTemplates";
 import { filterCurrencies, getCurrencyByCode, getStoredCurrencyCode, setStoredCurrencyCode } from "@/utils/currencies";
 import { getLessonForStudentOnDate } from "@/utils/earnings";
-import type { Student } from "@/types";
+import type { Lesson, Student } from "@/types";
 
 export default function Settings() {
-  const { data, setUser, updateUserProfile, addLesson, updateLesson, clearAllLessons, reload } = useStoreContext();
+  const { data, setUser, updateUserProfile, addLesson, addLessonsBulk, updateLesson, clearAllLessons, reload } = useStoreContext();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -148,57 +148,64 @@ export default function Settings() {
         return;
       }
 
-      const total = parsed.attendance.length;
-      setImportProgress({ current: 0, total });
-      let imported = 0;
-      let skipped = 0;
+      const existingSet = new Set(data.lessons.map((l) => `${l.studentId}|${l.date}`));
+      const toAdd: Omit<Lesson, "id">[] = [];
+      const toUpdate: { id: string; date: string; updates: { completed: boolean; amountCents: number; durationMinutes: number } }[] = [];
       const errors: string[] = [];
-      const countsByYear: Record<string, number> = {};
 
-      for (let idx = 0; idx < total; idx++) {
-        setImportProgress({ current: idx + 1, total });
+      for (let idx = 0; idx < parsed.attendance.length; idx++) {
+        setImportProgress({ current: idx + 1, total: parsed.attendance.length });
         const { date, studentIndex } = parsed.attendance[idx];
         const name = parsed.studentNames[studentIndex];
         const student = name ? matchStudentByName(name) : undefined;
         if (!student) {
-          skipped++;
           if (!errors.some((x) => x.includes(name ?? ""))) errors.push(`No student named "${name}"`);
           continue;
         }
-
-        try {
+        const key = `${student.id}|${date}`;
+        if (existingSet.has(key)) {
           const existing = getLessonForStudentOnDate(data.lessons, student.id, date);
-          if (existing) {
-            await updateLesson(existing.id, {
-              completed: true,
-              amountCents: student.rateCents,
-              durationMinutes: student.durationMinutes,
-            });
-            imported++;
-            const y = date.slice(0, 4);
-            countsByYear[y] = (countsByYear[y] ?? 0) + 1;
-          } else {
-            const id = await addLesson({
-              studentId: student.id,
-              date,
-              durationMinutes: student.durationMinutes,
-              amountCents: student.rateCents,
-              completed: true,
-            });
-            if (id) {
-              imported++;
-              const y = date.slice(0, 4);
-              countsByYear[y] = (countsByYear[y] ?? 0) + 1;
-            } else { skipped++; errors.push(`Failed: ${name} on ${date}`); }
-          }
-        } catch (err: unknown) {
-          skipped++;
-          console.error(`Matrix import failed: ${name} on ${date}`, err);
-          const msg = err instanceof Error ? err.message : typeof err === "object" && err !== null && "message" in err ? String((err as Record<string, unknown>).message) : "unknown error";
-          errors.push(`Failed: ${name} on ${date} — ${msg}`);
+          if (existing) toUpdate.push({ id: existing.id, date, updates: { completed: true, amountCents: student.rateCents, durationMinutes: student.durationMinutes } });
+        } else {
+          toAdd.push({ studentId: student.id, date, durationMinutes: student.durationMinutes, amountCents: student.rateCents, completed: true });
+          existingSet.add(key);
         }
       }
 
+      let updateImported = 0;
+      const countsByYear: Record<string, number> = {};
+      for (let i = 0; i < toUpdate.length; i++) {
+        setImportProgress({ current: parsed.attendance.length + i + 1, total: parsed.attendance.length + toUpdate.length + toAdd.length });
+        const { id, date, updates } = toUpdate[i]!;
+        try {
+          await updateLesson(id, updates);
+          updateImported++;
+          const y = date.slice(0, 4);
+          countsByYear[y] = (countsByYear[y] ?? 0) + 1;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`Update failed for ${date}: ${msg}`);
+        }
+      }
+
+      let bulkImported = 0;
+      if (toAdd.length > 0) {
+        setImportProgress({ current: parsed.attendance.length + toUpdate.length + toAdd.length, total: parsed.attendance.length + toUpdate.length + toAdd.length });
+        try {
+          const created = await addLessonsBulk(toAdd);
+          bulkImported = created.length;
+          for (const l of created) {
+            const y = l.date.slice(0, 4);
+            countsByYear[y] = (countsByYear[y] ?? 0) + 1;
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`Bulk add failed (${toAdd.length} lessons): ${msg}`);
+        }
+      }
+
+      const imported = updateImported + bulkImported;
+      const skipped = parsed.attendance.length - imported;
       const dateRange =
         parsed.dates.length > 0
           ? { min: parsed.dates[0]!, max: parsed.dates[parsed.dates.length - 1]! }
