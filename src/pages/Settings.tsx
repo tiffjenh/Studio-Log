@@ -46,6 +46,7 @@ export default function Settings() {
   const [passwordError, setPasswordError] = useState("");
   const [importDataOpen, setImportDataOpen] = useState(false);
   const [importMatrixOpen, setImportMatrixOpen] = useState(false);
+  const [clearingLessons, setClearingLessons] = useState(false);
   const [defaultCurrencyCode, setDefaultCurrencyCode] = useState(() => getStoredCurrencyCode());
   const [currencyModalOpen, setCurrencyModalOpen] = useState(false);
   const [currencySearch, setCurrencySearch] = useState("");
@@ -148,13 +149,19 @@ export default function Settings() {
         return;
       }
 
+      const total = parsed.attendance.length;
+      setImportProgress({ current: 0, total });
+
       const existingSet = new Set(data.lessons.map((l) => `${l.studentId}|${l.date}`));
       const toAdd: Omit<Lesson, "id">[] = [];
       const toUpdate: { id: string; date: string; updates: { completed: boolean; amountCents: number; durationMinutes: number } }[] = [];
       const errors: string[] = [];
 
+      const PROGRESS_BATCH = 100;
       for (let idx = 0; idx < parsed.attendance.length; idx++) {
-        setImportProgress({ current: idx + 1, total: parsed.attendance.length });
+        if (idx % PROGRESS_BATCH === 0 || idx === parsed.attendance.length - 1) {
+          setImportProgress({ current: idx + 1, total });
+        }
         const { date, studentIndex } = parsed.attendance[idx];
         const name = parsed.studentNames[studentIndex];
         const student = name ? matchStudentByName(name) : undefined;
@@ -172,10 +179,13 @@ export default function Settings() {
         }
       }
 
+      const totalSteps = parsed.attendance.length + toUpdate.length + toAdd.length;
       let updateImported = 0;
       const countsByYear: Record<string, number> = {};
       for (let i = 0; i < toUpdate.length; i++) {
-        setImportProgress({ current: parsed.attendance.length + i + 1, total: parsed.attendance.length + toUpdate.length + toAdd.length });
+        if (i % PROGRESS_BATCH === 0 || i === toUpdate.length - 1) {
+          setImportProgress({ current: parsed.attendance.length + i + 1, total: totalSteps });
+        }
         const { id, date, updates } = toUpdate[i]!;
         try {
           await updateLesson(id, updates);
@@ -190,7 +200,7 @@ export default function Settings() {
 
       let bulkImported = 0;
       if (toAdd.length > 0) {
-        setImportProgress({ current: parsed.attendance.length + toUpdate.length + toAdd.length, total: parsed.attendance.length + toUpdate.length + toAdd.length });
+        setImportProgress({ current: totalSteps, total: totalSteps });
         try {
           const created = await addLessonsBulk(toAdd);
           bulkImported = created.length;
@@ -455,8 +465,8 @@ export default function Settings() {
               <button
                 type="button"
                 onClick={() => matrixFileInputRef.current?.click()}
-                disabled={importing}
-                style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#111", background: "transparent", border: "1px solid #374151", borderRadius: 8, cursor: importing ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)" }}
+                disabled={importing || clearingLessons}
+                style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#111", background: "transparent", border: "1px solid #374151", borderRadius: 8, cursor: importing || clearingLessons ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)" }}
               >
                 {importing ? t("common.loading") : t("settings.importMatrix")}
               </button>
@@ -478,14 +488,24 @@ export default function Settings() {
             <p style={{ margin: "16px 0 8px", fontSize: 13, color: "var(--text-muted)" }}>To fix wrong dates (e.g. everything in 2024): clear all lessons, then re-import your matrix CSV with full dates (1/15/2024, 1/15/2025).</p>
             <button
               type="button"
-              onClick={() => {
+              disabled={clearingLessons}
+              onClick={async () => {
                 if (!window.confirm("Are you sure?")) return;
                 if (!window.confirm("This will delete ALL lessons. This cannot be undone. You can re-import the attendance matrix after. Continue?")) return;
-                clearAllLessons().catch((e) => { console.error(e); window.alert(e instanceof Error ? e.message : "Failed to clear"); });
+                setClearingLessons(true);
+                try {
+                  await clearAllLessons();
+                  if (hasSupabase()) await reload();
+                } catch (e) {
+                  console.error(e);
+                  window.alert(e instanceof Error ? e.message : "Failed to clear");
+                } finally {
+                  setClearingLessons(false);
+                }
               }}
-              style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#991b1b", background: "transparent", border: "1px solid #fecaca", borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-sans)" }}
+              style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#991b1b", background: "transparent", border: "1px solid #fecaca", borderRadius: 8, cursor: clearingLessons ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: clearingLessons ? 0.7 : 1 }}
             >
-              Clear all lessons
+              {clearingLessons ? "Clearing…" : "Clear all lessons"}
             </button>
           </div>
         )}
