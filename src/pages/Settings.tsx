@@ -12,7 +12,7 @@ import { getLessonForStudentOnDate } from "@/utils/earnings";
 import type { Lesson, Student } from "@/types";
 
 export default function Settings() {
-  const { data, setUser, updateUserProfile, addLesson, addLessonsBulk, updateLesson, clearAllLessons, reload } = useStoreContext();
+  const { data, setUser, updateUserProfile, addLessonsBulk, updateLesson, clearAllLessons, reload } = useStoreContext();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
