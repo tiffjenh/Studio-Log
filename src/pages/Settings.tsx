@@ -5,7 +5,8 @@ import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { updatePasswordSupabase, initiateEmailChange } from "@/store/supabaseSync";
-import { parseLessonCSV, parseLessonMatrixCSV, rowToLesson, type ImportResult } from "@/utils/csvImport";
+import { parseLessonMatrixCSV, type ImportResult } from "@/utils/csvImport";
+import { downloadCsv, getMatrixTemplateCsv } from "@/utils/importTemplates";
 import { filterCurrencies, getCurrencyByCode, getStoredCurrencyCode, setStoredCurrencyCode } from "@/utils/currencies";
 import { getLessonForStudentOnDate } from "@/utils/earnings";
 import type { Student } from "@/types";
@@ -18,7 +19,6 @@ export default function Settings() {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const matrixFileInputRef = useRef<HTMLInputElement>(null);
   const user = data.user;
   const [name, setName] = useState(user?.name ?? "");
@@ -46,7 +46,6 @@ export default function Settings() {
   const [passwordError, setPasswordError] = useState("");
   const [importDataOpen, setImportDataOpen] = useState(false);
   const [importMatrixOpen, setImportMatrixOpen] = useState(false);
-  const [importRowOpen, setImportRowOpen] = useState(false);
   const [defaultCurrencyCode, setDefaultCurrencyCode] = useState(() => getStoredCurrencyCode());
   const [currencyModalOpen, setCurrencyModalOpen] = useState(false);
   const [currencySearch, setCurrencySearch] = useState("");
@@ -102,93 +101,6 @@ export default function Settings() {
     setNewPassword("");
     setConfirmPassword("");
     setEditing(null);
-  };
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportResult(null);
-    setImporting(true);
-    setImportProgress(null);
-
-    try {
-      const text = await file.text();
-      const parsed = parseLessonCSV(text);
-      if (parsed.error) {
-        setImportResult({ imported: 0, skipped: 0, errors: [parsed.error] });
-        setImporting(false);
-        setImportProgress(null);
-        e.target.value = "";
-        return;
-      }
-
-      const total = parsed.rows.length;
-      setImportProgress({ current: 0, total });
-      const students = data.students;
-      let imported = 0;
-      let skipped = 0;
-      const errors: string[] = [];
-
-      for (let i = 0; i < total; i++) {
-        setImportProgress({ current: i + 1, total });
-        const lessonData = rowToLesson(parsed.rows[i]);
-        if (!lessonData) {
-          skipped++;
-          errors.push(`Row ${i + 2}: Invalid or missing data`);
-          continue;
-        }
-
-        const student = students.find(
-          (s) =>
-            s.firstName.toLowerCase().trim() === lessonData.first_name.toLowerCase() &&
-            s.lastName.toLowerCase().trim() === lessonData.last_name.toLowerCase()
-        );
-        if (!student) {
-          skipped++;
-          errors.push(`Row ${i + 2}: No student named ${lessonData.first_name} ${lessonData.last_name}`);
-          continue;
-        }
-
-        try {
-          const existing = getLessonForStudentOnDate(data.lessons, student.id, lessonData.date);
-          if (existing) {
-            await updateLesson(existing.id, {
-              completed: true,
-              durationMinutes: lessonData.duration_minutes,
-              amountCents: lessonData.amount_cents,
-              note: lessonData.note,
-            });
-            imported++;
-          } else {
-            const id = await addLesson({
-              studentId: student.id,
-              date: lessonData.date,
-              durationMinutes: lessonData.duration_minutes,
-              amountCents: lessonData.amount_cents,
-              completed: true,
-              note: lessonData.note,
-            });
-            if (id) imported++;
-            else {
-              skipped++;
-              errors.push(`Row ${i + 2}: Failed to save`);
-            }
-          }
-        } catch (err: unknown) {
-          skipped++;
-          const msg = err instanceof Error ? err.message : typeof err === "object" && err !== null && "message" in err ? String((err as Record<string, unknown>).message) : "Failed to save";
-          errors.push(`Row ${i + 2}: ${msg}`);
-        }
-      }
-
-      setImportResult({ imported, skipped, errors });
-    } catch (err) {
-      setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
-    } finally {
-      setImporting(false);
-      setImportProgress(null);
-      e.target.value = "";
-    }
   };
 
   function matchStudentByName(name: string): Student | undefined {
@@ -523,9 +435,21 @@ export default function Settings() {
                 type="button"
                 onClick={() => matrixFileInputRef.current?.click()}
                 disabled={importing}
-                style={{ padding: "10px 16px", fontSize: 14, border: "2px solid #fff", borderRadius: 8, background: "transparent", color: "var(--text)", cursor: importing ? "not-allowed" : "pointer" }}
+                style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#111", background: "transparent", border: "1px solid #374151", borderRadius: 8, cursor: importing ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)" }}
               >
                 {importing ? t("common.loading") : t("settings.importMatrix")}
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadCsv("lessons-matrix-template.csv", getMatrixTemplateCsv())}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#111", background: "transparent", border: "1px solid #374151", borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-sans)" }}
+              >
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Template
               </button>
             </div>
             {importProgressBar}
@@ -542,40 +466,6 @@ export default function Settings() {
             >
               Clear all lessons
             </button>
-          </div>
-        )}
-      </div>
-      <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
-        <button
-          type="button"
-          onClick={() => setImportRowOpen((o) => !o)}
-          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", background: "none", border: "none", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}
-        >
-          <span style={{ fontSize: 14 }}>{importRowOpen ? "▼" : "▶"}</span>
-          {t("settings.importLessonsRow")}
-        </button>
-        {importRowOpen && (
-          <div style={{ padding: "0 20px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)", fontSize: 13 }}>
-            <p style={{ margin: "12px 0", fontSize: 13, color: "var(--text-muted)" }}>
-              CSV needs: <code>first_name</code>, <code>last_name</code>, <code>date</code> (YYYY-MM-DD or M/D/YYYY), <code>duration_minutes</code>, <code>amount</code> (dollars) or <code>amount_cents</code>. Optional: <code>completed</code>, <code>note</code>. Students must already exist.
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleImport}
-              style={{ display: "none" }}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
-              style={{ padding: "10px 16px", fontSize: 14, border: "2px solid #fff", borderRadius: 8, background: "transparent", color: "var(--text)", cursor: importing ? "not-allowed" : "pointer" }}
-            >
-              {importing ? t("common.loading") : t("settings.importCsv")}
-            </button>
-            {importProgressBar}
-            {importResultBanner}
           </div>
         )}
       </div>

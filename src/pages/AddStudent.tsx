@@ -4,6 +4,7 @@ import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
 import { parseStudentCSV, rowToStudentWithError } from "@/utils/csvImport";
+import { downloadCsv, getStudentTemplateCsv } from "@/utils/importTemplates";
 import { getCurrencyByCode, getStoredCurrencyCode } from "@/utils/currencies";
 import type { DaySchedule, Student } from "@/types";
 
@@ -216,10 +217,22 @@ export default function AddStudent() {
       <Link to="/students" style={{ display: "inline-flex", marginBottom: 24, color: "var(--text)", textDecoration: "none", ...fontStyle }}>&larr; {t("common.back")}</Link>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, ...fontStyle }}>{t("addStudent.title")}</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} />
           <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} className="pill" style={{ minHeight: 40, ...fontStyle }} title={t("students.importStudents")}>
             {importing ? "..." : t("students.importStudents")}
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadCsv("students-template.csv", getStudentTemplateCsv())}
+            style={{ minHeight: 40, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: "1px solid var(--border)", background: "transparent", cursor: "pointer", fontSize: 14, ...fontStyle }}
+          >
+            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Template
           </button>
         </div>
       </div>

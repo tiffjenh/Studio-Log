@@ -141,31 +141,69 @@ export function parseLessonMatrixCSV(text: string, year: number): MatrixParseRes
   return { dates, studentNames, attendance };
 }
 
-/** Parse month-day-year (M/D/YYYY, M-D-YYYY, M/D, M-D) or ISO YYYY-MM-DD. Returns YYYY-MM-DD. */
+/** Parse month-day-year (M/D/YYYY, M-D-YYYY), year-month-day (YYYY-M-D, YYYY/M/D), or ISO YYYY-MM-DD. Returns YYYY-MM-DD. */
 function normalizeDateToYYYYMMDD(val: string, year: number): string | null {
-  const s = val.trim();
-  const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  const s = val.trim().replace(/\s+/g, " ").trim();
+  const norm = s.replace(/\s/g, "");
+
+  const slashMatch = norm.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (slashMatch) {
     const [, m, d, y] = slashMatch;
     const month = parseInt(m!, 10);
     const day = parseInt(d!, 10);
-    const yr = y ? (parseInt(y, 10) < 100 ? 2000 + parseInt(y, 10) : parseInt(y, 10)) : year;
+    const yr = parseInt(y!, 10) < 100 ? 2000 + parseInt(y!, 10) : parseInt(y!, 10);
     if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
       return `${yr}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     }
   }
-  const dashMatch = s.match(/^(\d{1,2})-(\d{1,2})(?:-(\d{2,4}))?$/);
+  const slashShort = norm.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (slashShort) {
+    const [, m, d] = slashShort;
+    const month = parseInt(m!, 10);
+    const day = parseInt(d!, 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+  const dashMatch = norm.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
   if (dashMatch) {
     const [, m, d, y] = dashMatch;
     const month = parseInt(m!, 10);
     const day = parseInt(d!, 10);
-    const yr = y ? (parseInt(y, 10) < 100 ? 2000 + parseInt(y, 10) : parseInt(y, 10)) : year;
+    const yr = parseInt(y!, 10) < 100 ? 2000 + parseInt(y!, 10) : parseInt(y!, 10);
     if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
       return `${yr}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     }
   }
-  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (isoMatch) return s;
+  const dashShort = norm.match(/^(\d{1,2})-(\d{1,2})$/);
+  if (dashShort) {
+    const [, m, d] = dashShort;
+    const month = parseInt(m!, 10);
+    const day = parseInt(d!, 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+  const yearFirstSlash = norm.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (yearFirstSlash) {
+    const [, yr, m, d] = yearFirstSlash;
+    const month = parseInt(m!, 10);
+    const day = parseInt(d!, 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${yr}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+  const yearFirstDash = norm.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (yearFirstDash) {
+    const [, yr, m, d] = yearFirstDash;
+    const month = parseInt(m!, 10);
+    const day = parseInt(d!, 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${yr}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+  const isoMatch = norm.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) return norm;
   return null;
 }
 
