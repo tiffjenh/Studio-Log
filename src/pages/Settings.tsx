@@ -201,6 +201,11 @@ export default function Settings() {
         }
       }
 
+      const toAddCountsByYear: Record<string, number> = {};
+      for (const l of toAdd) {
+        const y = l.date.slice(0, 4);
+        toAddCountsByYear[y] = (toAddCountsByYear[y] ?? 0) + 1;
+      }
       let bulkImported = 0;
       if (toAdd.length > 0) {
         setImportProgress({ current: totalSteps, total: totalSteps });
@@ -210,6 +215,9 @@ export default function Settings() {
           for (const l of created) {
             const y = l.date.slice(0, 4);
             countsByYear[y] = (countsByYear[y] ?? 0) + 1;
+          }
+          if (created.length !== toAdd.length) {
+            errors.push(`Only ${created.length} of ${toAdd.length} lessons were saved; ${toAdd.length - created.length} may have failed.`);
           }
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -238,7 +246,7 @@ export default function Settings() {
         const y = date.slice(0, 4);
         parsedCountsByYear[y] = (parsedCountsByYear[y] ?? 0) + 1;
       }
-      setImportResult({ imported, skipped, errors, dateRange, yearsInFile, countsByYear: Object.keys(countsByYear).length > 0 ? countsByYear : undefined, parsedCountsByYear: Object.keys(parsedCountsByYear).length > 0 ? parsedCountsByYear : undefined, skippedRowsNoYear: parsed.skippedRowsNoYear });
+      setImportResult({ imported, skipped, errors, dateRange, yearsInFile, countsByYear: Object.keys(countsByYear).length > 0 ? countsByYear : undefined, parsedCountsByYear: Object.keys(parsedCountsByYear).length > 0 ? parsedCountsByYear : undefined, toAddCountsByYear: Object.keys(toAddCountsByYear).length > 0 ? toAddCountsByYear : undefined, skippedRowsNoYear: parsed.skippedRowsNoYear });
       if (imported > 0 && hasSupabase()) await reload();
     } catch (err) {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
@@ -289,12 +297,15 @@ export default function Settings() {
               Date range in file: {dateRange.min} to {dateRange.max}
               {importResult.yearsInFile && importResult.yearsInFile.length > 0 && ` · Years: ${importResult.yearsInFile.join(", ")}`}.
               {importResult.parsedCountsByYear && Object.keys(importResult.parsedCountsByYear).length > 0 && (
-                <> Parsed from file: {Object.entries(importResult.parsedCountsByYear).sort(([a], [b]) => a.localeCompare(b)).map(([yr, n]) => `${yr}: ${n}`).join(", ")}. </>
+                <> Parsed: {Object.entries(importResult.parsedCountsByYear).sort(([a], [b]) => a.localeCompare(b)).map(([yr, n]) => `${yr}: ${n}`).join(", ")}. </>
+              )}
+              {importResult.toAddCountsByYear && Object.keys(importResult.toAddCountsByYear).length > 0 && (
+                <> To add: {Object.entries(importResult.toAddCountsByYear).sort(([a], [b]) => a.localeCompare(b)).map(([yr, n]) => `${yr}: ${n}`).join(", ")}. </>
               )}
               {importResult.countsByYear && Object.keys(importResult.countsByYear).length > 0 && (
                 <> Saved: {Object.entries(importResult.countsByYear).sort(([a], [b]) => a.localeCompare(b)).map(([yr, n]) => `${yr}: ${n}`).join(", ")} lessons. </>
               )}
-              If 2025 or 2026 show $0 on Earnings, use <strong>Clear all lessons</strong> below, then re-import. Student names must match exactly (e.g. Chloe Parker).
+              If 2025 or 2026 show $0 or wrong totals, use <strong>Clear all lessons</strong> below, then re-import this CSV. Check that <strong>Parsed</strong>, <strong>To add</strong>, and <strong>Saved</strong> all show 2024, 2025, and 2026. Student names must match exactly (e.g. Chloe Parker).
             </p>
             {importResult.yearsInFile && importResult.yearsInFile.length === 1 && (
               <p style={{ margin: "6px 0 0", fontSize: 12, color: "#92400e", fontWeight: 600 }}>

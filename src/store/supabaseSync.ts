@@ -258,7 +258,7 @@ export async function deleteStudentSupabase(uid: string, id: string): Promise<vo
   if (error) throw error;
 }
 
-const BULK_INSERT_CHUNK = 200;
+const BULK_INSERT_CHUNK = 100;
 
 export async function addLessonSupabase(uid: string, lesson: Omit<Lesson, "id">): Promise<Lesson> {
   if (!supabase) throw new Error("Supabase not configured");
@@ -297,6 +297,9 @@ export async function bulkInsertLessonsSupabase(uid: string, lessons: Omit<Lesso
     const { data, error } = await supabase.from("lessons").insert(chunk).select();
     if (error) throw error;
     const list = (data ?? []) as Record<string, unknown>[];
+    if (list.length !== chunk.length) {
+      throw new Error(`Insert returned ${list.length} rows but ${chunk.length} were sent (chunk at index ${i}).`);
+    }
     for (const r of list) out.push(rowToLesson(r));
   }
   return out;

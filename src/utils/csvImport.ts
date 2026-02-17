@@ -74,6 +74,8 @@ export interface ImportResult {
   countsByYear?: Record<string, number>;
   /** For matrix import: number of attendance entries parsed from file per year (before save) */
   parsedCountsByYear?: Record<string, number>;
+  /** For matrix import: number of lessons queued to add per year (before bulk insert) */
+  toAddCountsByYear?: Record<string, number>;
   /** For matrix import: rows skipped because date had no year */
   skippedRowsNoYear?: number;
 }
