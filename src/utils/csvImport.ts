@@ -133,7 +133,8 @@ export function parseLessonMatrixCSV(text: string, year: number): MatrixParseRes
 
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
-    const dateCell = (row[0] ?? "").trim();
+    const raw = (row[0] ?? "").trim();
+    const dateCell = raw.replace(/\r/g, "").split(/\n/)[0]!.trim();
     if (!dateCell) continue;
 
     const normalized = normalizeDateToYYYYMMDD(dateCell, year);

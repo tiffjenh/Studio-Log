@@ -312,6 +312,11 @@ export default function Settings() {
                 Only one year was detected. If your sheet has 2025/2026 too: in Google Sheets, select the date column (column A) → Format → Number → <strong>Plain text</strong>, then File → Download → CSV and re-import.
               </p>
             )}
+            {importResult.toAddCountsByYear && importResult.countsByYear && ["2025", "2026"].some((yr) => (importResult.toAddCountsByYear![yr] ?? 0) > 0 && (importResult.countsByYear![yr] ?? 0) === 0) && (
+              <p style={{ margin: "6px 0 0", fontSize: 12, color: "#991b1b", fontWeight: 600 }}>
+                Some years were in the file but didn’t save (2025/2026 missing or low). Check the error below—copy the full message if you need to report it. Try <strong>Clear all lessons</strong> and re-import; if it happens again, share the error.
+              </p>
+            )}
           </>
         )}
         {importResult.errors.length > 0 && (
