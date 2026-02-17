@@ -280,3 +280,9 @@ export async function updateLessonSupabase(uid: string, id: string, updates: Par
   if (updates.note !== undefined) row.note = updates.note ?? null;
   if (Object.keys(row).length) await supabase.from("lessons").update(row).eq("id", id).eq("user_id", uid);
 }
+
+export async function deleteAllLessonsSupabase(uid: string): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.from("lessons").delete().eq("user_id", uid);
+  if (error) throw error;
+}

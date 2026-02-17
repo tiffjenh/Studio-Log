@@ -9,6 +9,7 @@ import {
   deleteStudentSupabase,
   addLessonSupabase,
   updateLessonSupabase,
+  deleteAllLessonsSupabase,
   updateProfileSupabase,
 } from "@/store/supabaseSync";
 
@@ -280,6 +281,18 @@ export function useStore() {
     [data, persist]
   );
 
+  const clearAllLessons = useCallback(
+    async (): Promise<void> => {
+      if (hasSupabase() && data.user) {
+        await deleteAllLessonsSupabase(data.user.id);
+        setData((prev) => ({ ...prev, lessons: [] }));
+        return;
+      }
+      persist({ ...data, lessons: [] });
+    },
+    [data, persist]
+  );
+
   const importLocalData = useCallback(async (): Promise<void> => {
     const toImport = importableLocalData;
     if (!toImport || !hasSupabase() || !data.user) return;
@@ -363,6 +376,7 @@ export function useStore() {
     deleteStudent,
     addLesson,
     updateLesson,
+    clearAllLessons,
     updateUserProfile,
     reload: load,
   };

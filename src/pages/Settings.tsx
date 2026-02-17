@@ -11,7 +11,7 @@ import { getLessonForStudentOnDate } from "@/utils/earnings";
 import type { Student } from "@/types";
 
 export default function Settings() {
-  const { data, setUser, updateUserProfile, addLesson, updateLesson, reload } = useStoreContext();
+  const { data, setUser, updateUserProfile, addLesson, updateLesson, clearAllLessons, reload } = useStoreContext();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -278,7 +278,11 @@ export default function Settings() {
         }
       }
 
-      setImportResult({ imported, skipped, errors });
+      const dateRange =
+        parsed.dates.length > 0
+          ? { min: parsed.dates[0]!, max: parsed.dates[parsed.dates.length - 1]! }
+          : undefined;
+      setImportResult({ imported, skipped, errors, dateRange });
       if (imported > 0 && hasSupabase()) await reload();
     } catch (err) {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
@@ -312,11 +316,17 @@ export default function Settings() {
     const partial = importResult.imported > 0 && importResult.errors.length > 0;
     const fail = importResult.imported === 0 && importResult.errors.length > 0;
     const label = success ? "lessons" : "items";
+    const dateRange = importResult.dateRange ?? null;
     return (
       <div style={{ marginTop: 12, padding: 12, borderRadius: 10, fontSize: 14, fontFamily: "var(--font-sans)", background: success ? "#f0fdf4" : fail ? "#fef2f2" : "#fffbeb", border: `1px solid ${success ? "#bbf7d0" : fail ? "#fecaca" : "#fde68a"}` }}>
         <p style={{ margin: 0, fontWeight: 700, color: success ? "#166534" : fail ? "#991b1b" : "#92400e" }}>
           {success ? `Success! Imported ${importResult.imported} ${label}.` : partial ? `Partially imported: ${importResult.imported} added, ${importResult.skipped} skipped.` : `Import failed — ${importResult.skipped} item${importResult.skipped !== 1 ? "s" : ""} skipped.`}
         </p>
+        {dateRange && (
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: success ? "#166534" : fail ? "#991b1b" : "#92400e", opacity: 0.9 }}>
+            Date range in file: {dateRange.min} to {dateRange.max}. If everything landed in one year, use dates with year in the CSV (e.g. 1/15/2025).
+          </p>
+        )}
         {importResult.errors.length > 0 && (
           <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: fail ? "#991b1b" : "#92400e", maxHeight: 120, overflowY: "auto", fontSize: 13 }}>
             {importResult.errors.slice(0, 10).map((err, i) => (<li key={i} style={{ marginBottom: 2 }}>{err}</li>))}
@@ -484,7 +494,7 @@ export default function Settings() {
         {importMatrixOpen && (
           <div style={{ padding: "0 20px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)", fontSize: 13 }}>
             <p style={{ margin: "12px 0", fontSize: 13, color: "var(--text-muted)" }}>
-              First row: student names. First column: dates (e.g. 1/1, 1/4). Put &quot;Y&quot; if they attended. Uses each student&apos;s rate. Students must already exist.
+              First row: student names. First column: dates in <strong>month-day-year</strong> format (e.g. 1/15/2024, 1-15-2025, or 2024-01-15). Use full dates with year so lessons go to the right year. If you use dates without a year (e.g. 1/15), the &quot;Year for dates&quot; above is used for <em>every</em> row. Put &quot;Y&quot; if they attended. Students must already exist.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
               <label style={{ fontSize: 14 }}>
@@ -518,6 +528,22 @@ export default function Settings() {
             {importResultBanner}
           </div>
         )}
+      </div>
+      <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)", fontSize: 13 }}>
+          <p style={{ margin: "0 0 10px", color: "var(--text-muted)" }}>To fix wrong dates (e.g. everything in 2024): clear all lessons, then re-import your matrix CSV with full dates (1/15/2024, 1/15/2025).</p>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm("Delete ALL lessons? This cannot be undone. You can re-import the attendance matrix after.")) {
+                clearAllLessons().catch((e) => { console.error(e); window.alert(e instanceof Error ? e.message : "Failed to clear"); });
+              }
+            }}
+            style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#991b1b", background: "transparent", border: "1px solid #fecaca", borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-sans)" }}
+          >
+            Clear all lessons
+          </button>
+        </div>
       </div>
       <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
         <button

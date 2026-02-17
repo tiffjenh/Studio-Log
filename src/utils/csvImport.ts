@@ -60,6 +60,8 @@ export interface ImportResult {
   imported: number;
   skipped: number;
   errors: string[];
+  /** For matrix import: date range of parsed dates (min, max) so user can see which year(s) were used */
+  dateRange?: { min: string; max: string };
 }
 
 const REQUIRED_COLS = ["first_name", "last_name", "date", "duration_minutes"];
@@ -131,11 +133,22 @@ export function parseLessonMatrixCSV(text: string, year: number): MatrixParseRes
   return { dates, studentNames, attendance };
 }
 
+/** Parse month-day-year (M/D/YYYY, M-D-YYYY, M/D, M-D) or ISO YYYY-MM-DD. Returns YYYY-MM-DD. */
 function normalizeDateToYYYYMMDD(val: string, year: number): string | null {
   const s = val.trim();
   const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
   if (slashMatch) {
     const [, m, d, y] = slashMatch;
+    const month = parseInt(m!, 10);
+    const day = parseInt(d!, 10);
+    const yr = y ? (parseInt(y, 10) < 100 ? 2000 + parseInt(y, 10) : parseInt(y, 10)) : year;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${yr}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+  const dashMatch = s.match(/^(\d{1,2})-(\d{1,2})(?:-(\d{2,4}))?$/);
+  if (dashMatch) {
+    const [, m, d, y] = dashMatch;
     const month = parseInt(m!, 10);
     const day = parseInt(d!, 10);
     const yr = y ? (parseInt(y, 10) < 100 ? 2000 + parseInt(y, 10) : parseInt(y, 10)) : year;
