@@ -220,7 +220,7 @@ export default function Settings() {
               return years;
             })()
           : undefined;
-      setImportResult({ imported, skipped, errors, dateRange, yearsInFile, countsByYear: Object.keys(countsByYear).length > 0 ? countsByYear : undefined });
+      setImportResult({ imported, skipped, errors, dateRange, yearsInFile, countsByYear: Object.keys(countsByYear).length > 0 ? countsByYear : undefined, skippedRowsNoYear: parsed.skippedRowsNoYear });
       if (imported > 0 && hasSupabase()) await reload();
     } catch (err) {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
@@ -260,6 +260,11 @@ export default function Settings() {
         <p style={{ margin: 0, fontWeight: 700, color: success ? "#166534" : fail ? "#991b1b" : "#92400e" }}>
           {success ? `Success! Imported ${importResult.imported} ${label}.` : partial ? `Partially imported: ${importResult.imported} added, ${importResult.skipped} skipped.` : `Import failed — ${importResult.skipped} item${importResult.skipped !== 1 ? "s" : ""} skipped.`}
         </p>
+        {importResult.skippedRowsNoYear != null && importResult.skippedRowsNoYear > 0 && (
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#92400e", fontWeight: 600 }}>
+            {importResult.skippedRowsNoYear} row{importResult.skippedRowsNoYear !== 1 ? "s" : ""} skipped: date had no year (e.g. 1/15). Use full dates in the first column (e.g. 1/15/2024, 1/15/2025) so lessons go to the right year.
+          </p>
+        )}
         {dateRange && (
           <p style={{ margin: "6px 0 0", fontSize: 12, color: success ? "#166534" : fail ? "#991b1b" : "#92400e", opacity: 0.9 }}>
             Date range in file: {dateRange.min} to {dateRange.max}
@@ -267,7 +272,7 @@ export default function Settings() {
             {importResult.countsByYear && Object.keys(importResult.countsByYear).length > 0 && (
               <> By year: {Object.entries(importResult.countsByYear).sort(([a], [b]) => a.localeCompare(b)).map(([yr, n]) => `${yr}: ${n}`).join(", ")} lessons. </>
             )}
-            If 2025 or 2026 show $0 or wrong totals on Earnings, use <strong>Clear all lessons</strong> below, then re-import this CSV so all years are correct. Ensure CSV uses full dates (e.g. 1/15/2025) and student names match exactly (e.g. Chloe Parker).
+            If 2025 or 2026 show $0 or wrong totals on Earnings, use <strong>Clear all lessons</strong> below, then re-import with full dates (e.g. 1/15/2025) in the first column. Student names must match exactly (e.g. Chloe Parker).
           </p>
         )}
         {importResult.errors.length > 0 && (

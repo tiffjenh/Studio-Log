@@ -72,6 +72,8 @@ export interface ImportResult {
   yearsInFile?: number[];
   /** For matrix import: number of lessons saved per year (e.g. { "2024": 500, "2025": 300, "2026": 44 }) */
   countsByYear?: Record<string, number>;
+  /** For matrix import: rows skipped because date had no year */
+  skippedRowsNoYear?: number;
 }
 
 const REQUIRED_COLS = ["first_name", "last_name", "date", "duration_minutes"];
@@ -105,10 +107,12 @@ export function parseLessonCSV(text: string): { headers: string[]; rows: Record<
 // ——— Attendance matrix format (dates × students, Y = attended) ———
 
 export interface MatrixParseResult {
-  dates: string[]; // M/D from CSV
+  dates: string[]; // YYYY-MM-DD from CSV
   studentNames: string[]; // column headers
   attendance: { date: string; studentIndex: number }[]; // each Y cell
   error?: string;
+  /** Rows skipped because date had no year (e.g. 1/15). Use full dates (1/15/2025) to fix. */
+  skippedRowsNoYear?: number;
 }
 
 export function parseLessonMatrixCSV(text: string, year: number): MatrixParseResult {
@@ -121,6 +125,7 @@ export function parseLessonMatrixCSV(text: string, year: number): MatrixParseRes
 
   const attendance: { date: string; studentIndex: number }[] = [];
   const dateStrToKey: Record<string, string> = {};
+  let skippedRowsNoYear = 0;
 
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
@@ -128,7 +133,10 @@ export function parseLessonMatrixCSV(text: string, year: number): MatrixParseRes
     if (!dateCell) continue;
 
     const normalized = normalizeDateToYYYYMMDD(dateCell, year);
-    if (!normalized) continue;
+    if (!normalized) {
+      if (/^\d{1,2}[\/-]\d{1,2}$/.test(dateCell.replace(/\s/g, ""))) skippedRowsNoYear++;
+      continue;
+    }
     dateStrToKey[dateCell] = normalized;
 
     for (let c = 1; c < row.length && c - 1 < studentNames.length; c++) {
@@ -140,7 +148,7 @@ export function parseLessonMatrixCSV(text: string, year: number): MatrixParseRes
   }
 
   const dates = [...new Set(attendance.map((a) => a.date))].sort();
-  return { dates, studentNames, attendance };
+  return { dates, studentNames, attendance, skippedRowsNoYear: skippedRowsNoYear > 0 ? skippedRowsNoYear : undefined };
 }
 
 /** Parse month-day-year (M/D/YYYY, M-D-YYYY), year-month-day (YYYY-M-D, YYYY/M/D), or ISO YYYY-MM-DD. Returns YYYY-MM-DD. */
@@ -159,14 +167,7 @@ function normalizeDateToYYYYMMDD(val: string, year: number): string | null {
     }
   }
   const slashShort = norm.match(/^(\d{1,2})\/(\d{1,2})$/);
-  if (slashShort) {
-    const [, m, d] = slashShort;
-    const month = parseInt(m!, 10);
-    const day = parseInt(d!, 10);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    }
-  }
+  if (slashShort) return null;
   const dashMatch = norm.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
   if (dashMatch) {
     const [, m, d, y] = dashMatch;
@@ -178,14 +179,7 @@ function normalizeDateToYYYYMMDD(val: string, year: number): string | null {
     }
   }
   const dashShort = norm.match(/^(\d{1,2})-(\d{1,2})$/);
-  if (dashShort) {
-    const [, m, d] = dashShort;
-    const month = parseInt(m!, 10);
-    const day = parseInt(d!, 10);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    }
-  }
+  if (dashShort) return null;
   const yearFirstSlash = norm.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
   if (yearFirstSlash) {
     const [, yr, m, d] = yearFirstSlash;
