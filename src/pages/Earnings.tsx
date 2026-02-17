@@ -4,7 +4,6 @@ import { useLanguage } from "@/context/LanguageContext";
 import {
   formatCurrency,
   dedupeLessons,
-  filterLessonsOnScheduledDay,
   getMonthBounds,
   toDateKey,
   getWeeksInMonth,
@@ -195,11 +194,8 @@ export default function Earnings() {
   const [dlFormat, setDlFormat] = useState<"csv" | "pdf">("csv");
   const [dlDelivery, setDlDelivery] = useState<"device" | "email">("device");
   const now = new Date();
-  // Earnings only count completed lessons on each student's scheduled day (avoids wrong-day and double-count).
-  const completedLessons = filterLessonsOnScheduledDay(
-    dedupeLessons(data.lessons.filter((l) => l.completed)),
-    data.students
-  );
+  // Use all completed, deduped lessons so matrix-imported attendance (any day) and tax CSV match. Scheduled-day filter excluded those.
+  const completedLessons = dedupeLessons(data.lessons.filter((l) => l.completed));
   const thisYear = now.getFullYear();
   const studentsDisplayYear = thisYear + studentsYearOffset;
   const todayKey = toDateKey(now);

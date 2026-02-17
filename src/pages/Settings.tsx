@@ -11,7 +11,7 @@ import { getLessonForStudentOnDate } from "@/utils/earnings";
 import type { Student } from "@/types";
 
 export default function Settings() {
-  const { data, setUser, updateUserProfile, addLesson, updateLesson } = useStoreContext();
+  const { data, setUser, updateUserProfile, addLesson, updateLesson, reload } = useStoreContext();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -279,6 +279,7 @@ export default function Settings() {
       }
 
       setImportResult({ imported, skipped, errors });
+      if (imported > 0 && hasSupabase()) await reload();
     } catch (err) {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
     } finally {

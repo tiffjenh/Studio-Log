@@ -269,11 +269,7 @@ export function useStore() {
       });
       setData(applyUpdate);
       if (hasSupabase() && data.user) {
-        try {
-          await updateLessonSupabase(data.user.id, id, updates);
-        } catch (e) {
-          console.error(e);
-        }
+        await updateLessonSupabase(data.user.id, id, updates);
         return;
       }
       persist({
