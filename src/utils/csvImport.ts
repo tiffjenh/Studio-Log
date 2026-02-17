@@ -151,8 +151,8 @@ export function parseLessonMatrixCSV(text: string, year: number): MatrixParseRes
   return { dates, studentNames, attendance, skippedRowsNoYear: skippedRowsNoYear > 0 ? skippedRowsNoYear : undefined };
 }
 
-/** Parse month-day-year (M/D/YYYY, M-D-YYYY), year-month-day (YYYY-M-D, YYYY/M/D), or ISO YYYY-MM-DD. Returns YYYY-MM-DD. */
-function normalizeDateToYYYYMMDD(val: string, year: number): string | null {
+/** Parse month-day-year (M/D/YYYY, M-D-YYYY), year-month-day (YYYY-M-D, YYYY/M/D), or ISO YYYY-MM-DD. Returns YYYY-MM-DD. Short dates (M/D, M-D) return null. */
+function normalizeDateToYYYYMMDD(val: string, _year: number): string | null {
   const s = val.trim().replace(/\s+/g, " ").trim();
   const norm = s.replace(/\s/g, "");
 
