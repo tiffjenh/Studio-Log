@@ -151,32 +151,50 @@ export function parseLessonMatrixCSV(text: string, year: number): MatrixParseRes
   return { dates, studentNames, attendance, skippedRowsNoYear: skippedRowsNoYear > 0 ? skippedRowsNoYear : undefined };
 }
 
-/** Parse month-day-year (M/D/YYYY, M-D-YYYY), year-month-day (YYYY-M-D, YYYY/M/D), or ISO YYYY-MM-DD. Returns YYYY-MM-DD. Short dates (M/D, M-D) return null. */
+/**
+ * Interpret two numbers as (month, day) or (day, month). Accepts M/D/YYYY and DD/MM/YYYY (and 2-digit year).
+ * - If first > 12 → first is day, second is month (DD/MM).
+ * - If second > 12 → first is month, second is day (MM/DD).
+ * - If both <= 12 → assume first is month, second is day (M/D).
+ */
+function parseMonthDayYear(a: number, b: number, y: number): string | null {
+  const yr = y < 100 ? 2000 + y : y;
+  let month: number;
+  let day: number;
+  if (a > 12) {
+    day = a;
+    month = b;
+  } else if (b > 12) {
+    month = a;
+    day = b;
+  } else {
+    month = a;
+    day = b;
+  }
+  if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+    return `${yr}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  return null;
+}
+
+/** Parse M/D/YYYY, DD/MM/YY, M-D-YYYY, DD-MM-YY, year-first, or ISO YYYY-MM-DD. Returns YYYY-MM-DD. Short dates (M/D, M-D) return null. */
 function normalizeDateToYYYYMMDD(val: string, _year: number): string | null {
   const s = val.trim().replace(/\s+/g, " ").trim();
   const norm = s.replace(/\s/g, "");
 
   const slashMatch = norm.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (slashMatch) {
-    const [, m, d, y] = slashMatch;
-    const month = parseInt(m!, 10);
-    const day = parseInt(d!, 10);
-    const yr = parseInt(y!, 10) < 100 ? 2000 + parseInt(y!, 10) : parseInt(y!, 10);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return `${yr}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    }
+    const [, a, b, y] = slashMatch;
+    const result = parseMonthDayYear(parseInt(a!, 10), parseInt(b!, 10), parseInt(y!, 10));
+    if (result) return result;
   }
   const slashShort = norm.match(/^(\d{1,2})\/(\d{1,2})$/);
   if (slashShort) return null;
   const dashMatch = norm.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
   if (dashMatch) {
-    const [, m, d, y] = dashMatch;
-    const month = parseInt(m!, 10);
-    const day = parseInt(d!, 10);
-    const yr = parseInt(y!, 10) < 100 ? 2000 + parseInt(y!, 10) : parseInt(y!, 10);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return `${yr}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    }
+    const [, a, b, y] = dashMatch;
+    const result = parseMonthDayYear(parseInt(a!, 10), parseInt(b!, 10), parseInt(y!, 10));
+    if (result) return result;
   }
   const dashShort = norm.match(/^(\d{1,2})-(\d{1,2})$/);
   if (dashShort) return null;
