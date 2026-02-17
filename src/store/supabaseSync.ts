@@ -258,7 +258,7 @@ export async function deleteStudentSupabase(uid: string, id: string): Promise<vo
   if (error) throw error;
 }
 
-const BULK_INSERT_CHUNK = 100;
+const BULK_INSERT_CHUNK = 50;
 
 export async function addLessonSupabase(uid: string, lesson: Omit<Lesson, "id">): Promise<Lesson> {
   if (!supabase) throw new Error("Supabase not configured");
@@ -279,7 +279,7 @@ export async function addLessonSupabase(uid: string, lesson: Omit<Lesson, "id">)
   return rowToLesson(data as Record<string, unknown>);
 }
 
-/** Insert many lessons in chunks. Returns all created lessons. Use for matrix import so 2025/2026 don't fail partway. */
+/** Insert many lessons in chunks. Returns all created lessons. On chunk failure, continues and throws at end with details so 2025/2026 aren't lost. */
 export async function bulkInsertLessonsSupabase(uid: string, lessons: Omit<Lesson, "id">[]): Promise<Lesson[]> {
   if (!supabase) throw new Error("Supabase not configured");
   const rows = lessons.map((l) => ({
@@ -292,15 +292,24 @@ export async function bulkInsertLessonsSupabase(uid: string, lessons: Omit<Lesso
     note: l.note ?? null,
   }));
   const out: Lesson[] = [];
+  const chunkErrors: string[] = [];
   for (let i = 0; i < rows.length; i += BULK_INSERT_CHUNK) {
     const chunk = rows.slice(i, i + BULK_INSERT_CHUNK);
     const { data, error } = await supabase.from("lessons").insert(chunk).select();
-    if (error) throw error;
+    if (error) {
+      chunkErrors.push(`Chunk ${i / BULK_INSERT_CHUNK + 1} (rows ${i}-${i + chunk.length}): ${error.message}`);
+      continue;
+    }
     const list = (data ?? []) as Record<string, unknown>[];
     if (list.length !== chunk.length) {
-      throw new Error(`Insert returned ${list.length} rows but ${chunk.length} were sent (chunk at index ${i}).`);
+      chunkErrors.push(`Chunk ${i / BULK_INSERT_CHUNK + 1}: returned ${list.length} rows, sent ${chunk.length}`);
+      for (const r of list) out.push(rowToLesson(r));
+      continue;
     }
     for (const r of list) out.push(rowToLesson(r));
+  }
+  if (chunkErrors.length > 0) {
+    throw new Error(`Bulk insert: ${out.length} saved, ${chunkErrors.length} chunk(s) failed. ${chunkErrors.join(" | ")}`);
   }
   return out;
 }
