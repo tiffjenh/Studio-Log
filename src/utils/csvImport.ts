@@ -29,7 +29,7 @@ function parseCSV(text: string): string[][] {
     } else {
       if (c === '"') {
         inQuotes = true;
-      } else if (c === "," || c === "\t") {
+      } else if (c === "," || c === "\t" || c === ";") {
         current.push(cell.trim());
         cell = "";
       } else if (c === "\n" || c === "\r") {
@@ -72,6 +72,8 @@ export interface ImportResult {
   yearsInFile?: number[];
   /** For matrix import: number of lessons saved per year (e.g. { "2024": 500, "2025": 300, "2026": 44 }) */
   countsByYear?: Record<string, number>;
+  /** For matrix import: number of attendance entries parsed from file per year (before save) */
+  parsedCountsByYear?: Record<string, number>;
   /** For matrix import: rows skipped because date had no year */
   skippedRowsNoYear?: number;
 }
@@ -231,6 +233,15 @@ function normalizeDateToYYYYMMDD(val: string, _year: number): string | null {
       if (y >= 2000 && y <= 2100 && m >= 1 && m <= 12 && day >= 1 && day <= 31) {
         return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       }
+    }
+  }
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    if (y >= 2000 && y <= 2100 && m >= 1 && m <= 12 && day >= 1 && day <= 31) {
+      return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     }
   }
   return null;

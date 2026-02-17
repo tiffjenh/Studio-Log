@@ -233,7 +233,12 @@ export default function Settings() {
               return years;
             })()
           : undefined;
-      setImportResult({ imported, skipped, errors, dateRange, yearsInFile, countsByYear: Object.keys(countsByYear).length > 0 ? countsByYear : undefined, skippedRowsNoYear: parsed.skippedRowsNoYear });
+      const parsedCountsByYear: Record<string, number> = {};
+      for (const { date } of parsed.attendance) {
+        const y = date.slice(0, 4);
+        parsedCountsByYear[y] = (parsedCountsByYear[y] ?? 0) + 1;
+      }
+      setImportResult({ imported, skipped, errors, dateRange, yearsInFile, countsByYear: Object.keys(countsByYear).length > 0 ? countsByYear : undefined, parsedCountsByYear: Object.keys(parsedCountsByYear).length > 0 ? parsedCountsByYear : undefined, skippedRowsNoYear: parsed.skippedRowsNoYear });
       if (imported > 0 && hasSupabase()) await reload();
     } catch (err) {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
@@ -279,14 +284,24 @@ export default function Settings() {
           </p>
         )}
         {dateRange && (
-          <p style={{ margin: "6px 0 0", fontSize: 12, color: success ? "#166534" : fail ? "#991b1b" : "#92400e", opacity: 0.9 }}>
-            Date range in file: {dateRange.min} to {dateRange.max}
-            {importResult.yearsInFile && importResult.yearsInFile.length > 0 && ` · Years: ${importResult.yearsInFile.join(", ")}`}.
-            {importResult.countsByYear && Object.keys(importResult.countsByYear).length > 0 && (
-              <> By year: {Object.entries(importResult.countsByYear).sort(([a], [b]) => a.localeCompare(b)).map(([yr, n]) => `${yr}: ${n}`).join(", ")} lessons. </>
+          <>
+            <p style={{ margin: "6px 0 0", fontSize: 12, color: success ? "#166534" : fail ? "#991b1b" : "#92400e", opacity: 0.9 }}>
+              Date range in file: {dateRange.min} to {dateRange.max}
+              {importResult.yearsInFile && importResult.yearsInFile.length > 0 && ` · Years: ${importResult.yearsInFile.join(", ")}`}.
+              {importResult.parsedCountsByYear && Object.keys(importResult.parsedCountsByYear).length > 0 && (
+                <> Parsed from file: {Object.entries(importResult.parsedCountsByYear).sort(([a], [b]) => a.localeCompare(b)).map(([yr, n]) => `${yr}: ${n}`).join(", ")}. </>
+              )}
+              {importResult.countsByYear && Object.keys(importResult.countsByYear).length > 0 && (
+                <> Saved: {Object.entries(importResult.countsByYear).sort(([a], [b]) => a.localeCompare(b)).map(([yr, n]) => `${yr}: ${n}`).join(", ")} lessons. </>
+              )}
+              If 2025 or 2026 show $0 on Earnings, use <strong>Clear all lessons</strong> below, then re-import. Student names must match exactly (e.g. Chloe Parker).
+            </p>
+            {importResult.yearsInFile && importResult.yearsInFile.length === 1 && (
+              <p style={{ margin: "6px 0 0", fontSize: 12, color: "#92400e", fontWeight: 600 }}>
+                Only one year was detected. If your sheet has 2025/2026 too: in Google Sheets, select the date column (column A) → Format → Number → <strong>Plain text</strong>, then File → Download → CSV and re-import.
+              </p>
             )}
-            If 2025 or 2026 show $0 or wrong totals on Earnings, use <strong>Clear all lessons</strong> below, then re-import with full dates (e.g. 1/15/2025) in the first column. Student names must match exactly (e.g. Chloe Parker).
-          </p>
+          </>
         )}
         {importResult.errors.length > 0 && (
           <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: fail ? "#991b1b" : "#92400e", maxHeight: 120, overflowY: "auto", fontSize: 13 }}>
