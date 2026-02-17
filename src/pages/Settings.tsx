@@ -18,7 +18,6 @@ export default function Settings() {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [importYear, setImportYear] = useState(new Date().getFullYear());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const matrixFileInputRef = useRef<HTMLInputElement>(null);
   const user = data.user;
@@ -228,7 +227,7 @@ export default function Settings() {
 
     try {
       const text = await file.text();
-      const parsed = parseLessonMatrixCSV(text, importYear);
+      const parsed = parseLessonMatrixCSV(text, new Date().getFullYear());
       if (parsed.error) {
         setImportResult({ imported: 0, skipped: 0, errors: [parsed.error] });
         setImporting(false);
@@ -257,7 +256,11 @@ export default function Settings() {
         try {
           const existing = getLessonForStudentOnDate(data.lessons, student.id, date);
           if (existing) {
-            await updateLesson(existing.id, { completed: true });
+            await updateLesson(existing.id, {
+              completed: true,
+              amountCents: student.rateCents,
+              durationMinutes: student.durationMinutes,
+            });
             imported++;
           } else {
             const id = await addLesson({
@@ -506,20 +509,9 @@ export default function Settings() {
         {importMatrixOpen && (
           <div style={{ padding: "0 20px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)", fontSize: 13 }}>
             <p style={{ margin: "12px 0", fontSize: 13, color: "var(--text-muted)" }}>
-              First row: student names. First column: dates in <strong>month-day-year</strong> format (e.g. 1/15/2024, 1-15-2025, or 2024-01-15). Use full dates with year so lessons go to the right year. If you use dates without a year (e.g. 1/15), the &quot;Year for dates&quot; above is used for <em>every</em> row. Put &quot;Y&quot; if they attended. Students must already exist.
+              First row: student names. First column: dates in <strong>month-day-year</strong> format (e.g. 1/15/2024, 1-15-2025, or 2024-01-15). Use full dates with year so lessons go to the right year. Put &quot;Y&quot; if they attended. Students must already exist.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
-              <label style={{ fontSize: 14 }}>
-                Year for dates:
-                <input
-                  type="number"
-                  min={2020}
-                  max={2030}
-                  value={importYear}
-                  onChange={(e) => setImportYear(parseInt(e.target.value, 10) || new Date().getFullYear())}
-                  style={{ marginLeft: 8, width: 70, padding: 6, border: "1px solid var(--border)", borderRadius: 6 }}
-                />
-              </label>
               <input
                 ref={matrixFileInputRef}
                 type="file"
