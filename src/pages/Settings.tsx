@@ -282,7 +282,17 @@ export default function Settings() {
         parsed.dates.length > 0
           ? { min: parsed.dates[0]!, max: parsed.dates[parsed.dates.length - 1]! }
           : undefined;
-      setImportResult({ imported, skipped, errors, dateRange });
+      const yearsInFile =
+        dateRange
+          ? (() => {
+              const yMin = parseInt(dateRange.min.slice(0, 4), 10);
+              const yMax = parseInt(dateRange.max.slice(0, 4), 10);
+              const years: number[] = [];
+              for (let y = yMin; y <= yMax; y++) years.push(y);
+              return years;
+            })()
+          : undefined;
+      setImportResult({ imported, skipped, errors, dateRange, yearsInFile });
       if (imported > 0 && hasSupabase()) await reload();
     } catch (err) {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
@@ -324,7 +334,9 @@ export default function Settings() {
         </p>
         {dateRange && (
           <p style={{ margin: "6px 0 0", fontSize: 12, color: success ? "#166534" : fail ? "#991b1b" : "#92400e", opacity: 0.9 }}>
-            Date range in file: {dateRange.min} to {dateRange.max}. If everything landed in one year, use dates with year in the CSV (e.g. 1/15/2025).
+            Date range in file: {dateRange.min} to {dateRange.max}
+            {importResult.yearsInFile && importResult.yearsInFile.length > 0 && ` · Years: ${importResult.yearsInFile.join(", ")}`}.
+            If everything landed in one year, use full dates in the CSV (e.g. 1/15/2025). If a year shows $0 on Earnings, use Clear all lessons and re-import; ensure student names in the header match exactly (e.g. Chloe Parker).
           </p>
         )}
         {importResult.errors.length > 0 && (
@@ -526,24 +538,20 @@ export default function Settings() {
             </div>
             {importProgressBar}
             {importResultBanner}
+            <p style={{ margin: "16px 0 8px", fontSize: 13, color: "var(--text-muted)" }}>To fix wrong dates (e.g. everything in 2024): clear all lessons, then re-import your matrix CSV with full dates (1/15/2024, 1/15/2025).</p>
+            <button
+              type="button"
+              onClick={() => {
+                if (!window.confirm("Are you sure?")) return;
+                if (!window.confirm("This will delete ALL lessons. This cannot be undone. You can re-import the attendance matrix after. Continue?")) return;
+                clearAllLessons().catch((e) => { console.error(e); window.alert(e instanceof Error ? e.message : "Failed to clear"); });
+              }}
+              style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#991b1b", background: "transparent", border: "1px solid #fecaca", borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-sans)" }}
+            >
+              Clear all lessons
+            </button>
           </div>
         )}
-      </div>
-      <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
-        <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)", fontSize: 13 }}>
-          <p style={{ margin: "0 0 10px", color: "var(--text-muted)" }}>To fix wrong dates (e.g. everything in 2024): clear all lessons, then re-import your matrix CSV with full dates (1/15/2024, 1/15/2025).</p>
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm("Delete ALL lessons? This cannot be undone. You can re-import the attendance matrix after.")) {
-                clearAllLessons().catch((e) => { console.error(e); window.alert(e instanceof Error ? e.message : "Failed to clear"); });
-              }
-            }}
-            style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#991b1b", background: "transparent", border: "1px solid #fecaca", borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-sans)" }}
-          >
-            Clear all lessons
-          </button>
-        </div>
       </div>
       <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
         <button

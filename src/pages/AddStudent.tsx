@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { parseStudentCSV, rowToStudent } from "@/utils/csvImport";
+import { hasSupabase } from "@/lib/supabase";
+import { parseStudentCSV, rowToStudentWithError } from "@/utils/csvImport";
 import { getCurrencyByCode, getStoredCurrencyCode } from "@/utils/currencies";
 import type { DaySchedule, Student } from "@/types";
 
@@ -27,7 +28,7 @@ function parseTimeOfDay(s: string): { hour: number; minute: number; amPm: "AM" |
 }
 
 export default function AddStudent() {
-  const { data, addStudent } = useStoreContext();
+  const { data, addStudent, reload } = useStoreContext();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -132,12 +133,13 @@ export default function AddStudent() {
       const errors: string[] = [];
       for (let i = 0; i < total; i++) {
         setImportProgress({ current: i + 1, total });
-        const studentData = rowToStudent(parsed.rows[i]);
-        if (!studentData) {
+        const result = rowToStudentWithError(parsed.rows[i]);
+        if (!result.ok) {
           skipped++;
-          errors.push(`Row ${i + 2}: Invalid or missing data`);
+          errors.push(`Row ${i + 2}: ${result.error}`);
           continue;
         }
+        const studentData = result.data;
         const key = `${studentData.first_name.toLowerCase()}|${studentData.last_name.toLowerCase()}`;
         if (existing.has(key)) {
           skipped++;
@@ -168,6 +170,7 @@ export default function AddStudent() {
         }
       }
       setImportResult({ imported, skipped, errors });
+      if (imported > 0 && hasSupabase()) await reload();
     } catch (err) {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
     } finally {

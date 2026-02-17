@@ -1,17 +1,23 @@
+/** Strip BOM if present (Excel/Sheets export can add it). */
+function stripBOM(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 /**
  * Parse CSV text into rows. Handles quoted fields with commas.
  */
 function parseCSV(text: string): string[][] {
+  const cleaned = stripBOM(text);
   const rows: string[][] = [];
   let current: string[] = [];
   let cell = "";
   let inQuotes = false;
 
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
+  for (let i = 0; i < cleaned.length; i++) {
+    const c = cleaned[i];
     if (inQuotes) {
       if (c === '"') {
-        if (text[i + 1] === '"') {
+        if (cleaned[i + 1] === '"') {
           cell += '"';
           i++;
         } else {
@@ -27,7 +33,7 @@ function parseCSV(text: string): string[][] {
         current.push(cell.trim());
         cell = "";
       } else if (c === "\n" || c === "\r") {
-        if (c === "\r" && text[i + 1] === "\n") i++;
+        if (c === "\r" && cleaned[i + 1] === "\n") i++;
         current.push(cell.trim());
         if (current.some((s) => s.length > 0)) rows.push(current);
         current = [];
@@ -62,6 +68,8 @@ export interface ImportResult {
   errors: string[];
   /** For matrix import: date range of parsed dates (min, max) so user can see which year(s) were used */
   dateRange?: { min: string; max: string };
+  /** For matrix import: years that appear in the imported date range (e.g. [2024, 2025, 2026]) */
+  yearsInFile?: number[];
 }
 
 const REQUIRED_COLS = ["first_name", "last_name", "date", "duration_minutes"];
@@ -269,12 +277,18 @@ function parseDuration(val: string): number {
 }
 
 export function rowToStudent(row: Record<string, string>): StudentImportRow | null {
+  const result = rowToStudentWithError(row);
+  return result.ok ? result.data : null;
+}
+
+/** Like rowToStudent but returns a specific error string when the row is invalid (for import UI). */
+export function rowToStudentWithError(row: Record<string, string>): { ok: true; data: StudentImportRow } | { ok: false; error: string } {
   let first: string;
   let last: string;
   if (row.name) {
     const parts = (row.name ?? "").trim().split(/\s+/);
     first = parts[0] ?? "";
-    last = parts.slice(1).join(" ").trim() || first; // use first as last if single name
+    last = parts.slice(1).join(" ").trim() || first;
   } else {
     first = (row.first_name ?? "").trim();
     last = (row.last_name ?? "").trim() || first;
@@ -285,10 +299,12 @@ export function rowToStudent(row: Record<string, string>): StudentImportRow | nu
   const timeStr = (row.time_of_day ?? "").trim();
   const location = (row.location ?? "").trim() || undefined;
 
-  if (!first || !rateStr) return null;
+  if (!first && !last) return { ok: false, error: "Missing first name and last name (or name)" };
+  if (!first) return { ok: false, error: "Missing first name" };
+  if (!rateStr) return { ok: false, error: "Missing or invalid rate (e.g. 70 or $70.00)" };
 
   const durationMinutes = parseDuration(durStr);
-  if (durationMinutes <= 0 || durationMinutes > 240) return null;
+  if (durationMinutes <= 0 || durationMinutes > 240) return { ok: false, error: "Duration must be 1–240 minutes or e.g. \"1 hour\", \"45 min\"" };
 
   let rateCents: number;
   if (row.rate_cents) {
@@ -296,22 +312,25 @@ export function rowToStudent(row: Record<string, string>): StudentImportRow | nu
     rateCents = cleaned.includes(".") ? Math.round(parseFloat(cleaned) * 100) : parseInt(cleaned, 10);
   } else {
     const num = parseFloat(rateStr);
-    rateCents = Math.round(num * 100); // $105 → 10500, 52.50 → 5250
+    rateCents = Math.round(num * 100);
   }
-  if (isNaN(rateCents) || rateCents < 0) return null;
+  if (isNaN(rateCents) || rateCents < 0) return { ok: false, error: "Rate must be a number (e.g. 70 or $70.00)" };
 
-  if (timeStr && timeStr !== "—" && !/am|pm/i.test(timeStr)) return null;
+  if (timeStr && timeStr !== "—" && !/am|pm/i.test(timeStr)) return { ok: false, error: "time_of_day must include AM or PM (e.g. 4:30 PM)" };
 
   const dayOfWeek = parseDayOfWeek(dayStr);
   const timeOfDay = timeStr || "—";
 
   return {
-    first_name: first,
-    last_name: last,
-    duration_minutes: durationMinutes,
-    rate_cents: rateCents,
-    day_of_week: dayOfWeek,
-    time_of_day: timeOfDay,
-    location,
+    ok: true,
+    data: {
+      first_name: first,
+      last_name: last,
+      duration_minutes: durationMinutes,
+      rate_cents: rateCents,
+      day_of_week: dayOfWeek,
+      time_of_day: timeOfDay,
+      location,
+    },
   };
 }
