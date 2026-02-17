@@ -23,11 +23,18 @@ function rowToStudent(r: Record<string, unknown>): Student {
   };
 }
 
+/** Ensure date is always YYYY-MM-DD (Supabase may return ISO datetime). */
+function toDateOnly(date: unknown): string {
+  const s = typeof date === "string" ? date : String(date ?? "");
+  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  return s;
+}
+
 function rowToLesson(r: Record<string, unknown>): Lesson {
   return {
     id: r.id as string,
     studentId: r.student_id as string,
-    date: r.date as string,
+    date: toDateOnly(r.date),
     durationMinutes: r.duration_minutes as number,
     amountCents: r.amount_cents as number,
     completed: (r.completed as boolean) ?? false,

@@ -151,16 +151,18 @@ export default function Settings() {
 
       const total = parsed.attendance.length;
       setImportProgress({ current: 0, total });
+      await new Promise((r) => setTimeout(r, 80));
 
       const existingSet = new Set(data.lessons.map((l) => `${l.studentId}|${l.date}`));
       const toAdd: Omit<Lesson, "id">[] = [];
       const toUpdate: { id: string; date: string; updates: { completed: boolean; amountCents: number; durationMinutes: number } }[] = [];
       const errors: string[] = [];
 
-      const PROGRESS_BATCH = 100;
+      const PROGRESS_BATCH = 150;
       for (let idx = 0; idx < parsed.attendance.length; idx++) {
         if (idx % PROGRESS_BATCH === 0 || idx === parsed.attendance.length - 1) {
           setImportProgress({ current: idx + 1, total });
+          if (idx > 0 && idx < parsed.attendance.length - 1) await new Promise((r) => setTimeout(r, 0));
         }
         const { date, studentIndex } = parsed.attendance[idx];
         const name = parsed.studentNames[studentIndex];
@@ -185,6 +187,7 @@ export default function Settings() {
       for (let i = 0; i < toUpdate.length; i++) {
         if (i % PROGRESS_BATCH === 0 || i === toUpdate.length - 1) {
           setImportProgress({ current: parsed.attendance.length + i + 1, total: totalSteps });
+          if (i > 0 && i < toUpdate.length - 1) await new Promise((r) => setTimeout(r, 0));
         }
         const { id, date, updates } = toUpdate[i]!;
         try {
@@ -485,7 +488,7 @@ export default function Settings() {
             </div>
             {importProgressBar}
             {importResultBanner}
-            <p style={{ margin: "16px 0 8px", fontSize: 13, color: "var(--text-muted)" }}>To fix wrong dates (e.g. everything in 2024): clear all lessons, then re-import your matrix CSV with full dates (1/15/2024, 1/15/2025).</p>
+            <p style={{ margin: "16px 0 8px", fontSize: 13, color: "var(--text-muted)" }}>To fix wrong dates (e.g. everything in 2024): clear all lessons, then re-import your matrix CSV with full dates (1/15/2024, 1/15/2025). If it still shows only 2024, do a <strong>hard refresh</strong> (Ctrl+Shift+R or Cmd+Shift+R) or open the app in a private/incognito window so the latest code loads, then clear and re-import again.</p>
             <button
               type="button"
               disabled={clearingLessons}

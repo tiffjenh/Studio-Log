@@ -218,6 +218,21 @@ function normalizeDateToYYYYMMDD(val: string, _year: number): string | null {
   }
   const isoMatch = norm.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (isoMatch) return norm;
+  const isoWithTime = norm.match(/^(\d{4})-(\d{2})-(\d{2})[T\s]/);
+  if (isoWithTime) return norm.slice(0, 10);
+  const serial = /^\d{5,6}$/.test(norm) ? parseInt(norm, 10) : NaN;
+  if (!Number.isNaN(serial) && serial >= 1 && serial <= 2958465) {
+    const ms = (serial - 25569) * 86400 * 1000;
+    const d = new Date(ms);
+    if (!Number.isNaN(d.getTime())) {
+      const y = d.getUTCFullYear();
+      const m = d.getUTCMonth() + 1;
+      const day = d.getUTCDate();
+      if (y >= 2000 && y <= 2100 && m >= 1 && m <= 12 && day >= 1 && day <= 31) {
+        return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      }
+    }
+  }
   return null;
 }
 
