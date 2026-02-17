@@ -153,6 +153,7 @@ export default function Settings() {
       let imported = 0;
       let skipped = 0;
       const errors: string[] = [];
+      const countsByYear: Record<string, number> = {};
 
       for (let idx = 0; idx < total; idx++) {
         setImportProgress({ current: idx + 1, total });
@@ -174,6 +175,8 @@ export default function Settings() {
               durationMinutes: student.durationMinutes,
             });
             imported++;
+            const y = date.slice(0, 4);
+            countsByYear[y] = (countsByYear[y] ?? 0) + 1;
           } else {
             const id = await addLesson({
               studentId: student.id,
@@ -182,8 +185,11 @@ export default function Settings() {
               amountCents: student.rateCents,
               completed: true,
             });
-            if (id) imported++;
-            else { skipped++; errors.push(`Failed: ${name} on ${date}`); }
+            if (id) {
+              imported++;
+              const y = date.slice(0, 4);
+              countsByYear[y] = (countsByYear[y] ?? 0) + 1;
+            } else { skipped++; errors.push(`Failed: ${name} on ${date}`); }
           }
         } catch (err: unknown) {
           skipped++;
@@ -207,7 +213,7 @@ export default function Settings() {
               return years;
             })()
           : undefined;
-      setImportResult({ imported, skipped, errors, dateRange, yearsInFile });
+      setImportResult({ imported, skipped, errors, dateRange, yearsInFile, countsByYear: Object.keys(countsByYear).length > 0 ? countsByYear : undefined });
       if (imported > 0 && hasSupabase()) await reload();
     } catch (err) {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
@@ -251,7 +257,10 @@ export default function Settings() {
           <p style={{ margin: "6px 0 0", fontSize: 12, color: success ? "#166534" : fail ? "#991b1b" : "#92400e", opacity: 0.9 }}>
             Date range in file: {dateRange.min} to {dateRange.max}
             {importResult.yearsInFile && importResult.yearsInFile.length > 0 && ` · Years: ${importResult.yearsInFile.join(", ")}`}.
-            If everything landed in one year, use full dates in the CSV (e.g. 1/15/2025). If a year shows $0 on Earnings, use Clear all lessons and re-import; ensure student names in the header match exactly (e.g. Chloe Parker).
+            {importResult.countsByYear && Object.keys(importResult.countsByYear).length > 0 && (
+              <> By year: {Object.entries(importResult.countsByYear).sort(([a], [b]) => a.localeCompare(b)).map(([yr, n]) => `${yr}: ${n}`).join(", ")} lessons. </>
+            )}
+            If 2025 or 2026 show $0 or wrong totals on Earnings, use <strong>Clear all lessons</strong> below, then re-import this CSV so all years are correct. Ensure CSV uses full dates (e.g. 1/15/2025) and student names match exactly (e.g. Chloe Parker).
           </p>
         )}
         {importResult.errors.length > 0 && (

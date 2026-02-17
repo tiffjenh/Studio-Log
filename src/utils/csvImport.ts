@@ -70,6 +70,8 @@ export interface ImportResult {
   dateRange?: { min: string; max: string };
   /** For matrix import: years that appear in the imported date range (e.g. [2024, 2025, 2026]) */
   yearsInFile?: number[];
+  /** For matrix import: number of lessons saved per year (e.g. { "2024": 500, "2025": 300, "2026": 44 }) */
+  countsByYear?: Record<string, number>;
 }
 
 const REQUIRED_COLS = ["first_name", "last_name", "date", "duration_minutes"];
