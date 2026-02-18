@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatCurrency } from "@/utils/earnings";
-import DatePicker from "@/components/DatePicker";
+import DatePicker, { parseToDateKey } from "@/components/DatePicker";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Lesson } from "@/types";
 
@@ -76,11 +76,20 @@ export default function EditLesson() {
   const dateFormatted = isNaN(date.getTime()) ? lessonDate : date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   const timeStr = student.timeOfDay ? ` - ${student.timeOfDay}` : "";
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const updates: Partial<Lesson> = { durationMinutes, amountCents, note: note.trim() || undefined };
-    if (/^\d{4}-\d{2}-\d{2}$/.test(lessonDate)) updates.date = lessonDate;
-    updateLesson(lesson.id, updates);
+    // Normalize date from input (user may have typed MM/DD/YYYY without blurring)
+    const dateInput = document.getElementById("edit-lesson-date") as HTMLInputElement | null;
+    const rawDate = dateInput?.value?.trim() ?? lessonDate;
+    const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : parseToDateKey(rawDate);
+
+    const updates: Partial<Lesson> = {
+      durationMinutes,
+      amountCents,
+      note: note.trim() || undefined,
+    };
+    if (normalizedDate) updates.date = normalizedDate;
+    await updateLesson(lesson.id, updates);
     navigate(-1);
   };
 
@@ -101,7 +110,7 @@ export default function EditLesson() {
         <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
           <div style={{ flex: 1 }}>
             <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Reschedule to date</label>
-            <DatePicker value={lessonDate} onChange={setLessonDate} placeholder="Select date" />
+            <DatePicker id="edit-lesson-date" value={lessonDate} onChange={setLessonDate} placeholder="Select date" />
           </div>
           <div style={{ flex: 1 }}>
             <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Reschedule time</label>

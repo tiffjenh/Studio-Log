@@ -21,8 +21,8 @@ function formatKeyToDisplay(key: string): string {
   return `${m}/${d}/${y}`;
 }
 
-/** Parse MM/DD/YYYY, M/D/YYYY, or YYYY-MM-DD to YYYY-MM-DD or null */
-function parseToDateKey(s: string): string | null {
+/** Parse MM/DD/YYYY, M/D/YYYY, or YYYY-MM-DD to YYYY-MM-DD or null. Exported for use in forms that need to normalize on submit. */
+export function parseToDateKey(s: string): string | null {
   const t = s.trim();
   if (!t) return null;
   const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
