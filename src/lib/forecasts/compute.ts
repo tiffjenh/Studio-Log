@@ -313,7 +313,6 @@ export function computeScenarioWhatIf(
   options: { avgWeekly: number | null; projectedYearly: number | null; students?: StudentSummary[] }
 ): { directAnswer: string; calculations: string[]; assumptions: string[]; confidence: "high" | "medium" | "low" } {
   const calculations: string[] = [];
-  const assumptions: string[] = [];
   const { avgWeekly, projectedYearly } = options;
 
   // If I take N weeks off
@@ -923,7 +922,6 @@ export function computeGeneralAnalytics(
 
   // Churn / LTV / most profitable hour (acknowledge; give what we can)
   if (/\bmost\s+profitable\s+hour|churn|who\s+likely\s+to\s+churn|lifetime\s+value|ltv|best\s+hour\s+of\s+week/i.test(q)) {
-    const cash = computeCashflowInsights(earnings);
     const bestDay = (() => {
       const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       const byDay = new Map<number, number>();
