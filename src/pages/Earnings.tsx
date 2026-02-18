@@ -174,6 +174,7 @@ const TAB_KEYS: Record<(typeof TABS)[number], string> = {
   Monthly: "earnings.monthly",
   Yearly: "earnings.yearly",
   Students: "earnings.studentsTab",
+  Forecasts: "earnings.forecasts",
 };
 
 export default function Earnings() {

@@ -99,6 +99,7 @@ export default {
     monthly: "Mensual",
     yearly: "Anual",
     studentsTab: "Estudiantes",
+    forecasts: "Pronósticos",
     earningsYTD: "Ingresos – año actual",
     earningsYear: "Ingresos",
     noEarnings: "Sin ingresos",

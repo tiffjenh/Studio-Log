@@ -99,6 +99,7 @@ export default {
     monthly: "每月",
     yearly: "每年",
     studentsTab: "學生",
+    forecasts: "預測",
     earningsYTD: "收入 – 今年至今",
     earningsYear: "收入",
     noEarnings: "無收入",
