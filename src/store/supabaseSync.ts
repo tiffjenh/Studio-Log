@@ -64,14 +64,29 @@ export async function fetchStudents(uid: string): Promise<Student[]> {
   return (data || []).map((r) => rowToStudent(r as Record<string, unknown>));
 }
 
+const LESSONS_PAGE_SIZE = 1000;
+
 export async function fetchLessons(uid: string): Promise<Lesson[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase.from("lessons").select("*").eq("user_id", uid);
-  if (error) {
-    console.error("[Studio Log] Failed to fetch lessons:", error.message, error);
-    throw error;
-  }
-  return (data || []).map((r) => rowToLesson(r as Record<string, unknown>));
+  const all: Lesson[] = [];
+  let offset = 0;
+  let page: Record<string, unknown>[];
+  do {
+    const { data, error } = await supabase
+      .from("lessons")
+      .select("*")
+      .eq("user_id", uid)
+      .order("date", { ascending: true })
+      .range(offset, offset + LESSONS_PAGE_SIZE - 1);
+    if (error) {
+      console.error("[Studio Log] Failed to fetch lessons:", error.message, error);
+      throw error;
+    }
+    page = (data ?? []) as Record<string, unknown>[];
+    for (const r of page) all.push(rowToLesson(r));
+    offset += LESSONS_PAGE_SIZE;
+  } while (page.length === LESSONS_PAGE_SIZE);
+  return all;
 }
 
 export async function signUpSupabase(
