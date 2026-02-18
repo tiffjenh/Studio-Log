@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { hasSupabase } from "@/lib/supabase";
 import { parseStudentCSV, rowToStudentWithError } from "@/utils/csvImport";
 import { downloadCsv, getStudentTemplateCsv } from "@/utils/importTemplates";
 import { getCurrencyByCode, getStoredCurrencyCode } from "@/utils/currencies";
