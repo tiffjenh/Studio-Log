@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import LogoIcon from "@/components/LogoIcon";
@@ -13,6 +13,7 @@ import {
   getEffectiveDurationMinutes,
   getEffectiveRateCents,
   getLessonForStudentOnDate,
+  getStudentIdsWithLessonOnDate,
   toDateKey,
   dedupeLessons,
   filterLessonsOnScheduledDay,
@@ -42,15 +43,15 @@ function LessonRow({
   const duration = lesson?.durationMinutes ?? effectiveDuration;
   const amount = lesson?.amountCents ?? effectiveRate;
   const rateText = duration >= 60 ? `${duration / 60} hour` : `${duration} mins`;
-  const { timeOfDay } = getEffectiveSchedule(student, dateKey);
+  const displayTime = lesson?.timeOfDay ?? getEffectiveSchedule(student, dateKey).timeOfDay;
   return (
     <div className="float-card" style={{ display: "flex", alignItems: "center", marginBottom: 12, cursor: "pointer", gap: 16 }} onClick={onEdit}>
       <StudentAvatar student={student} size={48} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontFamily: "var(--font-sans)" }}>{student.firstName} {student.lastName}</div>
         <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{rateText} / {formatCurrency(effectiveRate)}</div>
-        {timeOfDay && timeOfDay !== "—" && (
-          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{timeOfDay}</div>
+        {displayTime && displayTime !== "—" && (
+          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{displayTime}</div>
         )}
       </div>
       <label className="toggle-wrap" onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
@@ -69,10 +70,20 @@ function addDays(d: Date, n: number): Date {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data, addLesson, updateLesson } = useStoreContext();
   const { t } = useLanguage();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
+
+  // After reschedule, EditLesson navigates here with state.goToDate so we show the new date (avoids accidentally adding a lesson on the old date)
+  useEffect(() => {
+    const goTo = (location.state as { goToDate?: Date } | null)?.goToDate;
+    if (goTo && !isNaN(goTo.getTime())) {
+      setSelectedDate(goTo);
+      navigate(".", { replace: true, state: {} });
+    }
+  }, [location.state, navigate]);
 
   const dateKey = toDateKey(selectedDate);
   const dayOfWeek = selectedDate.getDay();
@@ -93,7 +104,17 @@ export default function Dashboard() {
   const ytdEndKey = toDateKey(today);
   const earningsYTD = earnedInDateRange(countableLessons, `${year}-01-01`, ytdEndKey);
 
-  const todaysStudents = getStudentsForDay(data.students, dayOfWeek, dateKey);
+  const scheduledForDay = getStudentsForDay(data.students, dayOfWeek, dateKey);
+  const studentIdsWithLessonOnDate = getStudentIdsWithLessonOnDate(data.lessons, dateKey);
+  const scheduledIds = new Set(scheduledForDay.map((s) => s.id));
+  const rescheduledOnly = data.students.filter((s) => studentIdsWithLessonOnDate.has(s.id) && !scheduledIds.has(s.id));
+  const todaysStudents = [...scheduledForDay, ...rescheduledOnly].sort((a, b) => {
+    const lessonA = getLessonForStudentOnDate(data.lessons, a.id, dateKey);
+    const lessonB = getLessonForStudentOnDate(data.lessons, b.id, dateKey);
+    const timeA = lessonA?.timeOfDay ?? getEffectiveSchedule(a, dateKey)?.timeOfDay ?? a.timeOfDay ?? "";
+    const timeB = lessonB?.timeOfDay ?? getEffectiveSchedule(b, dateKey)?.timeOfDay ?? b.timeOfDay ?? "";
+    return timeA > timeB ? 1 : -1;
+  });
   const isToday = toDateKey(selectedDate) === toDateKey(today);
 
   const handleToggle = (studentId: string, completed: boolean) => {

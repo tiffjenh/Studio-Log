@@ -78,9 +78,16 @@ export default function Layout() {
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [reload]);
 
+  const devLoadedAt = typeof window !== "undefined" && import.meta.env.DEV ? (window as unknown as { __studioLogLoadedAt?: number }).__studioLogLoadedAt : null;
+
   return (
     <>
       <main className="app-shell" style={{ padding: "20px 16px 24px" }}>
+        {devLoadedAt != null && (
+          <div style={{ position: "fixed", bottom: 56, right: 12, fontSize: 10, color: "var(--text-muted)", opacity: 0.7, pointerEvents: "none", zIndex: 0 }} title="Page load time – if this doesn’t change after refresh, the browser is serving cached code">
+            loaded {new Date(devLoadedAt).toLocaleTimeString()}
+          </div>
+        )}
         {loadError && (
           <div style={{ marginBottom: 16, padding: 12, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, fontSize: 14, color: "#dc2626" }}>
             Could not load data: {loadError}. Try logging out and back in, or check the browser console.

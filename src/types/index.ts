@@ -39,6 +39,8 @@ export interface Lesson {
   id: string;
   studentId: string;
   date: string;
+  /** When set, overrides the student's default time for this lesson (e.g. "4:00 PM"). */
+  timeOfDay?: string;
   durationMinutes: number;
   amountCents: number;
   completed: boolean;

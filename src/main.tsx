@@ -6,6 +6,10 @@ import { StoreProvider } from "./context/StoreContext";
 import App from "./App";
 import "./index.css";
 
+if (import.meta.env.DEV) {
+  (window as unknown as { __studioLogLoadedAt?: number }).__studioLogLoadedAt = Date.now();
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <LanguageProvider>

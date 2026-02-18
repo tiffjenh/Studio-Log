@@ -33,7 +33,7 @@ function parseTimeOfDay(s: string): { hour: number; minute: number; amPm: "AM" |
 export default function EditLesson() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { data, updateLesson } = useStoreContext();
+  const { data, updateLesson, deleteLesson } = useStoreContext();
   const { t } = useLanguage();
   const lesson = data.lessons.find((l) => l.id === id);
   const student = lesson ? data.students.find((s) => s.id === lesson.studentId) : null;
@@ -41,13 +41,17 @@ export default function EditLesson() {
   const [durationMinutes, setDurationMinutes] = useState(lesson?.durationMinutes ?? 60);
   const [note, setNote] = useState(lesson?.note ?? "");
 
-  // Time picker state
-  const initTime = parseTimeOfDay(student?.timeOfDay ?? "5:00 PM");
-  const [lessonTime, setLessonTime] = useState(student?.timeOfDay ?? "5:00 PM");
+  // Time picker state: per-lesson time if set, else student default
+  const defaultTime = lesson?.timeOfDay ?? student?.timeOfDay ?? "5:00 PM";
+  const initTime = parseTimeOfDay(defaultTime);
+  const [lessonTime, setLessonTime] = useState(defaultTime);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [timePickerHour, setTimePickerHour] = useState(initTime.hour);
   const [timePickerMinute, setTimePickerMinute] = useState(initTime.minute);
   const [timePickerAmPm, setTimePickerAmPm] = useState<"AM" | "PM">(initTime.amPm);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const openTimePicker = () => {
     const p = parseTimeOfDay(lessonTime);
@@ -62,10 +66,13 @@ export default function EditLesson() {
   };
 
   useEffect(() => {
-    if (lesson) setLessonDate(lesson.date);
-    if (lesson) setDurationMinutes(lesson.durationMinutes);
-    if (lesson) setNote(lesson.note ?? "");
-  }, [lesson?.id, student?.id]);
+    if (lesson) {
+      setLessonDate(lesson.date);
+      setDurationMinutes(lesson.durationMinutes);
+      setNote(lesson.note ?? "");
+      setLessonTime(lesson.timeOfDay ?? student?.timeOfDay ?? "5:00 PM");
+    }
+  }, [lesson?.id, lesson?.date, lesson?.durationMinutes, lesson?.note, lesson?.timeOfDay, student?.id, student?.timeOfDay]);
 
   if (!lesson || !student) return <p style={{ padding: 24 }}>Lesson not found</p>;
 
@@ -74,23 +81,55 @@ export default function EditLesson() {
   const [y, m, d] = lessonDate.split("-").map(Number);
   const date = new Date(y, m - 1, d);
   const dateFormatted = isNaN(date.getTime()) ? lessonDate : date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  const timeStr = student.timeOfDay ? ` - ${student.timeOfDay}` : "";
+  const timeStr = lessonTime ? ` - ${lessonTime}` : "";
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Normalize date from input (user may have typed MM/DD/YYYY without blurring)
-    const dateInput = document.getElementById("edit-lesson-date") as HTMLInputElement | null;
-    const rawDate = dateInput?.value?.trim() ?? lessonDate;
-    const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : parseToDateKey(rawDate);
+    setSaveError(null);
+    setSaving(true);
+    try {
+      // Read date from the visible input at submit time (source of truth), then fallback to state
+      const dateInput = document.getElementById("edit-lesson-date") as HTMLInputElement | null;
+      const rawInput = dateInput?.value?.trim() ?? "";
+      const fromInput = parseToDateKey(rawInput) ?? (/^\d{4}-\d{2}-\d{2}$/.test(rawInput) ? rawInput : null);
+      const fromState = /^\d{4}-\d{2}-\d{2}$/.test(lessonDate) ? lessonDate : null;
+      const normalizedDate = fromInput ?? fromState ?? lesson.date;
 
-    const updates: Partial<Lesson> = {
-      durationMinutes,
-      amountCents,
-      note: note.trim() || undefined,
-    };
-    if (normalizedDate) updates.date = normalizedDate;
-    await updateLesson(lesson.id, updates);
-    navigate(-1);
+      const updates: Partial<Lesson> = {
+        date: normalizedDate,
+        durationMinutes,
+        amountCents,
+        note: note.trim() || undefined,
+        timeOfDay: lessonTime.trim() || undefined,
+      };
+      console.log("EditLesson save", { lessonId: lesson.id, oldDate: lesson.date, newDate: normalizedDate });
+      await updateLesson(lesson.id, updates);
+      // After rescheduling, go back to dashboard with the new date selected so we don't land on the old date (where clicking would add a duplicate)
+      if (normalizedDate && normalizedDate !== lesson.date) {
+        const [y, m, d] = normalizedDate.split("-").map(Number);
+        navigate("/", { state: { goToDate: new Date(y, m - 1, d) } });
+      } else {
+        navigate(-1);
+      }
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm(t("editLesson.deleteConfirm"))) return;
+    setDeleting(true);
+    setSaveError(null);
+    try {
+      await deleteLesson(lesson.id);
+      navigate("/");
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to delete");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -144,7 +183,18 @@ export default function EditLesson() {
           onChange={(e) => setNote(e.target.value)}
           style={{ width: "100%", minHeight: 80, padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 24, fontSize: 16 }}
         />
-        <button type="submit" className="btn btn-primary" style={{ width: "100%" }}>{t("common.save")}</button>
+        {saveError && <p style={{ color: "var(--error, #c00)", marginBottom: 16 }}>{saveError}</p>}
+        <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={saving}>
+          {saving ? (t("common.loading") ?? "Saving…") : t("common.save")}
+        </button>
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={saving || deleting}
+          style={{ marginTop: 16, width: "100%", padding: "12px 16px", border: "1px solid var(--error, #c00)", color: "var(--error, #c00)", background: "transparent", borderRadius: 12, cursor: "pointer", fontSize: 15 }}
+        >
+          {deleting ? (t("common.loading") ?? "Deleting…") : t("editLesson.deleteLesson")}
+        </button>
       </form>
 
       {timePickerOpen && (

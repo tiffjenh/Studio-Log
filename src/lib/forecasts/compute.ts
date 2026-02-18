@@ -14,6 +14,11 @@ function roundTo2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/** Format dollar amount with thousands separators (e.g. $1,000 or $10,000). */
+function fmtDollars(n: number): string {
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
 export function computeAvgWeekly(rows: EarningsRow[]): number | null {
   if (!rows.length) return null;
   const sorted = [...rows].sort((r1, r2) => parseISODate(r1.date).getTime() - parseISODate(r2.date).getTime());
@@ -261,7 +266,7 @@ export function computeWhatIf(
   const calculations: string[] = [];
 
   const currentIncome = sumInRange(earnings, bounds.startDate, bounds.endDate);
-  calculations.push(`Current income in period (${bounds.label}): $${roundTo2(currentIncome)}`);
+  calculations.push(`Current income in period (${bounds.label}): ${fmtDollars(roundTo2(currentIncome))}`);
 
   const target = parsed.target_income ?? 0;
   const rate = parsed.hourly_rate ?? 0;
@@ -275,7 +280,7 @@ export function computeWhatIf(
   calculations.push(`Weeks remaining in year: ${weeksRemaining}`);
 
   const remainingIncome = Math.max(0, target - currentIncome);
-  calculations.push(`Remaining income to reach $${target}: $${roundTo2(remainingIncome)}`);
+  calculations.push(`Remaining income to reach ${fmtDollars(target)}: ${fmtDollars(roundTo2(remainingIncome))}`);
 
   if (rate <= 0) {
     return {
@@ -287,15 +292,15 @@ export function computeWhatIf(
   }
 
   const hoursNeeded = remainingIncome / rate;
-  calculations.push(`Hours needed at $${rate}/hour: ${roundTo2(hoursNeeded)}`);
+  calculations.push(`Hours needed at ${fmtDollars(rate)}/hour: ${roundTo2(hoursNeeded)}`);
 
   const studentsNeeded = hoursPerStudentPerWeek * weeksRemaining <= 0 ? 0 : Math.ceil(hoursNeeded / (weeksRemaining * hoursPerStudentPerWeek));
   calculations.push(`Formula: students_needed = ceil(hours_needed / (weeks_remaining × hours_per_student_per_week)) = ceil(${hoursNeeded} / (${weeksRemaining} × ${hoursPerStudentPerWeek})) = ${studentsNeeded}`);
 
   const directAnswer =
     studentsNeeded <= 0
-      ? `You’re already on track. Current income in period: $${roundTo2(currentIncome)}.`
-      : `You’d need about ${studentsNeeded} new student(s) (at $${rate}/hr, ${hoursPerStudentPerWeek} hr/student/week, ${weeksRemaining} weeks left) to reach $${roundTo2(target)}.`;
+      ? `You’re already on track. Current income in period: ${fmtDollars(roundTo2(currentIncome))}.`
+      : `You’d need about ${studentsNeeded} new student(s) (at ${fmtDollars(rate)}/hr, ${hoursPerStudentPerWeek} hr/student/week, ${weeksRemaining} weeks left) to reach ${fmtDollars(roundTo2(target))}.`;
 
   return {
     directAnswer,
@@ -319,13 +324,13 @@ export function computeScenarioWhatIf(
   if (parsed.weeks_off != null && parsed.weeks_off > 0 && avgWeekly != null) {
     const lost = roundTo2(parsed.weeks_off * avgWeekly);
     const newYearly = projectedYearly != null ? roundTo2(projectedYearly - lost) : null;
-    calculations.push(`Current avg weekly: $${avgWeekly}`);
-    calculations.push(`Lost income (${parsed.weeks_off} weeks × $${avgWeekly}): $${lost}`);
+    calculations.push(`Current avg weekly: ${fmtDollars(avgWeekly)}`);
+    calculations.push(`Lost income (${parsed.weeks_off} weeks × ${fmtDollars(avgWeekly)}): ${fmtDollars(lost)}`);
     return {
       directAnswer:
         newYearly != null
-          ? `Taking ${parsed.weeks_off} weeks off would cost about $${lost} in income. Projected yearly would be ~$${newYearly}.`
-          : `Taking ${parsed.weeks_off} weeks off would cost about $${lost} in income.`,
+          ? `Taking ${parsed.weeks_off} weeks off would cost about ${fmtDollars(lost)} in income. Projected yearly would be ~${fmtDollars(newYearly)}.`
+          : `Taking ${parsed.weeks_off} weeks off would cost about ${fmtDollars(lost)} in income.`,
       calculations,
       assumptions: ["Using your recent average weekly earnings."],
       confidence: "high",
@@ -342,9 +347,9 @@ export function computeScenarioWhatIf(
     const addedPerYear = roundTo2(parsed.new_students_added * avgRate * hrsPerStudent * 52);
     const currentYearly = projectedYearly ?? roundTo2(avgWeekly != null ? avgWeekly * 52 : 0);
     const newYearly = roundTo2(currentYearly + addedPerYear);
-    calculations.push(`Avg rate: $${roundTo2(avgRate)}/hr; ${parsed.new_students_added} students × ${hrsPerStudent} hr/week × 52 = $${addedPerYear}/year`);
+    calculations.push(`Avg rate: ${fmtDollars(roundTo2(avgRate))}/hr; ${parsed.new_students_added} students × ${hrsPerStudent} hr/week × 52 = ${fmtDollars(addedPerYear)}/year`);
     return {
-      directAnswer: `Adding ${parsed.new_students_added} new weekly student(s) would add about $${addedPerYear}/year. Projected yearly would be ~$${newYearly}.`,
+      directAnswer: `Adding ${parsed.new_students_added} new weekly student(s) would add about ${fmtDollars(addedPerYear)}/year. Projected yearly would be ~${fmtDollars(newYearly)}.`,
       calculations,
       assumptions: [`Using ${hrsPerStudent} hour(s) per student per week.`],
       confidence: avgRate > 0 ? "high" : "medium",
@@ -371,10 +376,10 @@ export function computeScenarioWhatIf(
     const total = earnings.reduce((s, r) => s + r.amount, 0);
     const yearly = projectedYearly ?? roundTo2(total);
     const yearlyWithout = total > 0 ? roundTo2((yearly / total) * (total - lowestRev)) : 0;
-    calculations.push(`${lowestName} contributed $${roundTo2(lowestRev)}`);
-    calculations.push(`Projected yearly without: ~$${yearlyWithout}`);
+    calculations.push(`${lowestName} contributed ${fmtDollars(roundTo2(lowestRev))}`);
+    calculations.push(`Projected yearly without: ~${fmtDollars(yearlyWithout)}`);
     return {
-      directAnswer: `If ${lowestName} left, you'd lose about $${roundTo2(lowestRev)} in recorded revenue. Projected yearly would be ~$${yearlyWithout}.`,
+      directAnswer: `If ${lowestName} left, you'd lose about ${fmtDollars(roundTo2(lowestRev))} in recorded revenue. Projected yearly would be ~${fmtDollars(yearlyWithout)}.`,
       calculations,
       assumptions: [],
       confidence: "high",
@@ -389,10 +394,10 @@ export function computeScenarioWhatIf(
     const currentYearly = projectedYearly ?? (avgWeekly != null ? roundTo2(avgWeekly * 52) : 0);
     if (rate > 0 && currentYearly > 0) {
       const n = Math.ceil(currentYearly / (rate * hrsPerWeek * 52));
-      calculations.push(`Current projected yearly: $${currentYearly}`);
-      calculations.push(`At $${rate}/hr, ${hrsPerWeek} hr/student/week: ${currentYearly} / (${rate} × ${hrsPerWeek} × 52) ≈ ${n} students`);
-      return {
-        directAnswer: `You'd need about ${n} student(s) at $${rate}/hour (${hrsPerWeek} hr/week each) to replace your current income (~$${currentYearly}/year).`,
+    calculations.push(`Current projected yearly: ${fmtDollars(currentYearly)}`);
+    calculations.push(`At ${fmtDollars(rate)}/hr, ${hrsPerWeek} hr/student/week: ${currentYearly} / (${rate} × ${hrsPerWeek} × 52) ≈ ${n} students`);
+    return {
+      directAnswer: `You'd need about ${n} student(s) at ${fmtDollars(rate)}/hour (${hrsPerWeek} hr/week each) to replace your current income (~${fmtDollars(currentYearly)}/year).`,
         calculations,
         assumptions: [`Using ${hrsPerWeek} hour(s) per student per week.`],
         confidence: "high",
@@ -408,13 +413,13 @@ export function computeScenarioWhatIf(
   let newRate: number | null = null;
   if (parsed.rate_increase_dollars != null && parsed.rate_increase_dollars > 0) {
     newRate = currentAvgRate + parsed.rate_increase_dollars;
-    calculations.push(`Current avg rate: $${roundTo2(currentAvgRate)}/hr; add $${parsed.rate_increase_dollars} → $${roundTo2(newRate)}/hr`);
+    calculations.push(`Current avg rate: ${fmtDollars(roundTo2(currentAvgRate))}/hr; add ${fmtDollars(parsed.rate_increase_dollars)} → ${fmtDollars(roundTo2(newRate))}/hr`);
   } else if (parsed.rate_increase_percent != null && parsed.rate_increase_percent > 0) {
     newRate = currentAvgRate * (1 + parsed.rate_increase_percent / 100);
-    calculations.push(`Current avg: $${roundTo2(currentAvgRate)}/hr; +${parsed.rate_increase_percent}% → $${roundTo2(newRate)}/hr`);
+    calculations.push(`Current avg: ${fmtDollars(roundTo2(currentAvgRate))}/hr; +${parsed.rate_increase_percent}% → ${fmtDollars(roundTo2(newRate))}/hr`);
   } else if (parsed.new_rate != null && parsed.new_rate > 0) {
     newRate = parsed.new_rate;
-    calculations.push(`Hypothetical rate: $${newRate}/hr (current avg: $${roundTo2(currentAvgRate)}/hr)`);
+    calculations.push(`Hypothetical rate: ${fmtDollars(newRate)}/hr (current avg: ${fmtDollars(roundTo2(currentAvgRate))}/hr)`);
   }
   if (newRate != null && newRate > 0 && (totalHours > 0 || (avgWeekly != null && currentAvgRate > 0))) {
     const currentYearly = projectedYearly ?? roundTo2(avgWeekly != null ? avgWeekly * 52 : total);
@@ -422,7 +427,7 @@ export function computeScenarioWhatIf(
     const newYearly = roundTo2(hoursPerYearFromWeeks * newRate);
     const diff = roundTo2(newYearly - currentYearly);
     return {
-      directAnswer: `At $${roundTo2(newRate)}/hour (instead of ~$${roundTo2(currentAvgRate)}/hr), you'd make about $${diff} more per year (projected ~$${newYearly}/year).`,
+      directAnswer: `At ${fmtDollars(roundTo2(newRate))}/hour (instead of ~${fmtDollars(roundTo2(currentAvgRate))}/hr), you'd make about ${fmtDollars(diff)} more per year (projected ~${fmtDollars(newYearly)}/year).`,
       calculations,
       assumptions: ["Using your recent teaching hours to project yearly."],
       confidence: "high",
@@ -463,9 +468,9 @@ export function computeGeneralAnalytics(
       const diff = target - projectedYearly;
       return {
         directAnswer: onTrack
-          ? `Yes. You're on track — projected yearly is $${roundTo2(projectedYearly)}, above your $${roundTo2(target)} goal.`
-          : `Not quite. Projected yearly is $${roundTo2(projectedYearly)}. You'd need about $${roundTo2(Math.max(0, diff))} more to reach $${roundTo2(target)}.`,
-        calculations: [`Projected yearly: $${roundTo2(projectedYearly)}; Target: $${roundTo2(target)}`],
+          ? `Yes. You're on track — projected yearly is ${fmtDollars(roundTo2(projectedYearly))}, above your ${fmtDollars(roundTo2(target))} goal.`
+          : `Not quite. Projected yearly is ${fmtDollars(roundTo2(projectedYearly))}. You'd need about ${fmtDollars(roundTo2(Math.max(0, diff)))} more to reach ${fmtDollars(roundTo2(target))}.`,
+        calculations: [`Projected yearly: ${fmtDollars(roundTo2(projectedYearly))}; Target: ${fmtDollars(roundTo2(target))}`],
         assumptions: [],
         confidence: "high",
       };
@@ -498,8 +503,8 @@ export function computeGeneralAnalytics(
       return { label: new Date(2000, (mo ?? 1) - 1, 1).toLocaleDateString("en-US", { month: "short" }) + " " + yr, value: roundTo2(v!) };
     });
     return {
-      directAnswer: `Your best month was ${label} with $${roundTo2(total)} in earnings.`,
-      calculations: [`By month: ${sorted.slice(0, 5).map(([k, v]) => `${k}: $${roundTo2(v!)}`).join("; ")}`],
+      directAnswer: `Your best month was ${label} with ${fmtDollars(roundTo2(total))} in earnings.`,
+      calculations: [`By month: ${sorted.slice(0, 5).map(([k, v]) => `${k}: ${fmtDollars(roundTo2(v!))}`).join("; ")}`],
       assumptions: [],
       confidence: "high",
       chartData,
@@ -522,8 +527,8 @@ export function computeGeneralAnalytics(
     const monthName = new Date(2000, (m ?? 1) - 1, 1).toLocaleDateString("en-US", { month: "long" });
     const label = `${monthName} ${y}`;
     return {
-      directAnswer: `Your worst month was ${label} with $${roundTo2(total)} in earnings.`,
-      calculations: [`By month (lowest first): ${sorted.slice(0, 5).map(([k, v]) => `${k}: $${roundTo2(v!)}`).join("; ")}`],
+      directAnswer: `Your worst month was ${label} with ${fmtDollars(roundTo2(total))} in earnings.`,
+      calculations: [`By month (lowest first): ${sorted.slice(0, 5).map(([k, v]) => `${k}: ${fmtDollars(roundTo2(v!))}`).join("; ")}`],
       assumptions: [],
       confidence: "high",
     };
@@ -545,8 +550,8 @@ export function computeGeneralAnalytics(
       return { directAnswer: "Earnings aren’t broken down by student in this data. Add student/customer info to see who pays the most.", calculations: [], assumptions: [], confidence: "low" };
     }
     return {
-      directAnswer: `${name} pays the most: $${roundTo2(total!)} total.`,
-      calculations: sorted.slice(0, 5).map(([n, v]) => `${n}: $${roundTo2(v!)}`),
+      directAnswer: `${name} pays the most: ${fmtDollars(roundTo2(total!))} total.`,
+      calculations: sorted.slice(0, 5).map(([n, v]) => `${n}: ${fmtDollars(roundTo2(v!))}`),
       assumptions: [],
       confidence: "high",
     };
@@ -568,8 +573,8 @@ export function computeGeneralAnalytics(
       return { directAnswer: "Earnings aren't broken down by student. Add student info to see who earned you the least.", calculations: [], assumptions: [], confidence: "low" };
     }
     return {
-      directAnswer: `${name} has earned you the least: $${roundTo2(total!)} total.`,
-      calculations: sorted.slice(0, 5).map(([n, v]) => `${n}: $${roundTo2(v!)}`),
+      directAnswer: `${name} has earned you the least: ${fmtDollars(roundTo2(total!))} total.`,
+      calculations: sorted.slice(0, 5).map(([n, v]) => `${n}: ${fmtDollars(roundTo2(v!))}`),
       assumptions: [],
       confidence: "high",
     };
@@ -583,9 +588,9 @@ export function computeGeneralAnalytics(
     const pick = isLowest ? byRate[0]! : byRate[byRate.length - 1]!;
     return {
       directAnswer: isLowest
-        ? `${pick.name} has the lowest rate: $${roundTo2(pick.rate)}/hour.`
-        : `${pick.name} pays the most per hour: $${roundTo2(pick.rate)}/hour.`,
-      calculations: byRate.slice(0, 6).map((x) => `${x.name}: $${roundTo2(x.rate)}/hr`),
+        ? `${pick.name} has the lowest rate: ${fmtDollars(roundTo2(pick.rate))}/hour.`
+        : `${pick.name} pays the most per hour: ${fmtDollars(roundTo2(pick.rate))}/hour.`,
+      calculations: byRate.slice(0, 6).map((x) => `${x.name}: ${fmtDollars(roundTo2(x.rate))}/hr`),
       assumptions: [],
       confidence: "high",
     };
@@ -598,16 +603,16 @@ export function computeGeneralAnalytics(
     const below = students.filter((s) => s.rateCents / 100 < avg);
     if (below.length === 0) {
       return {
-        directAnswer: `Everyone is at or above your average rate of $${roundTo2(avg)}/hour.`,
-        calculations: [`Average: $${roundTo2(avg)}/hr`],
+        directAnswer: `Everyone is at or above your average rate of ${fmtDollars(roundTo2(avg))}/hour.`,
+        calculations: [`Average: ${fmtDollars(roundTo2(avg))}/hr`],
         assumptions: [],
         confidence: "high",
       };
     }
-    const names = below.map((s) => `${s.name} ($${roundTo2(s.rateCents / 100)}/hr)`).join("; ");
+    const names = below.map((s) => `${s.name} (${fmtDollars(roundTo2(s.rateCents / 100))}/hr)`).join("; ");
     return {
-      directAnswer: `${below.length} student(s) are below your average rate ($${roundTo2(avg)}/hr): ${names}.`,
-      calculations: [`Average: $${roundTo2(avg)}/hr`, ...below.map((s) => `${s.name}: $${roundTo2(s.rateCents / 100)}/hr`)],
+      directAnswer: `${below.length} student(s) are below your average rate (${fmtDollars(roundTo2(avg))}/hr): ${names}.`,
+      calculations: [`Average: ${fmtDollars(roundTo2(avg))}/hr`, ...below.map((s) => `${s.name}: ${fmtDollars(roundTo2(s.rateCents / 100))}/hr`)],
       assumptions: [],
       confidence: "high",
     };
@@ -628,8 +633,8 @@ export function computeGeneralAnalytics(
       }
       const avg = totalHours > 0 ? roundTo2(totalEarned / totalHours) : 0;
       return {
-        directAnswer: `Your average hourly rate is $${avg}/hour (from ${earnings.length} entries, ${roundTo2(totalHours)} hours).`,
-        calculations: [`Total earned: $${roundTo2(totalEarned)}; Total hours: ${roundTo2(totalHours)}; Average = $${roundTo2(totalEarned)} / ${roundTo2(totalHours)} = $${avg}/hr`],
+        directAnswer: `Your average hourly rate is ${fmtDollars(avg)}/hour (from ${earnings.length} entries, ${roundTo2(totalHours)} hours).`,
+        calculations: [`Total earned: ${fmtDollars(roundTo2(totalEarned))}; Total hours: ${roundTo2(totalHours)}; Average = ${fmtDollars(roundTo2(totalEarned))} / ${roundTo2(totalHours)} = ${fmtDollars(avg)}/hr`],
         assumptions: [],
         confidence: "high",
       };
@@ -640,8 +645,8 @@ export function computeGeneralAnalytics(
     totalHours = earnings.length;
     const avg = totalHours > 0 ? roundTo2(totalEarned / totalHours) : 0;
     return {
-      directAnswer: `About $${avg}/hour (assuming 1 hour per lesson).`,
-      calculations: [`Total: $${roundTo2(totalEarned)} over ${earnings.length} lessons (1 hr each) = $${avg}/hr`],
+      directAnswer: `About ${fmtDollars(avg)}/hour (assuming 1 hour per lesson).`,
+      calculations: [`Total: ${fmtDollars(roundTo2(totalEarned))} over ${earnings.length} lessons (1 hr each) = ${fmtDollars(avg)}/hr`],
       assumptions,
       confidence: "medium",
     };
@@ -658,7 +663,7 @@ export function computeGeneralAnalytics(
       return { directAnswer: "Payment method isn’t recorded in this data. Add method (cash, Venmo, etc.) to see a breakdown.", calculations: [], assumptions: [], confidence: "low" };
     }
     const entries = [...byMethod.entries()].sort((a, b) => b[1]! - a[1]!);
-    const lines = entries.map(([method, amt]) => `${method}: $${roundTo2(amt!)}`);
+    const lines = entries.map(([method, amt]) => `${method}: ${fmtDollars(roundTo2(amt!))}`);
     const chartData = entries.map(([label, value]) => ({ label: label.charAt(0).toUpperCase() + label.slice(1), value: roundTo2(value!) }));
     return {
       directAnswer: `By payment method: ${lines.join("; ")}.`,
@@ -711,8 +716,8 @@ export function computeGeneralAnalytics(
     const total = earnings.reduce((s, r) => s + r.amount, 0);
     const perLesson = roundTo2(total / earnings.length);
     return {
-      directAnswer: `Your average revenue per lesson is $${perLesson}.`,
-      calculations: [`Total $${roundTo2(total)} / ${earnings.length} lessons = $${perLesson}`],
+      directAnswer: `Your average revenue per lesson is ${fmtDollars(perLesson)}.`,
+      calculations: [`Total ${fmtDollars(roundTo2(total))} / ${earnings.length} lessons = ${fmtDollars(perLesson)}`],
       assumptions: [],
       confidence: "high",
     };
@@ -733,8 +738,8 @@ export function computeGeneralAnalytics(
       return { directAnswer: "Earnings aren't broken down by student. Add student info for per-student revenue.", calculations: [], assumptions: [], confidence: "low" };
     }
     return {
-      directAnswer: `Your average revenue per student is $${perStudent} (${numStudents} students).`,
-      calculations: [`Total $${roundTo2(total)} / ${numStudents} students = $${perStudent}`],
+      directAnswer: `Your average revenue per student is ${fmtDollars(perStudent)} (${numStudents} students).`,
+      calculations: [`Total ${fmtDollars(roundTo2(total))} / ${numStudents} students = ${fmtDollars(perStudent)}`],
       assumptions: [],
       confidence: "high",
     };
@@ -753,8 +758,8 @@ export function computeGeneralAnalytics(
     }
     const perHour = roundTo2(total / totalHours);
     return {
-      directAnswer: `You generate about $${perHour} per hour of teaching.`,
-      calculations: [`Total $${roundTo2(total)} / ${roundTo2(totalHours)} hours = $${perHour}/hr`],
+      directAnswer: `You generate about ${fmtDollars(perHour)} per hour of teaching.`,
+      calculations: [`Total ${fmtDollars(roundTo2(total))} / ${roundTo2(totalHours)} hours = ${fmtDollars(perHour)}/hr`],
       assumptions: hasDuration ? [] : ["Assuming 1 hour per lesson."],
       confidence: hasDuration ? "high" : "medium",
     };
@@ -776,8 +781,8 @@ export function computeGeneralAnalytics(
     const [dayNum, total] = sorted[0]!;
     const chartData = sorted.map(([d, v]) => ({ label: dayNames[d!]!, value: roundTo2(v!) }));
     return {
-      directAnswer: `${dayNames[dayNum]!} earns you the most: $${roundTo2(total)} total.`,
-      calculations: chartData.map((x) => `${x.label}: $${x.value}`),
+      directAnswer: `${dayNames[dayNum]!} earns you the most: ${fmtDollars(roundTo2(total))} total.`,
+      calculations: chartData.map((x) => `${x.label}: ${fmtDollars(x.value)}`),
       assumptions: [],
       confidence: "high",
       chartData,
@@ -795,10 +800,10 @@ export function computeGeneralAnalytics(
       directAnswer:
         tax.estimatedTax == null
           ? "Not enough data for tax estimate."
-          : `Set aside about $${tax.monthlySetAside}/month ($${tax.estimatedTax}/year). Estimated quarterly payment: $${quarterly}.`,
+          : `Set aside about ${fmtDollars(tax.monthlySetAside)}/month (${fmtDollars(tax.estimatedTax)}/year). Estimated quarterly payment: ${quarterly != null ? fmtDollars(quarterly) : "—"}.`,
       calculations:
         tax.estimatedTax != null
-          ? [`20% of projected yearly $${projectedYearly} ≈ $${tax.estimatedTax}`, `Monthly: $${tax.monthlySetAside}`, `Quarterly: $${quarterly}`]
+          ? [`20% of projected yearly ${fmtDollars(projectedYearly)} ≈ ${fmtDollars(tax.estimatedTax)}`, `Monthly: ${fmtDollars(tax.monthlySetAside)}`, `Quarterly: ${quarterly != null ? fmtDollars(quarterly) : "—"}`]
           : [],
       assumptions: ["Using ~20% for combined federal/state self-employment tax estimate. Consult a tax professional."],
       confidence: "medium",
@@ -811,8 +816,8 @@ export function computeGeneralAnalytics(
     const tax = computeTaxEstimate(projectedYearly);
     const takeHome = tax.estimatedTax != null ? roundTo2(projectedYearly - tax.estimatedTax) : projectedYearly;
     return {
-      directAnswer: `Projected take-home after estimated taxes: about $${takeHome}/year ($${roundTo2(takeHome / 12)}/month).`,
-      calculations: [`Projected yearly $${projectedYearly} − estimated tax $${tax.estimatedTax} = $${takeHome}`],
+      directAnswer: `Projected take-home after estimated taxes: about ${fmtDollars(takeHome)}/year (${fmtDollars(roundTo2(takeHome / 12))}/month).`,
+      calculations: [`Projected yearly ${fmtDollars(projectedYearly)} − estimated tax ${tax.estimatedTax != null ? fmtDollars(tax.estimatedTax) : "—"} = ${fmtDollars(takeHome)}`],
       assumptions: ["~20% tax estimate. Actual taxes depend on deductions and situation."],
       confidence: "medium",
     };
@@ -831,7 +836,7 @@ export function computeGeneralAnalytics(
         : `Your income has moderate variation week to week (volatility ${(cash.volatility * 100).toFixed(0)}%). Best and worst weeks can differ.`,
       calculations:
         cash.bestWeek && cash.worstWeek
-          ? [`Best week: $${cash.bestWeek.total} (${cash.bestWeek.start}–${cash.bestWeek.end})`, `Worst week: $${cash.worstWeek.total}`]
+          ? [`Best week: ${fmtDollars(cash.bestWeek.total)} (${cash.bestWeek.start}–${cash.bestWeek.end})`, `Worst week: ${fmtDollars(cash.worstWeek.total)}`]
           : [],
       assumptions: [],
       confidence: earnings.length >= 8 ? "high" : "medium",
@@ -856,9 +861,9 @@ export function computeGeneralAnalytics(
     return {
       directAnswer:
         lastTotal === 0
-          ? `This month so far: $${roundTo2(thisTotal)}. Last month had no recorded earnings.`
-          : `This month: $${roundTo2(thisTotal)}. Last month: $${roundTo2(lastTotal)}. That's ${change >= 0 ? "+" : ""}${change}% ${change >= 0 ? "higher" : "lower"}.`,
-      calculations: [`This month (to date): $${roundTo2(thisTotal)}`, `Last month: $${roundTo2(lastTotal)}`, `Change: ${change}%`],
+          ? `This month so far: ${fmtDollars(roundTo2(thisTotal))}. Last month had no recorded earnings.`
+          : `This month: ${fmtDollars(roundTo2(thisTotal))}. Last month: ${fmtDollars(roundTo2(lastTotal))}. That's ${change >= 0 ? "+" : ""}${change}% ${change >= 0 ? "higher" : "lower"}.`,
+      calculations: [`This month (to date): ${fmtDollars(roundTo2(thisTotal))}`, `Last month: ${fmtDollars(roundTo2(lastTotal))}`, `Change: ${change}%`],
       assumptions: [],
       confidence: "high",
     };
@@ -876,9 +881,9 @@ export function computeGeneralAnalytics(
     return {
       directAnswer:
         lastYear === 0
-          ? `This year so far: $${roundTo2(thisYear)}. No data for ${y - 1}.`
-          : `This year: $${roundTo2(thisYear)}. Last year: $${roundTo2(lastYear)}. Year-over-year: ${change >= 0 ? "+" : ""}${change}%.`,
-      calculations: [`${y} YTD: $${roundTo2(thisYear)}`, `${y - 1}: $${roundTo2(lastYear)}`, `Change: ${change}%`],
+          ? `This year so far: ${fmtDollars(roundTo2(thisYear))}. No data for ${y - 1}.`
+          : `This year: ${fmtDollars(roundTo2(thisYear))}. Last year: ${fmtDollars(roundTo2(lastYear))}. Year-over-year: ${change >= 0 ? "+" : ""}${change}%.`,
+      calculations: [`${y} YTD: ${fmtDollars(roundTo2(thisYear))}`, `${y - 1}: ${fmtDollars(roundTo2(lastYear))}`, `Change: ${change}%`],
       assumptions: [],
       confidence: "high",
     };
@@ -912,7 +917,7 @@ export function computeGeneralAnalytics(
     return {
       directAnswer: `Your top 3 students account for ${pctTop3}% of revenue. About ${n80} student(s) generate 80% of your revenue.`,
       calculations: [
-        ...top3.map(([name, v]) => `${name}: $${roundTo2(v!)} (${total > 0 ? roundTo2((v! / total) * 100) : 0}%)`),
+        ...top3.map(([name, v]) => `${name}: ${fmtDollars(roundTo2(v!))} (${total > 0 ? roundTo2((v! / total) * 100) : 0}%)`),
         `Top 3 total: ${pctTop3}%`,
       ],
       assumptions: [],
@@ -955,9 +960,9 @@ export function computeGeneralAnalytics(
       confidence: "low",
     };
   }
-  calculations.push(`Total: $${roundTo2(total)}; Count: ${count}`);
+  calculations.push(`Total: ${fmtDollars(roundTo2(total))}; Count: ${count}`);
   return {
-    directAnswer: `You have ${count} earnings entries, totaling $${roundTo2(total)}.`,
+    directAnswer: `You have ${count} earnings entries, totaling ${fmtDollars(roundTo2(total))}.`,
     calculations,
     assumptions: [],
     confidence: "medium",

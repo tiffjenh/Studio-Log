@@ -135,5 +135,7 @@ export default {
   },
   editLesson: {
     title: "Editar clase",
+    deleteLesson: "Eliminar clase",
+    deleteConfirm: "¿Eliminar esta clase? No se puede deshacer.",
   },
 } as const;

@@ -135,5 +135,7 @@ export default {
   },
   editLesson: {
     title: "Edit lesson",
+    deleteLesson: "Delete lesson",
+    deleteConfirm: "Remove this lesson? This cannot be undone.",
   },
 };

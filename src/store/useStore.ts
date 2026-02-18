@@ -13,6 +13,8 @@ import {
   addLessonSupabase,
   bulkInsertLessonsSupabase,
   updateLessonSupabase,
+  deleteLessonSupabase,
+  fetchLessonIdsToRemoveForMove,
   deleteAllLessonsSupabase,
   updateProfileSupabase,
 } from "@/store/supabaseSync";
@@ -46,6 +48,15 @@ function dedupeLessonsByStudentDate(lessons: Lesson[]): Lesson[] {
   return [...byKey.values()];
 }
 
+/** Guardrail: one lesson per id. Use when building lesson lists to avoid duplicates. */
+function dedupeLessonsById(lessons: Lesson[]): Lesson[] {
+  const byId = new Map<string, Lesson>();
+  for (const l of lessons) {
+    if (!byId.has(l.id)) byId.set(l.id, l);
+  }
+  return [...byId.values()];
+}
+
 /** Skip reload for this long after a bulk student import so we don't overwrite with a stale fetch. */
 const SKIP_RELOAD_AFTER_BULK_IMPORT_MS = 30_000;
 
@@ -66,7 +77,7 @@ export function useStore() {
       try {
         const raw = await loadFromSupabase();
         const appData = raw
-          ? { ...raw, lessons: dedupeLessonsByStudentDate(raw.lessons) }
+          ? { ...raw, lessons: dedupeLessonsById(dedupeLessonsByStudentDate(raw.lessons)) }
           : null;
         setData(appData ?? initialData);
         const d = appData ?? initialData;
@@ -303,22 +314,57 @@ export function useStore() {
 
   const updateLesson = useCallback(
     async (id: string, updates: Partial<Lesson>) => {
-      // Apply to local state immediately so toggle and earnings stay in sync (optimistic update)
-      const applyUpdate = (prev: AppData) => ({
-        ...prev,
-        lessons: prev.lessons.map((l) => (l.id === id ? { ...l, ...updates } : l)),
-      });
-      setData(applyUpdate);
+      const newDate = updates.date;
+      const current = data.lessons.find((l) => l.id === id);
+      const isDateMove = current && newDate != null && /^\d{4}-\d{2}-\d{2}$/.test(String(newDate)) && current.date !== newDate;
+      const oldDate = isDateMove ? current.date : null;
+      console.log("Saving lesson", { lessonId: id, oldDate: current?.date, newDate, mode: isDateMove ? "move" : "update" });
+      const duplicatesOnNewDate =
+        isDateMove ? data.lessons.filter((l) => l.id !== id && l.studentId === current.studentId && l.date === newDate) : [];
+      const duplicatesOnOldDate =
+        isDateMove && oldDate
+          ? data.lessons.filter((l) => l.id !== id && l.studentId === current.studentId && l.date === oldDate)
+          : [];
+      const allToRemove = [...duplicatesOnNewDate, ...duplicatesOnOldDate];
+      const removeIds = new Set(allToRemove.map((l) => l.id));
+
       if (hasSupabase() && data.user) {
+        if (isDateMove && oldDate) {
+          const idsToRemove = await fetchLessonIdsToRemoveForMove(
+            data.user.id,
+            current.studentId,
+            oldDate,
+            newDate as string,
+            id,
+          );
+          for (const lessonId of idsToRemove) {
+            await deleteLessonSupabase(data.user.id, lessonId);
+          }
+        } else {
+          for (const dup of allToRemove) {
+            await deleteLessonSupabase(data.user.id, dup.id);
+          }
+        }
+        // UPDATE only: by primary key; never insert here
         await updateLessonSupabase(data.user.id, id, updates);
+        const updatedLesson = { ...current, ...updates };
+        setData((prev) => {
+          const nextLessons = prev.lessons
+            .filter((l) => !removeIds.has(l.id))
+            .map((l) => (l.id === id ? updatedLesson : l));
+          return { ...prev, lessons: dedupeLessonsById(nextLessons) };
+        });
+        if (isDateMove) await load();
         return;
       }
-      persist({
-        ...data,
-        lessons: data.lessons.map((l) => (l.id === id ? { ...l, ...updates } : l)),
-      });
+      const nextLessons = data.lessons
+        .filter((l) => !removeIds.has(l.id))
+        .map((l) => (l.id === id ? { ...l, ...updates } : l));
+      const deduped = dedupeLessonsById(nextLessons);
+      setData((prev) => ({ ...prev, lessons: deduped }));
+      persist({ ...data, lessons: deduped });
     },
-    [data, persist]
+    [data, persist, load]
   );
 
   /** Add many lessons in one go (bulk insert when Supabase). Used by matrix import so 2025/2026 don't fail partway. */
@@ -335,6 +381,21 @@ export function useStore() {
       return withIds;
     },
     [data, persist]
+  );
+
+  const deleteLesson = useCallback(
+    async (lessonId: string): Promise<void> => {
+      if (hasSupabase() && data.user) {
+        await deleteLessonSupabase(data.user.id, lessonId);
+        setData((prev) => ({ ...prev, lessons: prev.lessons.filter((l) => l.id !== lessonId) }));
+        await load();
+        return;
+      }
+      const next = data.lessons.filter((l) => l.id !== lessonId);
+      setData((prev) => ({ ...prev, lessons: next }));
+      persist({ ...data, lessons: next });
+    },
+    [data, persist, load]
   );
 
   const clearAllLessons = useCallback(
@@ -447,6 +508,7 @@ export function useStore() {
     addLesson,
     addLessonsBulk,
     updateLesson,
+    deleteLesson,
     clearAllLessons,
     clearAllStudents,
     updateUserProfile,

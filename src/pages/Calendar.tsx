@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatCurrency, getStudentsForDay, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, toDateKey } from "@/utils/earnings";
+import { formatCurrency, getStudentsForDay, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, getStudentIdsWithLessonOnDate, toDateKey } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Student } from "@/types";
 
@@ -32,7 +32,17 @@ export default function Calendar() {
 
   const dateKey = toDateKey(selectedDate);
   const dayOfWeek = selectedDate.getDay();
-  const todaysStudents = getStudentsForDay(data.students, dayOfWeek, dateKey);
+  const scheduledForDay = getStudentsForDay(data.students, dayOfWeek, dateKey);
+  const studentIdsWithLessonOnDate = getStudentIdsWithLessonOnDate(data.lessons, dateKey);
+  const scheduledIds = new Set(scheduledForDay.map((s) => s.id));
+  const rescheduledOnly = data.students.filter((s) => studentIdsWithLessonOnDate.has(s.id) && !scheduledIds.has(s.id));
+  const todaysStudents = [...scheduledForDay, ...rescheduledOnly].sort((a, b) => {
+    const lessonA = getLessonForStudentOnDate(data.lessons, a.id, dateKey);
+    const lessonB = getLessonForStudentOnDate(data.lessons, b.id, dateKey);
+    const timeA = lessonA?.timeOfDay ?? getEffectiveSchedule(a, dateKey)?.timeOfDay ?? a.timeOfDay ?? "";
+    const timeB = lessonB?.timeOfDay ?? getEffectiveSchedule(b, dateKey)?.timeOfDay ?? b.timeOfDay ?? "";
+    return timeA > timeB ? 1 : -1;
+  });
   const todaysStudentIds = new Set(todaysStudents.map((s) => s.id));
   // Only count completed lessons for students who are on today's schedule (avoids orphan lessons and matches Schedule list)
   const todayEarnings = data.lessons

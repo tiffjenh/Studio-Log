@@ -37,7 +37,13 @@ npm install
 npm run dev
 ```
 
-Open the URL shown (e.g. http://localhost:5173) in your browser or on your phone/iPad on the same network.
+Open the URL shown (e.g. http://localhost:5174) in your browser or on your phone/iPad on the same network.
+
+**Cursor Simple Browser:** The built-in browser often caches aggressively, so reschedule/date changes may not work. Use one of these:
+
+1. **Preferred:** In the Simple Browser tab, use the **⋮** menu → **Open in External Browser** so the app opens in Chrome/Safari with the same URL. Test there; it will load the latest code.
+2. In dev, a small “loaded HH:MM:SS” appears at bottom-right. After you refresh, that time should update. If it doesn’t change, the browser is serving cached code — use the external browser.
+3. Restart the dev server (`npm run dev`), then open http://localhost:5174 in Chrome (or external browser) and test there.
 
 ## Build for production
 

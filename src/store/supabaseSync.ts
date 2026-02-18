@@ -34,7 +34,8 @@ function rowToLesson(r: Record<string, unknown>): Lesson {
   return {
     id: r.id as string,
     studentId: r.student_id as string,
-    date: toDateOnly(r.date),
+    date: toDateOnly(r.lesson_date ?? r.date),
+    timeOfDay: (r.time_of_day as string) || undefined,
     durationMinutes: r.duration_minutes as number,
     amountCents: r.amount_cents as number,
     completed: (r.completed as boolean) ?? false,
@@ -95,7 +96,7 @@ export async function fetchLessons(uid: string): Promise<Lesson[]> {
       .from("lessons")
       .select("*")
       .eq("user_id", uid)
-      .order("date", { ascending: true })
+      .order("lesson_date", { ascending: true })
       .range(offset, offset + LESSONS_PAGE_SIZE - 1);
     if (error) {
       console.error("[Studio Log] Failed to fetch lessons:", error.message, error);
@@ -335,7 +336,8 @@ export async function addLessonSupabase(uid: string, lesson: Omit<Lesson, "id">)
     .insert({
       user_id: uid,
       student_id: lesson.studentId,
-      date: lesson.date,
+      lesson_date: lesson.date,
+      time_of_day: lesson.timeOfDay ?? null,
       duration_minutes: lesson.durationMinutes,
       amount_cents: lesson.amountCents,
       completed: lesson.completed,
@@ -353,7 +355,8 @@ export async function bulkInsertLessonsSupabase(uid: string, lessons: Omit<Lesso
   const rows = lessons.map((l) => ({
     user_id: uid,
     student_id: l.studentId,
-    date: l.date,
+    lesson_date: l.date,
+    time_of_day: l.timeOfDay ?? null,
     duration_minutes: l.durationMinutes,
     amount_cents: l.amountCents,
     completed: l.completed ?? true,
@@ -382,15 +385,71 @@ export async function bulkInsertLessonsSupabase(uid: string, lessons: Omit<Lesso
   return out;
 }
 
+const DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Get current auth user id so RLS (auth.uid()) always matches. Throws if no session. */
+async function requireAuthUid(): Promise<string> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user?.id) throw new Error("Session expired. Please log out and log in again.");
+  return session.user.id;
+}
+
+/**
+ * Return lesson ids for this student on old or new date (excluding the one we're keeping).
+ * Caller should then delete each by id using deleteLessonSupabase (same path as "Delete lesson").
+ */
+export async function fetchLessonIdsToRemoveForMove(
+  uid: string,
+  studentId: string,
+  oldDate: string,
+  newDate: string,
+  keepLessonId: string,
+): Promise<string[]> {
+  if (!supabase) return [];
+  const authUid = await requireAuthUid();
+  const dates = [oldDate, newDate].filter((d) => d && DATE_KEY_REGEX.test(d));
+  if (dates.length === 0) return [];
+  const { data, error } = await supabase
+    .from("lessons")
+    .select("id")
+    .eq("user_id", authUid)
+    .eq("student_id", studentId)
+    .in("lesson_date", dates)
+    .neq("id", keepLessonId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r: { id: string }) => r.id);
+}
+
 export async function updateLessonSupabase(uid: string, id: string, updates: Partial<Lesson>): Promise<void> {
   if (!supabase) return;
+  const authUid = await requireAuthUid();
   const row: Record<string, unknown> = {};
-  if (updates.date != null) row.date = updates.date;
+  if (updates.date != null && DATE_KEY_REGEX.test(String(updates.date))) row.lesson_date = updates.date;
+  if (updates.timeOfDay !== undefined) row.time_of_day = updates.timeOfDay ?? null;
   if (updates.durationMinutes != null) row.duration_minutes = updates.durationMinutes;
   if (updates.amountCents != null) row.amount_cents = updates.amountCents;
   if (updates.completed !== undefined) row.completed = updates.completed;
   if (updates.note !== undefined) row.note = updates.note ?? null;
-  if (Object.keys(row).length) await supabase.from("lessons").update(row).eq("id", id).eq("user_id", uid);
+  if (Object.keys(row).length === 0) return;
+  const { data, error } = await supabase.from("lessons").update(row).eq("id", id).eq("user_id", authUid).select("id");
+  if (error) throw new Error(error.message);
+  if (data == null || !Array.isArray(data) || data.length === 0) throw new Error("Lesson not found or update had no effect");
+}
+
+export async function deleteLessonSupabase(uid: string, lessonId: string): Promise<void> {
+  if (!supabase) return;
+  const authUid = await requireAuthUid();
+  const { data, error } = await supabase
+    .from("lessons")
+    .delete()
+    .eq("id", lessonId)
+    .eq("user_id", authUid)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    throw new Error("Lesson not found or could not be deleted. Try logging out and back in, then try again.");
+  }
 }
 
 export async function deleteAllLessonsSupabase(uid: string): Promise<void> {

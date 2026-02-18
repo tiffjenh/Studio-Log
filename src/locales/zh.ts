@@ -135,5 +135,7 @@ export default {
   },
   editLesson: {
     title: "編輯課程",
+    deleteLesson: "刪除課程",
+    deleteConfirm: "確定要刪除此課程？無法復原。",
   },
 };

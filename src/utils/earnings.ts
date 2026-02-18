@@ -16,13 +16,14 @@ export function getScheduleForDay(student: Student, dayOfWeek: number): DaySched
   return getAllScheduledDays(student).find((s) => s.dayOfWeek === dayOfWeek);
 }
 
+/** Format currency with thousands separators (e.g. $1,000 or $10,000). */
 export function formatCurrency(cents: number): string {
-  return "$" + (cents / 100).toFixed(0);
+  return "$" + (cents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
-/** Format currency with thousands separators (e.g. $10,000). */
+/** Alias for formatCurrency (same comma formatting). */
 export function formatCurrencyWithCommas(cents: number): string {
-  return "$" + (cents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 });
+  return formatCurrency(cents);
 }
 
 /** Week is Sunday–Saturday. */
@@ -172,6 +173,15 @@ export function getStudentsForDay(students: Student[], dayOfWeek: number, dateKe
 
 export function getLessonForStudentOnDate(lessons: Lesson[], studentId: string, dateKey: string): Lesson | undefined {
   return lessons.find((l) => l.studentId === studentId && l.date === dateKey);
+}
+
+/** Student IDs that have a lesson on the given date (for rescheduled lessons). */
+export function getStudentIdsWithLessonOnDate(lessons: Lesson[], dateKey: string): Set<string> {
+  const set = new Set<string>();
+  for (const l of lessons) {
+    if (l.date === dateKey) set.add(l.studentId);
+  }
+  return set;
 }
 
 /** Day of week (0–6) for a YYYY-MM-DD date key. */
