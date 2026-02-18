@@ -451,21 +451,21 @@ export async function deleteOtherLessonsForStudentOnOldDateSafe(
 
 /**
  * TEMP DEBUG: After reschedule, query DB for lessons for this student on old/new date.
- * If count > 1 → DB duplication (delete didn't remove the other row). If count === 1 → DB OK.
+ * select id, student_id, lesson_date, created_at from lessons where student_id = X and lesson_date in (oldDate, newDate)
  */
 export async function debugFetchLessonsForStudentOnDates(
   _uid: string,
   studentId: string,
   date1: string,
   date2: string,
-): Promise<{ id: string; lesson_date: string }[]> {
+): Promise<{ id: string; student_id: string; lesson_date: string; created_at: string | null }[]> {
   if (!supabase) return [];
   const authUid = await requireAuthUid();
   const dates = [date1, date2].filter((d) => d && DATE_KEY_REGEX.test(d));
   if (dates.length === 0) return [];
   const { data, error } = await supabase
     .from("lessons")
-    .select("id, lesson_date")
+    .select("id, student_id, lesson_date, created_at")
     .eq("user_id", authUid)
     .eq("student_id", studentId)
     .in("lesson_date", dates);
@@ -473,27 +473,40 @@ export async function debugFetchLessonsForStudentOnDates(
     console.warn("[RESCHEDULE DEBUG] debugFetchLessonsForStudentOnDates error", error.message);
     return [];
   }
-  return (data ?? []) as { id: string; lesson_date: string }[];
+  return (data ?? []) as { id: string; student_id: string; lesson_date: string; created_at: string | null }[];
 }
 
 /**
- * Update one lesson by id. Used by Edit lesson page only — updates the existing row in place.
- * Never inserts; never creates a duplicate. All changes (date, time, duration, amount, note) apply to this lesson only.
+ * Update one lesson by id. Edit/reschedule path only — updates the existing row in place.
+ * Never insert; never upsert; never generate new UUID for edits.
  */
-export async function updateLessonSupabase(_uid: string, id: string, updates: Partial<Lesson>): Promise<void> {
+export async function updateLessonSupabase(_uid: string, lessonId: string, updates: Partial<Lesson>): Promise<void> {
   if (!supabase) return;
   const authUid = await requireAuthUid();
+  const newLessonDate = updates.date != null && DATE_KEY_REGEX.test(String(updates.date)) ? updates.date : undefined;
+  const duration_minutes = updates.durationMinutes ?? undefined;
+  const amount_cents = updates.amountCents ?? undefined;
+  const note = updates.note !== undefined ? (updates.note || null) : undefined;
+  const completed = updates.completed !== undefined ? updates.completed : undefined;
+  const time_of_day = updates.timeOfDay !== undefined ? (updates.timeOfDay || null) : undefined;
   const row: Record<string, unknown> = {};
-  if (updates.date != null && DATE_KEY_REGEX.test(String(updates.date))) row.lesson_date = updates.date;
-  if (updates.timeOfDay !== undefined) row.time_of_day = updates.timeOfDay ?? null;
-  if (updates.durationMinutes != null) row.duration_minutes = updates.durationMinutes;
-  if (updates.amountCents != null) row.amount_cents = updates.amountCents;
-  if (updates.completed !== undefined) row.completed = updates.completed;
-  if (updates.note !== undefined) row.note = updates.note ?? null;
+  if (newLessonDate != null) row.lesson_date = newLessonDate;
+  if (duration_minutes != null) row.duration_minutes = duration_minutes;
+  if (amount_cents != null) row.amount_cents = amount_cents;
+  if (note !== undefined) row.note = note;
+  if (completed !== undefined) row.completed = completed;
+  if (time_of_day !== undefined) row.time_of_day = time_of_day;
   if (Object.keys(row).length === 0) return;
-  const { data, error } = await supabase.from("lessons").update(row).eq("id", id).eq("user_id", authUid).select("id");
+  // Edit path: update by id only. No insert, no upsert.
+  const { data, error } = await supabase
+    .from("lessons")
+    .update(row)
+    .eq("id", lessonId)
+    .eq("user_id", authUid)
+    .select()
+    .single();
   if (error) throw new Error(error.message);
-  if (data == null || !Array.isArray(data) || data.length === 0) throw new Error("Lesson not found or update had no effect");
+  if (data == null) throw new Error("Lesson not found or update had no effect");
 }
 
 export async function deleteLessonSupabase(_uid: string, lessonId: string): Promise<void> {
