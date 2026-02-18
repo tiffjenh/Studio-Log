@@ -347,7 +347,17 @@ export function useStore() {
         }
         // UPDATE only: by primary key; never insert here
         await updateLessonSupabase(data.user.id, id, updates);
-        const updatedLesson = { ...current, ...updates };
+        const cur = current!;
+        const updatedLesson: Lesson = {
+          ...cur,
+          ...updates,
+          id: cur.id,
+          studentId: cur.studentId,
+          date: (updates.date ?? cur.date) as string,
+          durationMinutes: (updates.durationMinutes ?? cur.durationMinutes) as number,
+          amountCents: (updates.amountCents ?? cur.amountCents) as number,
+          completed: updates.completed ?? cur.completed,
+        };
         setData((prev) => {
           const nextLessons = prev.lessons
             .filter((l) => !removeIds.has(l.id))

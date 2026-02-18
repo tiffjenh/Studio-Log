@@ -404,7 +404,7 @@ async function requireAuthUid(): Promise<string> {
  * Caller should then delete each by id using deleteLessonSupabase (same path as "Delete lesson").
  */
 export async function fetchLessonIdsToRemoveForMove(
-  uid: string,
+  _uid: string,
   studentId: string,
   oldDate: string,
   newDate: string,
@@ -425,7 +425,7 @@ export async function fetchLessonIdsToRemoveForMove(
   return (data ?? []).map((r: { id: string }) => r.id);
 }
 
-export async function updateLessonSupabase(uid: string, id: string, updates: Partial<Lesson>): Promise<void> {
+export async function updateLessonSupabase(_uid: string, id: string, updates: Partial<Lesson>): Promise<void> {
   if (!supabase) return;
   const authUid = await requireAuthUid();
   const row: Record<string, unknown> = {};
@@ -441,7 +441,7 @@ export async function updateLessonSupabase(uid: string, id: string, updates: Par
   if (data == null || !Array.isArray(data) || data.length === 0) throw new Error("Lesson not found or update had no effect");
 }
 
-export async function deleteLessonSupabase(uid: string, lessonId: string): Promise<void> {
+export async function deleteLessonSupabase(_uid: string, lessonId: string): Promise<void> {
   if (!supabase) return;
   const authUid = await requireAuthUid();
   const { data, error } = await supabase
