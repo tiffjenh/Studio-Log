@@ -400,31 +400,34 @@ async function requireAuthUid(): Promise<string> {
 }
 
 /**
- * Return lesson ids for this student on old or new date (excluding the one we're keeping).
- * Caller deletes each by id using deleteLessonSupabase (same path as "Delete lesson").
+ * Delete all lessons for this student on old or new date except the one we're keeping.
+ * Single bulk delete so we don't rely on select-then-delete (avoids missing rows due to RLS/cache).
  */
-export async function fetchLessonIdsToRemoveForMove(
+export async function deleteOtherLessonsForStudentOnDates(
   _uid: string,
   studentId: string,
   oldDate: string,
   newDate: string,
   keepLessonId: string,
-): Promise<string[]> {
-  if (!supabase) return [];
+): Promise<void> {
+  if (!supabase) return;
   const authUid = await requireAuthUid();
   const dates = [oldDate, newDate].filter((d) => d && DATE_KEY_REGEX.test(d));
-  if (dates.length === 0) return [];
-  const { data, error } = await supabase
+  if (dates.length === 0) return;
+  const { error } = await supabase
     .from("lessons")
-    .select("id")
+    .delete()
     .eq("user_id", authUid)
     .eq("student_id", studentId)
     .in("lesson_date", dates)
     .neq("id", keepLessonId);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r: { id: string }) => r.id);
 }
 
+/**
+ * Update one lesson by id. Used by Edit lesson page only — updates the existing row in place.
+ * Never inserts; never creates a duplicate. All changes (date, time, duration, amount, note) apply to this lesson only.
+ */
 export async function updateLessonSupabase(_uid: string, id: string, updates: Partial<Lesson>): Promise<void> {
   if (!supabase) return;
   const authUid = await requireAuthUid();

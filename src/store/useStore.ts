@@ -14,7 +14,7 @@ import {
   bulkInsertLessonsSupabase,
   updateLessonSupabase,
   deleteLessonSupabase,
-  fetchLessonIdsToRemoveForMove,
+  deleteOtherLessonsForStudentOnDates,
   deleteAllLessonsSupabase,
   updateProfileSupabase,
 } from "@/store/supabaseSync";
@@ -318,7 +318,6 @@ export function useStore() {
       const current = data.lessons.find((l) => l.id === id);
       const isDateMove = current && newDate != null && /^\d{4}-\d{2}-\d{2}$/.test(String(newDate)) && current.date !== newDate;
       const oldDate = isDateMove ? current.date : null;
-      console.log("Saving lesson", { lessonId: id, oldDate: current?.date, newDate, mode: isDateMove ? "move" : "update" });
       const duplicatesOnNewDate =
         isDateMove ? data.lessons.filter((l) => l.id !== id && l.studentId === current.studentId && l.date === newDate) : [];
       const duplicatesOnOldDate =
@@ -330,22 +329,19 @@ export function useStore() {
 
       if (hasSupabase() && data.user) {
         if (isDateMove && oldDate) {
-          const idsToRemove = await fetchLessonIdsToRemoveForMove(
+          await deleteOtherLessonsForStudentOnDates(
             data.user.id,
             current.studentId,
             oldDate,
             newDate as string,
             id,
           );
-          for (const lessonId of idsToRemove) {
-            await deleteLessonSupabase(data.user.id, lessonId);
-          }
         } else {
           for (const dup of allToRemove) {
             await deleteLessonSupabase(data.user.id, dup.id);
           }
         }
-        // UPDATE only: by primary key; never insert here
+        // Edit lesson: update this lesson only by id. Remove any other lesson for this student on old/new date so no duplicate remains.
         await updateLessonSupabase(data.user.id, id, updates);
         const cur = current!;
         const updatedLesson: Lesson = {

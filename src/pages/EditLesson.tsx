@@ -95,6 +95,7 @@ export default function EditLesson() {
       const fromState = /^\d{4}-\d{2}-\d{2}$/.test(lessonDate) ? lessonDate : null;
       const normalizedDate = fromInput ?? fromState ?? lesson.date;
 
+      // Update the existing lesson in place (date, time, duration, amount, note). No new row; no duplicate.
       const updates: Partial<Lesson> = {
         date: normalizedDate,
         durationMinutes,
@@ -102,9 +103,8 @@ export default function EditLesson() {
         note: note.trim() || undefined,
         timeOfDay: lessonTime.trim() || undefined,
       };
-      console.log("EditLesson save", { lessonId: lesson.id, oldDate: lesson.date, newDate: normalizedDate });
       await updateLesson(lesson.id, updates);
-      // After rescheduling, go back to dashboard with the new date selected so we don't land on the old date (where clicking would add a duplicate)
+      // After rescheduling, go back to dashboard with the new date selected
       if (normalizedDate && normalizedDate !== lesson.date) {
         const [y, m, d] = normalizedDate.split("-").map(Number);
         navigate("/", { state: { goToDate: new Date(y, m - 1, d) } });
