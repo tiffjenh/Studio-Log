@@ -55,6 +55,8 @@ export default {
   },
   students: {
     title: "學生",
+    oneStudent: "1 位學生",
+    studentCountLabel: "位學生",
     addStudent: "新增學生",
     importStudents: "匯入學生",
     searchPlaceholder: "依姓名搜尋",
@@ -62,6 +64,11 @@ export default {
     noMatch: "沒有符合的學生",
     noStudentsOnDay: "當日無學生",
     noStudentsYet: "尚無學生，點 + 新增。",
+    deleteAllStudents: "刪除所有學生",
+    deleteAllConfirmTitle: "確定嗎？",
+    deleteAllConfirmMessage: "將刪除所有學生與所有收入紀錄，且無法復原。",
+    deleteAllCancel: "取消",
+    deleteAllConfirm: "確定刪除",
   },
   addStudent: {
     title: "新增學生",

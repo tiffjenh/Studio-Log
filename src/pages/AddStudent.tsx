@@ -29,7 +29,7 @@ function parseTimeOfDay(s: string): { hour: number; minute: number; amPm: "AM" |
 }
 
 export default function AddStudent() {
-  const { data, addStudent, reload } = useStoreContext();
+  const { data, addStudent, addStudentsBulk } = useStoreContext();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -129,7 +129,7 @@ export default function AddStudent() {
       const total = parsed.rows.length;
       setImportProgress({ current: 0, total });
       const existing = new Set(data.students.map((s) => `${s.firstName.toLowerCase()}|${s.lastName.toLowerCase()}`));
-      let imported = 0;
+      const toAdd: Omit<Student, "id">[] = [];
       let skipped = 0;
       const errors: string[] = [];
       for (let i = 0; i < total; i++) {
@@ -147,31 +147,47 @@ export default function AddStudent() {
           errors.push(`Row ${i + 2}: ${studentData.first_name} ${studentData.last_name} already exists`);
           continue;
         }
+        toAdd.push({
+          firstName: studentData.first_name,
+          lastName: studentData.last_name,
+          durationMinutes: studentData.duration_minutes,
+          rateCents: studentData.rate_cents,
+          dayOfWeek: studentData.day_of_week,
+          timeOfDay: studentData.time_of_day,
+        });
+        existing.add(key);
+      }
+      let imported = 0;
+      if (toAdd.length > 0) {
         try {
-          await addStudent({
-            id: `s_${Date.now()}_${i}`,
-            firstName: studentData.first_name,
-            lastName: studentData.last_name,
-            durationMinutes: studentData.duration_minutes,
-            rateCents: studentData.rate_cents,
-            dayOfWeek: studentData.day_of_week,
-            timeOfDay: studentData.time_of_day,
+          setImportProgress({ current: 0, total: toAdd.length });
+          const { addedCount, chunkErrors } = await addStudentsBulk(toAdd, (inserted, total) => {
+            setImportProgress({ current: inserted, total });
           });
-          existing.add(key);
-          imported++;
+          imported = addedCount;
+          errors.push(...chunkErrors);
+          if (addedCount < toAdd.length) {
+            if (chunkErrors.length > 0) {
+              errors.push(`${addedCount} of ${toAdd.length} students saved. See errors below.`);
+            } else {
+              errors.push(`Only ${addedCount} of ${toAdd.length} students were saved.`);
+            }
+            errors.push("To allow more students: Supabase Dashboard → SQL Editor → run: ALTER ROLE \"postgres\" SET \"pgrst.db_max_rows\" = '2000';");
+          } else if (chunkErrors.length > 0) {
+            errors.push(`${addedCount} of ${toAdd.length} students saved. Some rows failed.`);
+          }
         } catch (err: unknown) {
-          skipped++;
-          console.error(`Import row ${i + 2} failed:`, err);
+          console.error("Bulk import failed:", err);
           let msg = "Failed to save";
           if (err instanceof Error) msg = err.message;
           else if (typeof err === "object" && err !== null && "message" in err) msg = String((err as Record<string, unknown>).message);
           else if (typeof err === "string") msg = err;
           else msg = JSON.stringify(err) ?? "Unknown error";
-          errors.push(`Row ${i + 2}: ${msg}`);
+          errors.push(msg);
+          skipped += toAdd.length;
         }
       }
       setImportResult({ imported, skipped, errors });
-      if (imported > 0 && hasSupabase()) await reload();
     } catch (err) {
       setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
     } finally {

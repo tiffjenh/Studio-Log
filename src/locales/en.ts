@@ -55,6 +55,8 @@ export default {
   },
   students: {
     title: "Students",
+    oneStudent: "1 student",
+    studentCountLabel: "students",
     addStudent: "Add student",
     importStudents: "Import students",
     searchPlaceholder: "Search by name",
@@ -62,6 +64,11 @@ export default {
     noMatch: "No students match your search",
     noStudentsOnDay: "No students on",
     noStudentsYet: "No students yet. Tap + to add one.",
+    deleteAllStudents: "Delete all students",
+    deleteAllConfirmTitle: "Are you sure?",
+    deleteAllConfirmMessage: "This will delete all students and all earnings. This cannot be undone.",
+    deleteAllCancel: "Cancel",
+    deleteAllConfirm: "Yes, delete",
   },
   addStudent: {
     title: "Add Student",

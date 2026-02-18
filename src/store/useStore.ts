@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppData, Lesson, Student, User } from "@/types";
 import { hasSupabase } from "@/lib/supabase";
 import {
   loadFromSupabase,
   signOutSupabase,
   addStudentSupabase,
+  insertStudentsBulkSupabase,
+  fetchStudents,
   updateStudentSupabase,
   deleteStudentSupabase,
+  deleteAllStudentsSupabase,
   addLessonSupabase,
   bulkInsertLessonsSupabase,
   updateLessonSupabase,
@@ -43,15 +46,23 @@ function dedupeLessonsByStudentDate(lessons: Lesson[]): Lesson[] {
   return [...byKey.values()];
 }
 
+/** Skip reload for this long after a bulk student import so we don't overwrite with a stale fetch. */
+const SKIP_RELOAD_AFTER_BULK_IMPORT_MS = 30_000;
+
 export function useStore() {
   const [data, setData] = useState<AppData>(defaultData);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [importableLocalData, setImportableLocalData] = useState<{ students: Student[]; lessons: Lesson[] } | null>(null);
+  const lastBulkImportAtRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     setLoadError(null);
     if (hasSupabase()) {
+      if (lastBulkImportAtRef.current != null && Date.now() - lastBulkImportAtRef.current < SKIP_RELOAD_AFTER_BULK_IMPORT_MS) {
+        setLoaded(true);
+        return;
+      }
       try {
         const raw = await loadFromSupabase();
         const appData = raw
@@ -165,6 +176,34 @@ export function useStore() {
         return;
       }
       persist({ ...data, students: [...data.students, student] });
+    },
+    [data, persist]
+  );
+
+  const addStudentsBulk = useCallback(
+    async (
+      students: Omit<Student, "id">[],
+      onProgress?: (inserted: number, total: number) => void
+    ): Promise<{ created: Student[]; addedCount: number; chunkErrors: string[] }> => {
+      if (students.length === 0) return { created: [], addedCount: 0, chunkErrors: [] };
+      if (hasSupabase() && data.user) {
+        const prevStudents = data.students;
+        const { inserted, errors: chunkErrors } = await insertStudentsBulkSupabase(
+          data.user.id,
+          students,
+          onProgress
+        );
+        setData((prev) => ({ ...prev, students: [...prev.students, ...inserted] }));
+        lastBulkImportAtRef.current = Date.now();
+        const fetched = await fetchStudents(data.user.id);
+        if (fetched.length >= prevStudents.length + inserted.length) {
+          setData((prev) => ({ ...prev, students: fetched }));
+        }
+        return { created: inserted, addedCount: inserted.length, chunkErrors };
+      }
+      const withIds = students.map((s, i) => ({ ...s, id: `s_${Date.now()}_${i}` }));
+      persist({ ...data, students: [...data.students, ...withIds] });
+      return { created: withIds, addedCount: withIds.length, chunkErrors: [] };
     },
     [data, persist]
   );
@@ -310,6 +349,19 @@ export function useStore() {
     [data, persist]
   );
 
+  const clearAllStudents = useCallback(
+    async (): Promise<void> => {
+      if (hasSupabase() && data.user) {
+        await deleteAllLessonsSupabase(data.user.id);
+        await deleteAllStudentsSupabase(data.user.id);
+        setData((prev) => ({ ...prev, students: [], lessons: [] }));
+        return;
+      }
+      persist({ ...data, students: [], lessons: [] });
+    },
+    [data, persist]
+  );
+
   const importLocalData = useCallback(async (): Promise<void> => {
     const toImport = importableLocalData;
     if (!toImport || !hasSupabase() || !data.user) return;
@@ -389,12 +441,14 @@ export function useStore() {
     clearImportableData,
     setUser,
     addStudent,
+    addStudentsBulk,
     updateStudent,
     deleteStudent,
     addLesson,
     addLessonsBulk,
     updateLesson,
     clearAllLessons,
+    clearAllStudents,
     updateUserProfile,
     reload: load,
   };

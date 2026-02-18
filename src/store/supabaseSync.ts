@@ -54,14 +54,33 @@ export async function fetchUser(uid: string): Promise<User | null> {
   return { id: data.id, email, name: (data.name as string) || "", phone: (data.phone as string) || undefined };
 }
 
+/**
+ * Fetch all students by paging. We advance offset by the number of rows we actually receive,
+ * so we get every row even when PostgREST returns fewer (or more) than requested.
+ */
+const STUDENTS_FETCH_PAGE_SIZE = 1000;
+
 export async function fetchStudents(uid: string): Promise<Student[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase.from("students").select("*").eq("user_id", uid).order("created_at", { ascending: true });
-  if (error) {
-    console.error("[Studio Log] Failed to fetch students:", error.message, error);
-    throw error;
-  }
-  return (data || []).map((r) => rowToStudent(r as Record<string, unknown>));
+  const all: Student[] = [];
+  let offset = 0;
+  let page: Record<string, unknown>[];
+  do {
+    const { data, error } = await supabase
+      .from("students")
+      .select("*")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: true })
+      .range(offset, offset + STUDENTS_FETCH_PAGE_SIZE - 1);
+    if (error) {
+      console.error("[Studio Log] Failed to fetch students:", error.message, error);
+      throw error;
+    }
+    page = (data ?? []) as Record<string, unknown>[];
+    for (const r of page) all.push(rowToStudent(r as Record<string, unknown>));
+    offset += page.length;
+  } while (page.length > 0);
+  return all;
 }
 
 const LESSONS_PAGE_SIZE = 1000;
@@ -213,8 +232,17 @@ export async function addStudentSupabase(uid: string, student: Omit<Student, "id
   if (!supabase) throw new Error("Supabase not configured");
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Session expired. Please log out and log in again.");
-  // Build insert row with only required columns + optional columns that have values.
-  // This avoids 400 errors when optional columns haven't been added to the DB yet.
+  const row = studentToRow(uid, student);
+  const { data, error } = await supabase
+    .from("students")
+    .insert(row)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToStudent(data as Record<string, unknown>);
+}
+
+function studentToRow(uid: string, student: Omit<Student, "id">): Record<string, unknown> {
   const row: Record<string, unknown> = {
     user_id: uid,
     first_name: student.firstName,
@@ -234,14 +262,40 @@ export async function addStudentSupabase(uid: string, student: Omit<Student, "id
   if (student.avatarIcon != null) row.avatar_icon = student.avatarIcon;
   if (student.additionalSchedules?.length) row.additional_schedules = JSON.stringify(student.additionalSchedules);
   if (student.scheduleChangeAdditionalSchedules?.length) row.schedule_change_additional_schedules = JSON.stringify(student.scheduleChangeAdditionalSchedules);
+  return row;
+}
 
-  const { data, error } = await supabase
-    .from("students")
-    .insert(row)
-    .select()
-    .single();
-  if (error) throw error;
-  return rowToStudent(data as Record<string, unknown>);
+export type BulkInsertStudentsResult = { inserted: Student[]; errors: string[] };
+
+/** Short delay between inserts to avoid rate limits or connection drops after many rapid requests. */
+const BULK_INSERT_DELAY_MS = 80;
+
+/**
+ * Insert many students one at a time using the same single-row API as "Add student".
+ * Calls onProgress after each student. Small delay between requests to avoid server limits.
+ */
+export async function insertStudentsBulkSupabase(
+  uid: string,
+  students: Omit<Student, "id">[],
+  onProgress?: (inserted: number, total: number) => void
+): Promise<BulkInsertStudentsResult> {
+  if (students.length === 0) return { inserted: [], errors: [] };
+  const inserted: Student[] = [];
+  const errors: string[] = [];
+  const total = students.length;
+  for (let i = 0; i < students.length; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, BULK_INSERT_DELAY_MS));
+    try {
+      const created = await addStudentSupabase(uid, students[i]!);
+      inserted.push(created);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`Row ${i + 1} (${students[i]?.firstName} ${students[i]?.lastName}): ${msg}`);
+      console.warn("[Studio Log] Bulk insert row failed:", msg);
+    }
+    onProgress?.(inserted.length, total);
+  }
+  return { inserted, errors };
 }
 
 export async function updateStudentSupabase(uid: string, id: string, updates: Partial<Student>): Promise<void> {
@@ -342,5 +396,11 @@ export async function updateLessonSupabase(uid: string, id: string, updates: Par
 export async function deleteAllLessonsSupabase(uid: string): Promise<void> {
   if (!supabase) return;
   const { error } = await supabase.from("lessons").delete().eq("user_id", uid);
+  if (error) throw error;
+}
+
+export async function deleteAllStudentsSupabase(uid: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase not configured");
+  const { error } = await supabase.from("students").delete().eq("user_id", uid);
   if (error) throw error;
 }

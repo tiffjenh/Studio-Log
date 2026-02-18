@@ -55,10 +55,12 @@ function sortStudentsByTime(students: Student[]): Student[] {
 }
 
 export default function Students() {
-  const { data } = useStoreContext();
+  const { data, clearAllStudents } = useStoreContext();
   const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [dayFilter, setDayFilter] = useState<number | null>(null);
+  const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   let filtered = data.students.filter((s) =>
     (dayFilter === null || getAllScheduledDays(s).some((sched) => sched.dayOfWeek === dayFilter)) &&
@@ -76,10 +78,30 @@ export default function Students() {
   const durationStr = (s: Student) =>
     s.durationMinutes === 60 ? "1 hour" : s.durationMinutes === 30 ? "30 min" : s.durationMinutes === 45 ? "45 min" : `${s.durationMinutes / 60} hours`;
 
+  const totalCount = data.students.length;
+  const countPerDay = DAY_LABELS.map((_, dayIndex) =>
+    data.students.filter((s) => getAllScheduledDays(s).some((sched) => sched.dayOfWeek === dayIndex)).length
+  );
+
+  const handleConfirmDeleteAll = async () => {
+    setDeleting(true);
+    try {
+      await clearAllStudents();
+      setDeleteAllConfirmOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0 }}>{t("students.title")}</h1>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+          <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0 }}>{t("students.title")}</h1>
+          <span style={{ fontSize: 16, color: "var(--text-muted)", fontWeight: 500 }}>
+            {totalCount === 1 ? t("students.oneStudent") : `${totalCount} ${t("students.studentCountLabel")}`}
+          </span>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Link
             to="/add-student"
@@ -143,6 +165,7 @@ export default function Students() {
               color: dayFilter === i ? "white" : "var(--text)",
               flexShrink: 0,
             }}
+            title={`${DAY_FULL[i]} (${countPerDay[i]})`}
           >
             {label}
           </button>
@@ -163,11 +186,9 @@ export default function Students() {
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {byDayThenTime.map(({ dayIndex, students }) => (
             <div key={dayIndex}>
-              {dayFilter === null && (
-                <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, color: "var(--text-muted)", margin: "0 0 12px", textTransform: "none" }}>
-                  {DAY_FULL[dayIndex]}
-                </h2>
-              )}
+              <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, color: "var(--text-muted)", margin: "0 0 12px", textTransform: "none" }}>
+                {DAY_FULL[dayIndex]} ({students.length})
+              </h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {students.map((s) => (
                   <Link key={s.id} to={`/students/${s.id}`} style={{ textDecoration: "none", color: "inherit" }}>
@@ -185,6 +206,87 @@ export default function Students() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "center" }}>
+        <button
+          type="button"
+          onClick={() => setDeleteAllConfirmOpen(true)}
+          disabled={totalCount === 0}
+          style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "#b91c1c",
+            background: "#ffffff",
+            border: "1px solid rgba(201, 123, 148, 0.6)",
+            borderRadius: 999,
+            padding: "6px 14px",
+            cursor: totalCount === 0 ? "default" : "pointer",
+            opacity: totalCount === 0 ? 0.5 : 1,
+            boxShadow: "none",
+          }}
+        >
+          {t("students.deleteAllStudents")}
+        </button>
+      </div>
+      {deleteAllConfirmOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-all-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 20,
+          }}
+          onClick={() => !deleting && setDeleteAllConfirmOpen(false)}
+        >
+          <div
+            className="float-card"
+            style={{ maxWidth: 360, width: "100%", padding: 24 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="delete-all-title" style={{ fontSize: 18, fontWeight: 600, margin: "0 0 12px" }}>
+              {t("students.deleteAllConfirmTitle")}
+            </h2>
+            <p style={{ color: "var(--text-muted)", fontSize: 14, margin: "0 0 20px", lineHeight: 1.45 }}>
+              {t("students.deleteAllConfirmMessage")}
+            </p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => !deleting && setDeleteAllConfirmOpen(false)}
+                disabled={deleting}
+                className="pill"
+                style={{ fontFamily: "var(--font-sans)", padding: "10px 20px", fontSize: 14, fontWeight: 500 }}
+              >
+                {t("students.deleteAllCancel")}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteAll}
+                disabled={deleting}
+                className="pill"
+                style={{
+                  fontFamily: "var(--font-sans)",
+                  padding: "10px 20px",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  background: "var(--avatar-gradient)",
+                  color: "white",
+                  border: "none",
+                }}
+              >
+                {deleting ? t("common.loading") || "..." : t("students.deleteAllConfirm")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

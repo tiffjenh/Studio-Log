@@ -16,6 +16,22 @@ import type { Lesson } from "@/types";
 const TABS = ["Daily", "Weekly", "Monthly", "Yearly", "Students"] as const;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const CHART_HEIGHT = 160;
+const LINE_CHART_HEIGHT = 200;
+const LINE_COLOR = "#CFA6FF";
+const LINE_STROKE_WIDTH = 2.5;
+const LINE_DOT_SIZE = 8;
+const LINE_CHART = {
+  bgGradientStart: "#1a2332",
+  bgGradientEnd: "#0f1623",
+  gridColor: "rgba(255,255,255,0.08)",
+  axisColor: "rgba(255,255,255,0.75)",
+  dotFill: "#ffffff",
+  dotStroke: "#CFA6FF",
+  dotGlow: "rgba(207, 166, 255, 0.5)",
+  areaGradientTop: "rgba(207, 166, 255, 0.45)",
+  areaGradientBottom: "rgba(207, 166, 255, 0)",
+  lineGlow: "rgba(207, 166, 255, 0.6)",
+} as const;
 
 const EMPTY_TICKS = [0, 5000, 10000, 15000, 20000];
 
@@ -169,6 +185,26 @@ function BarChart({
   );
 }
 
+/** Smooth cubic Bezier path through points (Catmull-Rom style). */
+function smoothPathD(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return "";
+  if (points.length === 1) return `M ${points[0]!.x} ${points[0]!.y}`;
+  const tension = 0.35;
+  let d = `M ${points[0]!.x} ${points[0]!.y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)]!;
+    const p1 = points[i]!;
+    const p2 = points[i + 1]!;
+    const p3 = points[Math.min(points.length - 1, i + 2)]!;
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    const cp2x = p2.x - (p3.x - p1.x) * tension;
+    const cp2y = p2.y - (p3.y - p1.y) * tension;
+    d += ` C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${p2.x} ${p2.y}`;
+  }
+  return d;
+}
+
 function LineChart({
   data,
   xLabels,
@@ -189,24 +225,38 @@ function LineChart({
   const topTick = Math.max(...ticks, 10000);
   const chartMax = isEmpty ? 20000 : topTick * 1.15;
   const n = data.length;
-  const padding = { left: 4, right: 4, bottom: 4, top: 4 };
+  const padding = { left: 6, right: 6, bottom: 8, top: 8 };
 
   const points = data.map((v, i) => {
     const x = n <= 1 ? 50 : (i / (n - 1)) * (100 - padding.left - padding.right) + padding.left;
     const y = chartMax > 0 ? 100 - (v / chartMax) * (100 - padding.top - padding.bottom) - padding.bottom : 50;
     return { x, y, v, dateKey: dateKeys?.[i] };
   });
-  const pathD = points.length ? "M " + points.map((p) => `${p.x} ${p.y}`).join(" L ") : "";
+  const pathD = smoothPathD(points.map((p) => ({ x: p.x, y: p.y })));
+  const halfDot = LINE_DOT_SIZE / 2;
+  const firstX = points[0]?.x ?? 0;
+  const lastX = points[points.length - 1]?.x ?? 100;
+  const areaPathD = pathD ? `${pathD} L ${lastX} 100 L ${firstX} 100 Z` : "";
+
+  const chartWrapperStyle: React.CSSProperties = {
+    background: `linear-gradient(165deg, ${LINE_CHART.bgGradientStart} 0%, ${LINE_CHART.bgGradientEnd} 100%)`,
+    borderRadius: 22,
+    padding: 20,
+    display: "flex",
+    gap: 0,
+    alignItems: "flex-start",
+    minHeight: LINE_CHART_HEIGHT + 44,
+  };
 
   return (
-    <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingRight: 8, minWidth: 36, fontSize: 11, color: "var(--text-muted)", textAlign: "right", height: CHART_HEIGHT }}>
+    <div style={chartWrapperStyle}>
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingRight: 12, minWidth: 46, fontSize: 11, color: LINE_CHART.axisColor, textAlign: "right", height: LINE_CHART_HEIGHT, fontFamily: "var(--font-sans)" }}>
         {[...ticks].reverse().map((t) => (
           <span key={t}>{formatCurrency(t)}</span>
         ))}
       </div>
       <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
-        <div style={{ position: "relative", height: CHART_HEIGHT, borderBottom: "1px solid var(--border)" }}>
+        <div style={{ position: "relative", height: LINE_CHART_HEIGHT }}>
           {ticks.slice(1).map((t) => (
             <div
               key={t}
@@ -216,28 +266,45 @@ function LineChart({
                 right: 0,
                 bottom: `${(t / chartMax) * 100}%`,
                 height: 1,
-                background: "var(--border)",
+                background: LINE_CHART.gridColor,
               }}
             />
           ))}
           {isEmpty && (
             <div style={{ position: "absolute", left: 0, right: 0, top: "37.5%", transform: "translateY(-50%)", display: "flex", justifyContent: "center", pointerEvents: "none" }}>
-              <span style={{ fontSize: 14, color: "var(--text-muted)" }}>{noEarningsText}</span>
+              <span style={{ fontSize: 14, color: LINE_CHART.axisColor }}>{noEarningsText}</span>
             </div>
           )}
-          {!isEmpty && pathD && (
+          {!isEmpty && pathD && areaPathD && (
             <svg
               style={{ position: "absolute", left: 0, top: 0, width: "100%", height: "100%", overflow: "visible" }}
               preserveAspectRatio="none"
               viewBox="0 0 100 100"
             >
               <defs>
-                <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="var(--primary, #c97b94)" />
-                  <stop offset="100%" stopColor="var(--primary, #c97b94)" stopOpacity="0.3" />
+                <linearGradient id="lineChartAreaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor={LINE_CHART.areaGradientTop} />
+                  <stop offset="100%" stopColor={LINE_CHART.areaGradientBottom} />
                 </linearGradient>
+                <filter id="lineChartGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
               </defs>
-              <path d={pathD} fill="none" stroke="var(--primary, #c97b94)" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              <path d={areaPathD} fill="url(#lineChartAreaGrad)" />
+              <path
+                d={pathD}
+                fill="none"
+                stroke={LINE_COLOR}
+                strokeWidth={LINE_STROKE_WIDTH}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+                filter="url(#lineChartGlow)"
+              />
             </svg>
           )}
           {!isEmpty && points.map((p, i) => (
@@ -247,22 +314,29 @@ function LineChart({
               onClick={() => p.dateKey && onPointClick?.(p.dateKey)}
               style={{
                 position: "absolute",
-                left: `calc(${p.x}% - 6px)`,
-                top: `calc(${p.y}% - 6px)`,
-                width: 12,
-                height: 12,
+                left: `calc(${p.x}% - ${halfDot}px)`,
+                top: `calc(${p.y}% - ${halfDot}px)`,
+                width: LINE_DOT_SIZE,
+                height: LINE_DOT_SIZE,
+                minWidth: LINE_DOT_SIZE,
+                minHeight: LINE_DOT_SIZE,
+                maxWidth: LINE_DOT_SIZE,
+                maxHeight: LINE_DOT_SIZE,
                 borderRadius: "50%",
-                background: "var(--card)",
-                border: "2px solid var(--primary, #c97b94)",
+                background: LINE_CHART.dotFill,
+                border: `2px solid ${LINE_CHART.dotStroke}`,
                 cursor: onPointClick ? "pointer" : "default",
                 padding: 0,
+                boxSizing: "border-box",
+                flexShrink: 0,
+                boxShadow: `0 0 8px ${LINE_CHART.dotGlow}`,
               }}
               title={p.v > 0 ? formatCurrency(p.v) : ""}
               aria-label={p.v > 0 ? formatCurrency(p.v) : xLabels[i]}
             />
           ))}
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 2px 0", fontSize: 10, color: "var(--text-muted)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "14px 4px 0", fontSize: 12, color: LINE_CHART.axisColor, fontFamily: "var(--font-sans)" }}>
           {xLabels.map((l, i) => (
             <div key={i} style={{ flex: 1, textAlign: "center", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{l}</div>
           ))}
@@ -760,7 +834,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
           </div>
           {monthsToShow > 0 && (
             <>
-              <div className="float-card" style={{ marginBottom: 24, padding: 20 }}>
+              <div style={{ marginBottom: 24 }}>
                 <LineChart
                   data={visibleMonthlyTotals}
                   xLabels={visibleMonthLabels}

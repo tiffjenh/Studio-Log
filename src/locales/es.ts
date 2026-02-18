@@ -55,6 +55,8 @@ export default {
   },
   students: {
     title: "Estudiantes",
+    oneStudent: "1 estudiante",
+    studentCountLabel: "estudiantes",
     addStudent: "Añadir estudiante",
     importStudents: "Importar estudiantes",
     searchPlaceholder: "Buscar por nombre",
@@ -62,6 +64,11 @@ export default {
     noMatch: "Ningún estudiante coincide con la búsqueda",
     noStudentsOnDay: "No hay estudiantes el",
     noStudentsYet: "Aún no hay estudiantes. Toca + para añadir uno.",
+    deleteAllStudents: "Eliminar todos los estudiantes",
+    deleteAllConfirmTitle: "¿Estás seguro?",
+    deleteAllConfirmMessage: "Se eliminarán todos los estudiantes y todos los ingresos. Esta acción no se puede deshacer.",
+    deleteAllCancel: "Cancelar",
+    deleteAllConfirm: "Sí, eliminar",
   },
   addStudent: {
     title: "Añadir estudiante",

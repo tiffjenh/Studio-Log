@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { NavLink, Outlet } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
@@ -53,14 +53,26 @@ const navKeys = [
   { to: "/settings", key: "nav.settings", icon: NavIcons.settings },
 ];
 
+/** Minimum time tab must be hidden before we refetch on visibility. Avoids overwriting state right after import. */
+const RELOAD_AFTER_HIDDEN_MS = 4000;
+
 export default function Layout() {
   const { loadError, reload } = useStoreContext();
   const { t } = useLanguage();
+  const hiddenAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!hasSupabase()) return;
     const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") reload();
+      if (document.visibilityState === "hidden") {
+        hiddenAtRef.current = Date.now();
+      } else if (document.visibilityState === "visible") {
+        const hiddenAt = hiddenAtRef.current;
+        hiddenAtRef.current = null;
+        if (hiddenAt == null || Date.now() - hiddenAt >= RELOAD_AFTER_HIDDEN_MS) {
+          reload();
+        }
+      }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
