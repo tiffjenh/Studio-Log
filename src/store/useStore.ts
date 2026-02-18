@@ -15,6 +15,7 @@ import {
   updateLessonSupabase,
   deleteLessonSupabase,
   deleteOtherLessonsForStudentOnDates,
+  deleteOtherLessonsForStudentOnOldDateSafe,
   debugFetchLessonsForStudentOnDates,
   deleteAllLessonsSupabase,
   updateProfileSupabase,
@@ -369,7 +370,13 @@ export function useStore() {
             .map((l) => (l.id === id ? updatedLesson : l));
           return { ...prev, lessons: dedupeLessonsById(nextLessons) };
         });
-        if (isDateMove) {
+        if (isDateMove && oldDate) {
+          // Safe cleanup: remove any other scheduled lesson for this student on the OLD date (duplicate/orphan).
+          try {
+            await deleteOtherLessonsForStudentOnOldDateSafe(data.user.id, cur.studentId, oldDate, id);
+          } catch (e) {
+            console.warn("[Reschedule] Safe cleanup on old date failed:", e);
+          }
           await load();
           // TEMP DEBUG: after save, query DB for this student on old/new date. If 2 rows → DB bug (delete didn't work). If 1 → DB OK.
           const rows = await debugFetchLessonsForStudentOnDates(data.user.id, cur.studentId, oldDate, newDate as string);

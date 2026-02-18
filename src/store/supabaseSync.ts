@@ -425,6 +425,31 @@ export async function deleteOtherLessonsForStudentOnDates(
 }
 
 /**
+ * Safe cleanup after reschedule: delete any other lesson for this student on the OLD date only.
+ * Only deletes rows with completed = false (scheduled) so we don't remove completed make-ups.
+ * Call after a date move to ensure the original date has no leftover duplicate.
+ */
+export async function deleteOtherLessonsForStudentOnOldDateSafe(
+  _uid: string,
+  studentId: string,
+  oldDate: string,
+  keepLessonId: string,
+): Promise<void> {
+  if (!supabase) return;
+  const authUid = await requireAuthUid();
+  if (!oldDate || !DATE_KEY_REGEX.test(oldDate)) return;
+  const { error } = await supabase
+    .from("lessons")
+    .delete()
+    .eq("user_id", authUid)
+    .eq("student_id", studentId)
+    .eq("lesson_date", oldDate)
+    .eq("completed", false)
+    .neq("id", keepLessonId);
+  if (error) throw new Error(error.message);
+}
+
+/**
  * TEMP DEBUG: After reschedule, query DB for lessons for this student on old/new date.
  * If count > 1 → DB duplication (delete didn't remove the other row). If count === 1 → DB OK.
  */
