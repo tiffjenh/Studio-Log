@@ -111,6 +111,42 @@ export interface VoiceAPIResult {
 }
 
 /* ------------------------------------------------------------------ */
+/*  New voice-logging schema (UPDATE_LESSON + followup)                */
+/* ------------------------------------------------------------------ */
+
+export type UpdateLessonPayment = {
+  amount: number | null;
+  method: "cash" | "venmo" | "zelle" | "check" | "card" | "other" | null;
+};
+
+export interface UpdateLessonAction {
+  type: "UPDATE_LESSON";
+  lesson_id: string | null;
+  student_id: string | null;
+  student_name_raw: string;
+  date: string;
+  set_status: "attended" | "not_attended" | "cancelled" | "rescheduled" | null;
+  set_duration_minutes: number | null;
+  payment: UpdateLessonPayment;
+}
+
+export interface VoiceLoggingResult {
+  language_detected: "en" | "es" | "zh";
+  normalized_command_english: string;
+  actions: UpdateLessonAction[];
+  needs_followup: boolean;
+  followup_question: string | null;
+  followup_choices: string[] | null;
+}
+
+/** Type guard: response uses the new voice-logging schema. */
+export function isVoiceLoggingResult(
+  r: VoiceAPIResult | VoiceLoggingResult
+): r is VoiceLoggingResult {
+  return "needs_followup" in r && "followup_question" in r;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Build context from app data                                        */
 /* ------------------------------------------------------------------ */
 
@@ -201,10 +237,12 @@ export function buildVoiceContext(
 /*  API call                                                           */
 /* ------------------------------------------------------------------ */
 
+export type VoiceAPIResponse = VoiceAPIResult | VoiceLoggingResult;
+
 export async function callVoiceAPI(
   transcript: string,
   context: VoiceContext
-): Promise<VoiceAPIResult> {
+): Promise<VoiceAPIResponse> {
   const resp = await fetch("/api/voice", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

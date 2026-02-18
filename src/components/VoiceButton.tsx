@@ -13,8 +13,11 @@ import { useStoreContext } from "@/context/StoreContext";
 import {
   buildVoiceContext,
   callVoiceAPI,
+  isVoiceLoggingResult,
   type VoiceAPIResult,
   type VoiceAPIAction,
+  type VoiceLoggingResult,
+  type UpdateLessonAction,
 } from "@/utils/voiceApi";
 import {
   processVoiceTranscript,
@@ -291,6 +294,65 @@ export default function VoiceButton({
     [data, addLesson, updateLesson, onDateChange, studentName, dayOfWeek, dateKey]
   );
 
+  /* ---- New voice-logging schema: apply UPDATE_LESSON actions ---- */
+  const applyVoiceLoggingActions = useCallback(
+    async (result: VoiceLoggingResult): Promise<string[]> => {
+      const lines: string[] = [];
+      const studentName = (id: string) => {
+        const s = data.students.find((x) => x.id === id);
+        return s ? `${s.firstName} ${s.lastName}` : "Student";
+      };
+
+      for (const action of result.actions as UpdateLessonAction[]) {
+        if (action.type !== "UPDATE_LESSON") continue;
+        const studentId = action.student_id ?? (() => {
+          const raw = (action.student_name_raw || "").trim().toLowerCase();
+          if (!raw) return null;
+          const match = data.students.find((s) => {
+            const full = `${s.firstName} ${s.lastName}`.toLowerCase();
+            return full.includes(raw) || raw.includes(full) || full.split(/\s+/).some((p) => p.startsWith(raw) || raw.startsWith(p));
+          });
+          return match?.id ?? null;
+        })();
+        if (!studentId) {
+          lines.push(`Could not find student "${action.student_name_raw}"`);
+          continue;
+        }
+        const student = data.students.find((s) => s.id === studentId);
+        if (!student) continue;
+        const existing = getLessonForStudentOnDate(data.lessons, studentId, action.date);
+
+        const completed =
+          action.set_status === "attended" ? true : action.set_status === "not_attended" || action.set_status === "cancelled" ? false : existing?.completed ?? null;
+        const durationMinutes = action.set_duration_minutes ?? existing?.durationMinutes ?? getEffectiveDurationMinutes(student, action.date);
+        const amountCents = action.payment?.amount != null ? Math.round(action.payment.amount * 100) : (existing?.amountCents ?? getEffectiveRateCents(student, action.date));
+
+        if (existing) {
+          const updates: { completed?: boolean; durationMinutes?: number; amountCents?: number } = {};
+          if (completed !== null) updates.completed = completed;
+          if (action.set_duration_minutes != null) updates.durationMinutes = action.set_duration_minutes;
+          if (action.payment?.amount != null) updates.amountCents = amountCents;
+          if (Object.keys(updates).length > 0) await updateLesson(existing.id, updates);
+        } else {
+          await addLesson({
+            studentId,
+            date: action.date,
+            durationMinutes,
+            amountCents,
+            completed: completed === true,
+          });
+        }
+
+        if (action.set_status === "attended") lines.push(`✓ ${studentName(studentId)} — attended`);
+        else if (action.set_status === "not_attended" || action.set_status === "cancelled") lines.push(`✗ ${studentName(studentId)} — ${action.set_status === "cancelled" ? "cancelled" : "absent"}`);
+        else if (action.payment?.amount != null) lines.push(`${studentName(studentId)} — $${action.payment.amount}${action.payment.method ? ` (${action.payment.method})` : ""}`);
+        else lines.push(`✓ ${studentName(studentId)} — updated`);
+      }
+      return lines;
+    },
+    [data, addLesson, updateLesson]
+  );
+
   /* ---- Fallback: apply local parser actions ---- */
   const applyLocalActions = useCallback(
     async (text: string): Promise<{ feedback: string; unmatched: { text: string; reason: string }[] }> => {
@@ -432,7 +494,24 @@ export default function VoiceButton({
         const context = buildVoiceContext(data.students, data.lessons, dateKey);
         const apiResult = await callVoiceAPI(text, context);
 
-        // Navigate if needed (find navigate_to_date action)
+        // New voice-logging schema (UPDATE_LESSON + followup)
+        if (isVoiceLoggingResult(apiResult)) {
+          if (apiResult.needs_followup && apiResult.followup_question) {
+            const choices = apiResult.followup_choices?.length
+              ? `\n${apiResult.followup_choices.map((c) => `• ${c}`).join("\n")}`
+              : "";
+            setFeedback(apiResult.followup_question + choices);
+            setPhase("result");
+            return;
+          }
+          const lines = await applyVoiceLoggingActions(apiResult);
+          setFeedback(lines.length ? lines.join("\n") : "Done!");
+          setUnmatchedItems([]);
+          setPhase("result");
+          return;
+        }
+
+        // Legacy schema: navigate if needed
         const navAction = apiResult.actions.find(
           (a): a is Extract<typeof a, { type: "navigate_to_date" }> =>
             a.type === "navigate_to_date"
@@ -454,7 +533,7 @@ export default function VoiceButton({
           return;
         }
 
-        // Apply actions
+        // Apply legacy actions
         const lines = await applyAPIActions(apiResult.actions, apiResult);
         setFeedback(lines.join("\n") || "Done!");
         setUnmatchedItems(
@@ -502,7 +581,7 @@ export default function VoiceButton({
     };
 
     recognition.start();
-  }, [data, dateKey, applyAPIActions, applyLocalActions, onDateChange]);
+  }, [data, dateKey, applyAPIActions, applyVoiceLoggingActions, applyLocalActions, onDateChange]);
 
   /* ---- Stop listening ---- */
   const stopListening = useCallback(() => {

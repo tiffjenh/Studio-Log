@@ -1,9 +1,9 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import ForecastsPanel from "@/components/forecasts/ForecastsPanel";
 import {
   formatCurrency,
+  formatCurrencyWithCommas,
   dedupeLessons,
   getMonthBounds,
   toDateKey,
@@ -13,7 +13,7 @@ import {
 } from "@/utils/earnings";
 import type { Lesson } from "@/types";
 
-const TABS = ["Daily", "Weekly", "Monthly", "Yearly", "Students", "Forecasts"] as const;
+const TABS = ["Daily", "Weekly", "Monthly", "Yearly", "Students"] as const;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const CHART_HEIGHT = 160;
 
@@ -57,11 +57,12 @@ function BarChart({
   const showSubLabels = xSubLabels && xSubLabels.length === data.length;
   const isClickable = Boolean(dateKeys?.length && onBarClick && dateKeys.length === data.length);
 
+  const formatAxis = yAxisStepCents != null ? formatCurrencyWithCommas : formatCurrency;
   return (
     <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingRight: 8, minWidth: 40, fontSize: 11, color: "var(--text-muted)", textAlign: "right", height: CHART_HEIGHT }}>
         {[...ticks].reverse().map((t) => (
-          <span key={t}>{formatCurrency(t)}</span>
+          <span key={t}>{formatAxis(t)}</span>
         ))}
       </div>
       <div style={{ flex: 1, position: "relative" }}>
@@ -168,13 +169,115 @@ function BarChart({
   );
 }
 
+function LineChart({
+  data,
+  xLabels,
+  maxVal,
+  noEarningsText = "No earnings",
+  dateKeys,
+  onPointClick,
+}: {
+  data: number[];
+  xLabels: string[];
+  maxVal: number;
+  noEarningsText?: string;
+  dateKeys?: string[];
+  onPointClick?: (dateKey: string) => void;
+}) {
+  const isEmpty = maxVal <= 0 || data.every((v) => v === 0);
+  const ticks = isEmpty ? EMPTY_TICKS : getYAxisTicks(maxVal);
+  const topTick = Math.max(...ticks, 10000);
+  const chartMax = isEmpty ? 20000 : topTick * 1.15;
+  const n = data.length;
+  const padding = { left: 4, right: 4, bottom: 4, top: 4 };
+
+  const points = data.map((v, i) => {
+    const x = n <= 1 ? 50 : (i / (n - 1)) * (100 - padding.left - padding.right) + padding.left;
+    const y = chartMax > 0 ? 100 - (v / chartMax) * (100 - padding.top - padding.bottom) - padding.bottom : 50;
+    return { x, y, v, dateKey: dateKeys?.[i] };
+  });
+  const pathD = points.length ? "M " + points.map((p) => `${p.x} ${p.y}`).join(" L ") : "";
+
+  return (
+    <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingRight: 8, minWidth: 36, fontSize: 11, color: "var(--text-muted)", textAlign: "right", height: CHART_HEIGHT }}>
+        {[...ticks].reverse().map((t) => (
+          <span key={t}>{formatCurrency(t)}</span>
+        ))}
+      </div>
+      <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
+        <div style={{ position: "relative", height: CHART_HEIGHT, borderBottom: "1px solid var(--border)" }}>
+          {ticks.slice(1).map((t) => (
+            <div
+              key={t}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: `${(t / chartMax) * 100}%`,
+                height: 1,
+                background: "var(--border)",
+              }}
+            />
+          ))}
+          {isEmpty && (
+            <div style={{ position: "absolute", left: 0, right: 0, top: "37.5%", transform: "translateY(-50%)", display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+              <span style={{ fontSize: 14, color: "var(--text-muted)" }}>{noEarningsText}</span>
+            </div>
+          )}
+          {!isEmpty && pathD && (
+            <svg
+              style={{ position: "absolute", left: 0, top: 0, width: "100%", height: "100%", overflow: "visible" }}
+              preserveAspectRatio="none"
+              viewBox="0 0 100 100"
+            >
+              <defs>
+                <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="var(--primary, #c97b94)" />
+                  <stop offset="100%" stopColor="var(--primary, #c97b94)" stopOpacity="0.3" />
+                </linearGradient>
+              </defs>
+              <path d={pathD} fill="none" stroke="var(--primary, #c97b94)" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            </svg>
+          )}
+          {!isEmpty && points.map((p, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => p.dateKey && onPointClick?.(p.dateKey)}
+              style={{
+                position: "absolute",
+                left: `calc(${p.x}% - 6px)`,
+                top: `calc(${p.y}% - 6px)`,
+                width: 12,
+                height: 12,
+                borderRadius: "50%",
+                background: "var(--card)",
+                border: "2px solid var(--primary, #c97b94)",
+                cursor: onPointClick ? "pointer" : "default",
+                padding: 0,
+              }}
+              title={p.v > 0 ? formatCurrency(p.v) : ""}
+              aria-label={p.v > 0 ? formatCurrency(p.v) : xLabels[i]}
+            />
+          ))}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 2px 0", fontSize: 10, color: "var(--text-muted)" }}>
+          {xLabels.map((l, i) => (
+            <div key={i} style={{ flex: 1, textAlign: "center", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{l}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TAB_KEYS: Record<(typeof TABS)[number], string> = {
   Daily: "earnings.daily",
   Weekly: "earnings.weekly",
   Monthly: "earnings.monthly",
   Yearly: "earnings.yearly",
   Students: "earnings.studentsTab",
-  Forecasts: "earnings.forecasts",
 };
 
 export default function Earnings() {
@@ -190,7 +293,7 @@ export default function Earnings() {
   const [studentsYearOffset, setStudentsYearOffset] = useState(0);
   const [selectedYearKey, setSelectedYearKey] = useState<string | null>(null);
   const [studentsSearch, setStudentsSearch] = useState("");
-  const [studentsSort, setStudentsSort] = useState<"az" | "za" | "high" | "low">("az");
+  const [studentsSort, setStudentsSort] = useState<"az" | "za" | "high" | "low">("high");
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [dlYear, setDlYear] = useState(0); // 0 = unset; will init on open
   const [dlFormat, setDlFormat] = useState<"csv" | "pdf">("csv");
@@ -198,14 +301,6 @@ export default function Earnings() {
   const now = new Date();
   // Use all completed, deduped lessons so matrix-imported attendance (any day) and tax CSV match. Scheduled-day filter excluded those.
   const completedLessons = dedupeLessons(data.lessons.filter((l) => l.completed));
-  const forecastsEarnings = useMemo(
-    () =>
-      completedLessons.map((l) => ({
-        date: l.date,
-        amount: l.amountCents / 100,
-      })),
-    [completedLessons]
-  );
   const thisYear = now.getFullYear();
   const studentsDisplayYear = thisYear + studentsYearOffset;
   const todayKey = toDateKey(now);
@@ -545,8 +640,8 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
         </div>
       )}
 
-      <div style={{ display: "flex", flexWrap: "nowrap", gap: 8, marginBottom: 20 }}>
-        {TABS.map((tab) => (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+        {(["Daily", "Weekly", "Monthly", "Yearly", "Students"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -555,8 +650,11 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
             style={{
               flex: "1 1 0",
               minWidth: 0,
+              minHeight: 40,
               textAlign: "center",
               fontFamily: "var(--font-sans)",
+              fontSize: 13,
+              padding: "10px 6px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -662,25 +760,15 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
           </div>
           {monthsToShow > 0 && (
             <>
-              <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
-                <div
-                  style={{
-                    overflowX: "auto",
-                    overflowY: "visible",
-                    WebkitOverflowScrolling: "touch",
-                  }}
-                >
-                  <div style={{ minWidth: Math.max(visibleMonthLabels.length * 56, 320), padding: 20 }}>
-                    <BarChart
-                      data={visibleMonthlyTotals}
-                      xLabels={visibleMonthLabels}
-                      maxVal={maxMonthly}
-                      noEarningsText={t("earnings.noEarnings")}
-                      dateKeys={visibleMonthLabels.map((_, i) => `${displayYear}-${String(i + 1).padStart(2, "0")}`)}
-                      onBarClick={(key) => setSelectedMonthKey((prev) => (prev === key ? null : key))}
-                    />
-                  </div>
-                </div>
+              <div className="float-card" style={{ marginBottom: 24, padding: 20 }}>
+                <LineChart
+                  data={visibleMonthlyTotals}
+                  xLabels={visibleMonthLabels}
+                  maxVal={maxMonthly}
+                  noEarningsText={t("earnings.noEarnings")}
+                  dateKeys={visibleMonthLabels.map((_, i) => `${displayYear}-${String(i + 1).padStart(2, "0")}`)}
+                  onPointClick={(key) => setSelectedMonthKey((prev) => (prev === key ? null : key))}
+                />
               </div>
               <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
                 {visibleMonthLabels.map((label, i) => {
@@ -782,7 +870,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                   noEarningsText={t("earnings.noEarnings")}
                   dateKeys={yearlyLabels}
                   onBarClick={(key) => setSelectedYearKey((prev) => (prev === key ? null : key))}
-                  yAxisStepCents={500000}
+                  yAxisStepCents={1000000}
                 />
               </div>
               <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
@@ -1018,12 +1106,6 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
         );
       })()}
 
-      {activeTab === "Forecasts" && (
-        <ForecastsPanel
-          earnings={forecastsEarnings}
-          rangeContext={{ mode: "forecasts" }}
-        />
-      )}
     </>
   );
 }

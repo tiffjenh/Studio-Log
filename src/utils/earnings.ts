@@ -20,6 +20,11 @@ export function formatCurrency(cents: number): string {
   return "$" + (cents / 100).toFixed(0);
 }
 
+/** Format currency with thousands separators (e.g. $10,000). */
+export function formatCurrencyWithCommas(cents: number): string {
+  return "$" + (cents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 });
+}
+
 /** Week is Sunday–Saturday. */
 export function getWeekBounds(date: Date): { start: Date; end: Date } {
   const d = new Date(date);

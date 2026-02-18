@@ -12,6 +12,7 @@ import Students from "./pages/Students";
 import StudentDetail from "./pages/StudentDetail";
 import AddStudent from "./pages/AddStudent";
 import Earnings from "./pages/Earnings";
+import Insights from "./pages/Insights";
 import Settings from "./pages/Settings";
 import Calendar from "./pages/Calendar";
 import EditLesson from "./pages/EditLesson";
@@ -116,6 +117,7 @@ export default function App() {
         <Route path="students/:id" element={<StudentDetail />} />
         <Route path="add-student" element={<AddStudent />} />
         <Route path="earnings" element={<Earnings />} />
+        <Route path="insights" element={<Insights />} />
         <Route path="settings" element={<Settings />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="edit-lesson/:id" element={<EditLesson />} />

@@ -4,6 +4,7 @@ export default {
     dashboard: "首頁",
     students: "學生",
     earnings: "收入",
+    insights: "洞察",
     settings: "設定",
   },
   landing: {

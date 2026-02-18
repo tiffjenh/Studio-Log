@@ -30,6 +30,13 @@ const NavIcons = {
       <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
     </svg>
   ),
+  insights: (
+    <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+    </svg>
+  ),
   settings: (
     <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <circle cx="12" cy="12" r="3" />
@@ -42,6 +49,7 @@ const navKeys = [
   { to: "/", key: "nav.dashboard", icon: NavIcons.dashboard },
   { to: "/students", key: "nav.students", icon: NavIcons.students },
   { to: "/earnings", key: "nav.earnings", icon: NavIcons.earnings },
+  { to: "/insights", key: "nav.insights", icon: NavIcons.insights },
   { to: "/settings", key: "nav.settings", icon: NavIcons.settings },
 ];
 

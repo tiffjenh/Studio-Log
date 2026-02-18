@@ -4,6 +4,7 @@ export default {
     dashboard: "Inicio",
     students: "Estudiantes",
     earnings: "Ingresos",
+    insights: "Información",
     settings: "Ajustes",
   },
   landing: {
