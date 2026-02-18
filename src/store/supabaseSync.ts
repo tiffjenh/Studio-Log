@@ -401,7 +401,7 @@ async function requireAuthUid(): Promise<string> {
 
 /**
  * Return lesson ids for this student on old or new date (excluding the one we're keeping).
- * Caller should then delete each by id using deleteLessonSupabase (same path as "Delete lesson").
+ * Caller deletes each by id using deleteLessonSupabase (same path as "Delete lesson").
  */
 export async function fetchLessonIdsToRemoveForMove(
   _uid: string,
