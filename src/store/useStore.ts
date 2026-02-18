@@ -15,6 +15,7 @@ import {
   updateLessonSupabase,
   deleteLessonSupabase,
   deleteOtherLessonsForStudentOnDates,
+  debugFetchLessonsForStudentOnDates,
   deleteAllLessonsSupabase,
   updateProfileSupabase,
 } from "@/store/supabaseSync";
@@ -328,6 +329,14 @@ export function useStore() {
       const removeIds = new Set(allToRemove.map((l) => l.id));
 
       if (hasSupabase() && data.user) {
+        // TEMP DEBUG: which Supabase path we're taking
+        console.log("[RESCHEDULE DEBUG] updateLesson Supabase path", {
+          lessonId: id,
+          oldDate: oldDate ?? null,
+          newDate: newDate ?? null,
+          isDateMove,
+          method: isDateMove && oldDate ? "deleteOtherLessonsForStudentOnDates + updateLessonSupabase (update only)" : "updateLessonSupabase only",
+        });
         if (isDateMove && oldDate) {
           await deleteOtherLessonsForStudentOnDates(
             data.user.id,
@@ -360,7 +369,26 @@ export function useStore() {
             .map((l) => (l.id === id ? updatedLesson : l));
           return { ...prev, lessons: dedupeLessonsById(nextLessons) };
         });
-        if (isDateMove) await load();
+        if (isDateMove) {
+          await load();
+          // TEMP DEBUG: after save, query DB for this student on old/new date. If 2 rows → DB bug (delete didn't work). If 1 → DB OK.
+          const rows = await debugFetchLessonsForStudentOnDates(data.user.id, cur.studentId, oldDate, newDate as string);
+          console.log("[RESCHEDULE DEBUG] After save: lessons in DB for this student on old/new date", {
+            count: rows.length,
+            rows: rows.map((r) => ({ id: r.id, lesson_date: r.lesson_date })),
+            rootCause: rows.length > 1 ? "DB: delete did not remove the other row" : "DB has 1 row (OK)",
+          });
+          // Fix: if DB still has 2 rows, delete the other(s) by id so only our lesson remains
+          if (rows.length > 1) {
+            for (const r of rows) {
+              if (r.id !== id) {
+                await deleteLessonSupabase(data.user.id, r.id);
+                console.log("[RESCHEDULE DEBUG] Fallback: deleted duplicate row", r.id);
+              }
+            }
+            await load();
+          }
+        }
         return;
       }
       const nextLessons = data.lessons

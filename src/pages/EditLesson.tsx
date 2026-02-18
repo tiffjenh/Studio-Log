@@ -103,6 +103,15 @@ export default function EditLesson() {
         note: note.trim() || undefined,
         timeOfDay: lessonTime.trim() || undefined,
       };
+      // TEMP DEBUG: reschedule save — only updateLesson (no insert)
+      console.log("[RESCHEDULE DEBUG] EditLesson save", {
+        lessonId: lesson.id,
+        oldDate: lesson.date,
+        newDate: normalizedDate,
+        oldTime: lesson.timeOfDay,
+        newTime: lessonTime.trim() || undefined,
+        method: "updateLesson only (no insert)",
+      });
       await updateLesson(lesson.id, updates);
       // After rescheduling, go back to dashboard with the new date selected
       if (normalizedDate && normalizedDate !== lesson.date) {

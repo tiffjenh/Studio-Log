@@ -425,6 +425,33 @@ export async function deleteOtherLessonsForStudentOnDates(
 }
 
 /**
+ * TEMP DEBUG: After reschedule, query DB for lessons for this student on old/new date.
+ * If count > 1 → DB duplication (delete didn't remove the other row). If count === 1 → DB OK.
+ */
+export async function debugFetchLessonsForStudentOnDates(
+  _uid: string,
+  studentId: string,
+  date1: string,
+  date2: string,
+): Promise<{ id: string; lesson_date: string }[]> {
+  if (!supabase) return [];
+  const authUid = await requireAuthUid();
+  const dates = [date1, date2].filter((d) => d && DATE_KEY_REGEX.test(d));
+  if (dates.length === 0) return [];
+  const { data, error } = await supabase
+    .from("lessons")
+    .select("id, lesson_date")
+    .eq("user_id", authUid)
+    .eq("student_id", studentId)
+    .in("lesson_date", dates);
+  if (error) {
+    console.warn("[RESCHEDULE DEBUG] debugFetchLessonsForStudentOnDates error", error.message);
+    return [];
+  }
+  return (data ?? []) as { id: string; lesson_date: string }[];
+}
+
+/**
  * Update one lesson by id. Used by Edit lesson page only — updates the existing row in place.
  * Never inserts; never creates a duplicate. All changes (date, time, duration, amount, note) apply to this lesson only.
  */

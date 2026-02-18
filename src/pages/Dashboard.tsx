@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -87,8 +87,13 @@ export default function Dashboard() {
 
   const dateKey = toDateKey(selectedDate);
   const dayOfWeek = selectedDate.getDay();
+  // Safety net: dedupe by id so we never show the same lesson twice (e.g. after reschedule)
+  const lessonsForDisplay = useMemo(
+    () => Array.from(new Map(data.lessons.map((l) => [l.id, l])).values()),
+    [data.lessons]
+  );
   const countableLessons = filterLessonsOnScheduledDay(
-    dedupeLessons(data.lessons.filter((l) => l.completed)),
+    dedupeLessons(lessonsForDisplay.filter((l) => l.completed)),
     data.students
   );
   const earned = earnedThisWeek(countableLessons, today);
@@ -105,12 +110,12 @@ export default function Dashboard() {
   const earningsYTD = earnedInDateRange(countableLessons, `${year}-01-01`, ytdEndKey);
 
   const scheduledForDay = getStudentsForDay(data.students, dayOfWeek, dateKey);
-  const studentIdsWithLessonOnDate = getStudentIdsWithLessonOnDate(data.lessons, dateKey);
+  const studentIdsWithLessonOnDate = getStudentIdsWithLessonOnDate(lessonsForDisplay, dateKey);
   const scheduledIds = new Set(scheduledForDay.map((s) => s.id));
   const rescheduledOnly = data.students.filter((s) => studentIdsWithLessonOnDate.has(s.id) && !scheduledIds.has(s.id));
   const todaysStudents = [...scheduledForDay, ...rescheduledOnly].sort((a, b) => {
-    const lessonA = getLessonForStudentOnDate(data.lessons, a.id, dateKey);
-    const lessonB = getLessonForStudentOnDate(data.lessons, b.id, dateKey);
+    const lessonA = getLessonForStudentOnDate(lessonsForDisplay, a.id, dateKey);
+    const lessonB = getLessonForStudentOnDate(lessonsForDisplay, b.id, dateKey);
     const timeA = lessonA?.timeOfDay ?? getEffectiveSchedule(a, dateKey)?.timeOfDay ?? a.timeOfDay ?? "";
     const timeB = lessonB?.timeOfDay ?? getEffectiveSchedule(b, dateKey)?.timeOfDay ?? b.timeOfDay ?? "";
     return timeA > timeB ? 1 : -1;
@@ -118,7 +123,7 @@ export default function Dashboard() {
   const isToday = toDateKey(selectedDate) === toDateKey(today);
 
   const handleToggle = (studentId: string, completed: boolean) => {
-    const existing = getLessonForStudentOnDate(data.lessons, studentId, dateKey);
+    const existing = getLessonForStudentOnDate(lessonsForDisplay, studentId, dateKey);
     if (existing) updateLesson(existing.id, { completed });
     else {
       const student = data.students.find((s) => s.id === studentId);
@@ -128,7 +133,7 @@ export default function Dashboard() {
   };
 
   const handleEdit = async (student: Student) => {
-    const existing = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
+    const existing = getLessonForStudentOnDate(lessonsForDisplay, student.id, dateKey);
     if (existing) navigate(`/edit-lesson/${existing.id}`);
     else {
       const id = await addLesson({ studentId: student.id, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: false });
@@ -193,7 +198,7 @@ export default function Dashboard() {
         <p style={{ color: "var(--text-muted)", padding: 28, fontSize: 15, textAlign: "center", fontStyle: "italic" }}>{t("dashboard.noLessonsScheduled")}</p>
       ) : (
         todaysStudents.map((student) => {
-          const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
+          const lesson = getLessonForStudentOnDate(lessonsForDisplay, student.id, dateKey);
           return (
             <LessonRow
               key={student.id}
