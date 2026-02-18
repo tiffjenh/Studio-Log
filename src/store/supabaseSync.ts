@@ -61,6 +61,9 @@ export async function fetchUser(uid: string): Promise<User | null> {
  */
 const STUDENTS_FETCH_PAGE_SIZE = 1000;
 
+/** Base columns from 001; optional columns from later migrations may be missing in some projects. */
+const STUDENTS_SELECT = "id, first_name, last_name, duration_minutes, rate_cents, day_of_week, time_of_day, location";
+
 export async function fetchStudents(uid: string): Promise<Student[]> {
   if (!supabase) return [];
   const all: Student[] = [];
@@ -69,7 +72,7 @@ export async function fetchStudents(uid: string): Promise<Student[]> {
   do {
     const { data, error } = await supabase
       .from("students")
-      .select("*")
+      .select(STUDENTS_SELECT)
       .eq("user_id", uid)
       .order("created_at", { ascending: true })
       .range(offset, offset + STUDENTS_FETCH_PAGE_SIZE - 1);
@@ -86,6 +89,8 @@ export async function fetchStudents(uid: string): Promise<Student[]> {
 
 const LESSONS_PAGE_SIZE = 1000;
 
+const LESSONS_SELECT = "id, student_id, lesson_date, time_of_day, duration_minutes, amount_cents, completed, note";
+
 export async function fetchLessons(uid: string): Promise<Lesson[]> {
   if (!supabase) return [];
   const all: Lesson[] = [];
@@ -94,7 +99,7 @@ export async function fetchLessons(uid: string): Promise<Lesson[]> {
   do {
     const { data, error } = await supabase
       .from("lessons")
-      .select("*")
+      .select(LESSONS_SELECT)
       .eq("user_id", uid)
       .order("lesson_date", { ascending: true })
       .range(offset, offset + LESSONS_PAGE_SIZE - 1);
@@ -229,15 +234,14 @@ export async function applyEmailChange(newEmail: string): Promise<{ error?: stri
   }
 }
 
-export async function addStudentSupabase(uid: string, student: Omit<Student, "id">): Promise<Student> {
+export async function addStudentSupabase(_uid: string, student: Omit<Student, "id">): Promise<Student> {
   if (!supabase) throw new Error("Supabase not configured");
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error("Session expired. Please log out and log in again.");
-  const row = studentToRow(uid, student);
+  const authUid = await requireAuthUid();
+  const row = studentToRow(authUid, student);
   const { data, error } = await supabase
     .from("students")
     .insert(row)
-    .select()
+    .select(STUDENTS_SELECT)
     .single();
   if (error) throw error;
   return rowToStudent(data as Record<string, unknown>);
@@ -340,10 +344,10 @@ export async function addLessonSupabase(uid: string, lesson: Omit<Lesson, "id">)
       time_of_day: lesson.timeOfDay ?? null,
       duration_minutes: lesson.durationMinutes,
       amount_cents: lesson.amountCents,
-      completed: lesson.completed,
+      completed: lesson.completed ?? false,
       note: lesson.note ?? null,
     })
-    .select()
+    .select(LESSONS_SELECT)
     .single();
   if (error) throw error;
   return rowToLesson(data as Record<string, unknown>);
@@ -366,7 +370,7 @@ export async function bulkInsertLessonsSupabase(uid: string, lessons: Omit<Lesso
   const chunkErrors: string[] = [];
   for (let i = 0; i < rows.length; i += BULK_INSERT_CHUNK) {
     const chunk = rows.slice(i, i + BULK_INSERT_CHUNK);
-    const { data, error } = await supabase.from("lessons").insert(chunk).select();
+    const { data, error } = await supabase.from("lessons").insert(chunk).select(LESSONS_SELECT);
     if (error) {
       chunkErrors.push(`Chunk ${i / BULK_INSERT_CHUNK + 1} (rows ${i}-${i + chunk.length}): ${error.message}`);
       continue;
