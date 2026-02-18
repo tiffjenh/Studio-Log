@@ -165,7 +165,6 @@ export async function initiateEmailChange(
   redirectUrl: string,
 ): Promise<{ error?: string }> {
   if (!supabase) return { error: "Supabase not configured" };
-
   // Store the intended new email for the callback handler
   localStorage.setItem("pendingEmailChange", newEmail.trim());
 

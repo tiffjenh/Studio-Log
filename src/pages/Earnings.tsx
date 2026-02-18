@@ -1,6 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
+import ForecastsPanel from "@/components/forecasts/ForecastsPanel";
 import {
   formatCurrency,
   dedupeLessons,
@@ -12,7 +13,7 @@ import {
 } from "@/utils/earnings";
 import type { Lesson } from "@/types";
 
-const TABS = ["Daily", "Weekly", "Monthly", "Yearly", "Students"] as const;
+const TABS = ["Daily", "Weekly", "Monthly", "Yearly", "Students", "Forecasts"] as const;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const CHART_HEIGHT = 160;
 
@@ -196,6 +197,14 @@ export default function Earnings() {
   const now = new Date();
   // Use all completed, deduped lessons so matrix-imported attendance (any day) and tax CSV match. Scheduled-day filter excluded those.
   const completedLessons = dedupeLessons(data.lessons.filter((l) => l.completed));
+  const forecastsEarnings = useMemo(
+    () =>
+      completedLessons.map((l) => ({
+        date: l.date,
+        amount: l.amountCents / 100,
+      })),
+    [completedLessons]
+  );
   const thisYear = now.getFullYear();
   const studentsDisplayYear = thisYear + studentsYearOffset;
   const todayKey = toDateKey(now);
@@ -652,15 +661,25 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
           </div>
           {monthsToShow > 0 && (
             <>
-              <div className="float-card" style={{ marginBottom: 24 }}>
-                <BarChart
-                  data={visibleMonthlyTotals}
-                  xLabels={visibleMonthLabels}
-                  maxVal={maxMonthly}
-                  noEarningsText={t("earnings.noEarnings")}
-                  dateKeys={visibleMonthLabels.map((_, i) => `${displayYear}-${String(i + 1).padStart(2, "0")}`)}
-                  onBarClick={(key) => setSelectedMonthKey((prev) => (prev === key ? null : key))}
-                />
+              <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
+                <div
+                  style={{
+                    overflowX: "auto",
+                    overflowY: "visible",
+                    WebkitOverflowScrolling: "touch",
+                  }}
+                >
+                  <div style={{ minWidth: Math.max(visibleMonthLabels.length * 56, 320), padding: 20 }}>
+                    <BarChart
+                      data={visibleMonthlyTotals}
+                      xLabels={visibleMonthLabels}
+                      maxVal={maxMonthly}
+                      noEarningsText={t("earnings.noEarnings")}
+                      dateKeys={visibleMonthLabels.map((_, i) => `${displayYear}-${String(i + 1).padStart(2, "0")}`)}
+                      onBarClick={(key) => setSelectedMonthKey((prev) => (prev === key ? null : key))}
+                    />
+                  </div>
+                </div>
               </div>
               <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
                 {visibleMonthLabels.map((label, i) => {
@@ -997,6 +1016,13 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
           </>
         );
       })()}
+
+      {activeTab === "Forecasts" && (
+        <ForecastsPanel
+          earnings={forecastsEarnings}
+          rangeContext={{ mode: "forecasts" }}
+        />
+      )}
     </>
   );
 }
