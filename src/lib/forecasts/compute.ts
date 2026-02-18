@@ -452,7 +452,6 @@ export function computeGeneralAnalytics(
   students?: StudentSummary[]
 ): { directAnswer: string; calculations: string[]; assumptions: string[]; confidence: "high" | "medium" | "low"; chartData?: { label: string; value: number }[] } {
   const q = query.toLowerCase();
-  const assumptions: string[] = [];
   const calculations: string[] = [];
   const projectedYearly = baseMetrics?.projected_yearly ?? null;
 
@@ -635,6 +634,7 @@ export function computeGeneralAnalytics(
         confidence: "high",
       };
     }
+    const assumptions: string[] = [];
     assumptions.push("Duration per lesson not in data; assuming 1 hour per earnings entry.");
     totalEarned = earnings.reduce((s, r) => s + r.amount, 0);
     totalHours = earnings.length;

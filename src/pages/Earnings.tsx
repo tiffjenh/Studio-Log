@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -10,10 +10,13 @@ import {
   getWeeksInMonth,
   getDailyTotalsForWeek,
   getYAxisTicks,
+  getEffectiveRateCents,
 } from "@/utils/earnings";
 import type { Lesson } from "@/types";
+import type { StudentSummary } from "@/lib/forecasts/types";
+import ForecastsPanel from "@/components/forecasts/ForecastsPanel";
 
-const TABS = ["Daily", "Weekly", "Monthly", "Yearly", "Students"] as const;
+const TABS = ["Daily", "Weekly", "Monthly", "Yearly", "Students", "Forecasts"] as const;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const CHART_HEIGHT = 160;
 const LINE_CHART_HEIGHT = 200;
@@ -352,6 +355,7 @@ const TAB_KEYS: Record<(typeof TABS)[number], string> = {
   Monthly: "earnings.monthly",
   Yearly: "earnings.yearly",
   Students: "earnings.studentsTab",
+  Forecasts: "earnings.forecasts",
 };
 
 export default function Earnings() {
@@ -382,6 +386,35 @@ export default function Earnings() {
     studentsDisplayYear === thisYear
       ? completedLessons.filter((l) => l.date >= `${studentsDisplayYear}-01-01` && l.date <= todayKey)
       : completedLessons.filter((l) => l.date.startsWith(String(studentsDisplayYear)));
+
+  const studentById = useMemo(() => new Map(data.students.map((s) => [s.id, s])), [data.students]);
+  const earningsForForecasts = useMemo(
+    () =>
+      completedLessons.map((l) => {
+        const student = studentById.get(l.studentId);
+        const name = student ? `${student.firstName} ${student.lastName}` : undefined;
+        return {
+          date: l.date,
+          amount: l.amountCents / 100,
+          durationMinutes: l.durationMinutes,
+          customer: name,
+          studentId: l.studentId,
+        };
+      }),
+    [completedLessons, studentById]
+  );
+  const studentsForForecasts: StudentSummary[] = useMemo(
+    () =>
+      data.students
+        .filter((s) => !s.terminatedFromDate || s.terminatedFromDate > todayKey)
+        .map((s) => ({
+          id: s.id,
+          name: `${s.firstName} ${s.lastName}`,
+          rateCents: getEffectiveRateCents(s, todayKey),
+          durationMinutes: s.durationMinutes,
+        })),
+    [data.students, todayKey]
+  );
 
   const weeklyMonthDate = new Date(now.getFullYear(), now.getMonth() + weeklyMonthOffset, 1);
   const weeklyYear = weeklyMonthDate.getFullYear();
@@ -715,7 +748,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
       )}
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-        {(["Daily", "Weekly", "Monthly", "Yearly", "Students"] as const).map((tab) => (
+        {TABS.map((tab) => (
           <button
             key={tab}
             type="button"
@@ -1179,6 +1212,16 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
           </>
         );
       })()}
+
+      {activeTab === "Forecasts" && (
+        <ForecastsPanel
+          earnings={earningsForForecasts}
+          students={studentsForForecasts}
+          rangeContext={{ mode: "forecasts" }}
+          voiceButtonPosition="inline"
+          searchLayout="inline"
+        />
+      )}
 
     </>
   );
