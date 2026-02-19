@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatCurrency, getStudentsForDay, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, getStudentIdsWithLessonOnDate, toDateKey, dedupeLessonsById, getWeekBounds } from "@/utils/earnings";
+import { formatCurrency, getStudentsForDay, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, getStudentIdsWithLessonOnDate, toDateKey, dedupeLessonsById, getWeekBounds, getSuppressedGeneratedSlotIds } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Lesson, Student } from "@/types";
 
@@ -33,7 +33,12 @@ export default function Calendar() {
   const dateKey = toDateKey(selectedDate);
   const dayOfWeek = selectedDate.getDay();
   const dedupedLessons = useMemo(() => dedupeLessonsById(data.lessons), [data.lessons]);
-  const scheduledForDay = getStudentsForDay(data.students, dayOfWeek, dateKey);
+  const { start: weekStart, end: weekEnd } = getWeekBounds(selectedDate);
+  const weekStartKey = toDateKey(weekStart);
+  const weekEndKey = toDateKey(weekEnd);
+  // Suppress generated recurring slots for students whose lesson was rescheduled away this week
+  const suppressedGeneratedIds = getSuppressedGeneratedSlotIds(dedupedLessons, data.students, dateKey, weekStartKey, weekEndKey);
+  const scheduledForDay = getStudentsForDay(data.students, dayOfWeek, dateKey).filter((s) => !suppressedGeneratedIds.has(s.id));
   const studentIdsWithLessonOnDate = getStudentIdsWithLessonOnDate(dedupedLessons, dateKey);
   const scheduledIds = new Set(scheduledForDay.map((s) => s.id));
   const rescheduledOnly = data.students.filter((s) => studentIdsWithLessonOnDate.has(s.id) && !scheduledIds.has(s.id));

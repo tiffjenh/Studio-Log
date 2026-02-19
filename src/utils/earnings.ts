@@ -59,6 +59,61 @@ export function dedupeLessonsById(lessons: Lesson[]): Lesson[] {
   return Array.from(new Map(lessons.map((l) => [l.id, l])).values());
 }
 
+/**
+ * Returns the set of student IDs whose generated recurring slot on dateKey should be suppressed.
+ *
+ * Suppression rule: suppress the generated slot for student S on dateKey if ALL of:
+ *   1. There is NO actual lesson for S on dateKey (the slot wasn't logged here)
+ *   2. There IS an actual lesson for S in the same week on a different date
+ *   3. That other-date lesson falls on a day that is NOT one of S's regular scheduled days
+ *      (i.e. it's a one-off reschedule, not a natural occurrence for a different slot)
+ *
+ * This means: only suppress when the lesson was explicitly moved to a non-scheduled day.
+ * Future weeks with no lesson rows are unaffected (conditions 2/3 never trigger).
+ */
+export function getSuppressedGeneratedSlotIds(
+  lessons: Lesson[],
+  students: Student[],
+  dateKey: string,
+  weekStartKey: string,
+  weekEndKey: string,
+): Set<string> {
+  const suppressed = new Set<string>();
+  const studentMap = new Map(students.map((s) => [s.id, s]));
+
+  // Group this week's actual lessons by student
+  const weekLessonsByStudent = new Map<string, Lesson[]>();
+  for (const l of lessons) {
+    if (l.date >= weekStartKey && l.date <= weekEndKey) {
+      const arr = weekLessonsByStudent.get(l.studentId) ?? [];
+      arr.push(l);
+      weekLessonsByStudent.set(l.studentId, arr);
+    }
+  }
+
+  for (const [studentId, weekLessons] of weekLessonsByStudent) {
+    // Condition 1: no actual lesson on the date being viewed
+    if (weekLessons.some((l) => l.date === dateKey)) continue;
+
+    const student = studentMap.get(studentId);
+    if (!student) continue;
+
+    // The student's regular scheduled days of week (respects schedule-change date)
+    const scheduledDows = getEffectiveSchedules(student, dateKey).map((s) => s.dayOfWeek);
+
+    // Condition 2 + 3: has a lesson this week on a non-scheduled day (one-off reschedule)
+    for (const l of weekLessons) {
+      if (l.date === dateKey) continue;
+      if (!scheduledDows.includes(getDayOfWeekFromDateKey(l.date))) {
+        suppressed.add(studentId);
+        break;
+      }
+    }
+  }
+
+  return suppressed;
+}
+
 /** Dedupe lessons to one per (studentId, date), keeping first (matches getLessonForStudentOnDate). */
 export function dedupeLessons(lessons: Lesson[]): Lesson[] {
   const byKey = new Map<string, Lesson>();
