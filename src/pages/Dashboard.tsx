@@ -18,8 +18,9 @@ import {
   toDateKey,
   dedupeLessons,
   dedupeLessonsById,
-  filterLessonsOnScheduledDay,
   getSuppressedGeneratedSlotIds,
+  computeLessonAmountCents,
+  isStudentActive,
 } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import VoiceButton from "@/components/VoiceButton";
@@ -42,9 +43,8 @@ function LessonRow({
 }) {
   const completed = lesson?.completed ?? false;
   const effectiveDuration = getEffectiveDurationMinutes(student, dateKey);
-  const effectiveRate = getEffectiveRateCents(student, dateKey);
   const duration = lesson?.durationMinutes ?? effectiveDuration;
-  const amount = lesson?.amountCents ?? effectiveRate;
+  const effectiveAmountCents = computeLessonAmountCents(student, lesson ?? undefined, dateKey);
   const rateText = duration >= 60 ? `${duration / 60} hour` : `${duration} mins`;
   const displayTime = lesson?.timeOfDay ?? getEffectiveSchedule(student, dateKey).timeOfDay;
   return (
@@ -52,14 +52,14 @@ function LessonRow({
       <StudentAvatar student={student} size={48} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontFamily: "var(--font-sans)" }}>{student.firstName} {student.lastName}</div>
-        <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{rateText} / {formatCurrency(effectiveRate)}</div>
+        <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{rateText} / {formatCurrency(effectiveAmountCents)}</div>
         {displayTime && displayTime !== "—" && (
           <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{displayTime}</div>
         )}
       </div>
       <label className="toggle-wrap" onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
         <input type="checkbox" checked={completed} onChange={(e) => onToggle(e.target.checked)} />
-        {completed && <span style={{ color: "var(--success)", fontWeight: 600 }}>{formatCurrency(amount)}</span>}
+        {completed && <span style={{ color: "var(--success)", fontWeight: 600 }}>{formatCurrency(effectiveAmountCents)}</span>}
       </label>
     </div>
   );
@@ -92,10 +92,8 @@ export default function Dashboard() {
   const dayOfWeek = selectedDate.getDay();
   // Safety net: dedupe by id so we never show the same lesson twice (e.g. after reschedule)
   const dedupedLessons = useMemo(() => dedupeLessonsById(data.lessons), [data.lessons]);
-  const countableLessons = filterLessonsOnScheduledDay(
-    dedupeLessons(dedupedLessons.filter((l) => l.completed)),
-    data.students
-  );
+  // Include all completed lessons for overview (rescheduled lessons have date off recurring schedule)
+  const countableLessons = dedupeLessons(dedupedLessons.filter((l) => l.completed));
   const earned = earnedThisWeek(countableLessons, today);
   const studioOwnerName = data.user?.name?.trim().split(/\s+/)[0] ?? null;
   const dashboardTitle = studioOwnerName ? `${studioOwnerName}'s Studio Log` : "Studio Log";
@@ -117,7 +115,9 @@ export default function Dashboard() {
   const scheduledForDay = getStudentsForDay(data.students, dayOfWeek, dateKey).filter((s) => !suppressedGeneratedIds.has(s.id));
   const studentIdsWithLessonOnDate = getStudentIdsWithLessonOnDate(dedupedLessons, dateKey);
   const scheduledIds = new Set(scheduledForDay.map((s) => s.id));
-  const rescheduledOnly = data.students.filter((s) => studentIdsWithLessonOnDate.has(s.id) && !scheduledIds.has(s.id));
+  const rescheduledOnly = data.students.filter(
+    (s) => studentIdsWithLessonOnDate.has(s.id) && !scheduledIds.has(s.id) && isStudentActive(s, dateKey)
+  );
   const todaysStudents = [...scheduledForDay, ...rescheduledOnly].sort((a, b) => {
     const lessonA = getLessonForStudentOnDate(dedupedLessons, a.id, dateKey);
     const lessonB = getLessonForStudentOnDate(dedupedLessons, b.id, dateKey);
@@ -138,11 +138,15 @@ export default function Dashboard() {
 
   const handleToggle = (studentId: string, completed: boolean) => {
     const existing = getLessonForStudentOnDate(dedupedLessons, studentId, dateKey);
-    if (existing) updateLesson(existing.id, { completed });
-    else {
+    const student = data.students.find((s) => s.id === studentId);
+    if (existing) {
+      const amountCents = existing.amountCents || (student ? getEffectiveRateCents(student, dateKey) : 0);
+      const updates: { completed: boolean; amountCents?: number } = { completed };
+      if (completed && amountCents > 0 && existing.amountCents !== amountCents) updates.amountCents = amountCents;
+      updateLesson(existing.id, updates);
+    } else {
       const elsewhere = getLessonElsewhereThisWeek(studentId);
       if (!elsewhere) {
-        const student = data.students.find((s) => s.id === studentId);
         if (!student) return;
         addLesson({ studentId, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: true });
       }

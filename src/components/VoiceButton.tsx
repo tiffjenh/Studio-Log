@@ -10,6 +10,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useStoreContext } from "@/context/StoreContext";
+import { useLanguage } from "@/context/LanguageContext";
 import {
   buildVoiceContext,
   callVoiceAPI,
@@ -75,6 +76,12 @@ type Phase = "idle" | "listening" | "processing" | "result" | "error";
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
+function langToSpeechLocale(lang: string): string {
+  if (lang === "es") return "es-ES";
+  if (lang === "zh") return "zh-CN";
+  return "en-US";
+}
+
 export default function VoiceButton({
   dateKey,
   dayOfWeek,
@@ -85,6 +92,7 @@ export default function VoiceButton({
   onDateChange?: (date: Date) => void;
 }) {
   const { data, addLesson, updateLesson } = useStoreContext();
+  const { lang } = useLanguage();
   const [phase, setPhase] = useState<Phase>("idle");
   const [transcript, setTranscript] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -471,7 +479,7 @@ export default function VoiceButton({
     if (!SpeechRecognition) return;
 
     const recognition = new SpeechRecognition();
-    recognition.lang = "en-US"; // browser auto-detects, this is a hint
+    recognition.lang = langToSpeechLocale(lang);
     recognition.interimResults = false;
     recognition.continuous = false;
     recognition.maxAlternatives = 1;

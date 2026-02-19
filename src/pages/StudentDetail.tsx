@@ -2,11 +2,13 @@ import { useState, useEffect, Fragment } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatCurrency, getEffectiveSchedules, getAllScheduledDays, getDayOfWeekFromDateKey, getLessonForStudentOnDate, getEffectiveDurationMinutes, getEffectiveRateCents, toDateKey } from "@/utils/earnings";
+import { formatCurrency, getEffectiveSchedules, getAllScheduledDays, getDayOfWeekFromDateKey, getLessonForStudentOnDate, getEffectiveDurationMinutes, getEffectiveRateCents, toDateKey, computeLessonAmountCents, isStudentActive } from "@/utils/earnings";
 import { getCurrencyByCode, getStoredCurrencyCode } from "@/utils/currencies";
 import DatePicker from "@/components/DatePicker";
 import StudentAvatar from "@/components/StudentAvatar";
-import type { DaySchedule, Student } from "@/types";
+import { hasSupabase } from "@/lib/supabase";
+import { fetchStudentChangeEvents, insertStudentChangeEvent } from "@/store/supabaseSync";
+import type { DaySchedule, Student, StudentChangeEvent } from "@/types";
 
 const DURATIONS = [30, 45, 60, 90, 120];
 const DURATION_LABELS: Record<number, string> = { 30: "30 min", 45: "45 min", 60: "1 hr", 90: "1.5 hr", 120: "2 hr" };
@@ -30,6 +32,52 @@ function parseTimeOfDay(s: string): { hour: number; minute: number; amPm: "AM" |
 
 function formatDuration(mins: number): string {
   return mins === 60 ? "1 hour" : mins === 90 ? "1.5 hours" : mins === 120 ? "2 hours" : `${mins} min`;
+}
+
+function formatHistoryEventSentence(event: StudentChangeEvent): string {
+  const { eventType, effectiveFromDate, oldValue, newValue } = event;
+  const fmt = (c: number) => formatCurrency(c);
+  const day = (dow: number) => DAYS_FULL[dow] ?? "";
+  const dur = (m: number) => (m === 60 ? "1 hr" : m === 90 ? "1.5 hr" : `${m} min`);
+  switch (eventType) {
+    case "schedule_change_saved": {
+      const sc = (newValue?.scheduleChange as Record<string, unknown>) ?? newValue;
+      const from = (sc?.fromDate ?? effectiveFromDate) as string;
+      const oldSc = (oldValue?.scheduleChange as Record<string, unknown>) ?? oldValue?.scheduleChange;
+      const base = (oldValue?.base as Record<string, unknown>) ?? {};
+      const oldStr = oldSc
+        ? `${day((oldSc.dayOfWeek as number) ?? 0)}s ${(oldSc.timeOfDay as string) ?? "—"} (${dur((oldSc.durationMinutes as number) ?? 0)}, ${fmt((oldSc.rateCents as number) ?? 0)})`
+        : `${day((base.dayOfWeek as number) ?? 0)}s ${(base.timeOfDay as string) ?? "—"} (${dur((base.durationMinutes as number) ?? 0)}, ${fmt((base.rateCents as number) ?? 0)})`;
+      const newStr = sc ? `${day((sc.dayOfWeek as number) ?? 0)}s ${(sc.timeOfDay as string) ?? "—"} (${dur((sc.durationMinutes as number) ?? 0)}, ${fmt((sc.rateCents as number) ?? 0)})` : "";
+      return from ? `Schedule change saved: Starting ${from}, lessons move from ${oldStr} to ${newStr}.` : `Schedule change saved: ${newStr}`;
+    }
+    case "schedule_change_canceled":
+      return "Schedule change canceled.";
+    case "schedule_change_applied": {
+      const o = oldValue as Record<string, unknown> | undefined;
+      const n = newValue as Record<string, unknown> | undefined;
+      if (!o || !n) return "Schedule change applied.";
+      const oldStr = `${day((o.dayOfWeek as number) ?? 0)}s ${(o.timeOfDay as string) ?? "—"} (${dur((o.durationMinutes as number) ?? 0)}, ${fmt((o.rateCents as number) ?? 0)})`;
+      const newStr = `${day((n.dayOfWeek as number) ?? 0)}s ${(n.timeOfDay as string) ?? "—"} (${dur((n.durationMinutes as number) ?? 0)}, ${fmt((n.rateCents as number) ?? 0)})`;
+      return `Schedule change applied: ${oldStr} → ${newStr}.`;
+    }
+    case "termination_saved":
+      return effectiveFromDate ? `Termination scheduled: Last lesson ${effectiveFromDate}.` : "Termination scheduled.";
+    case "termination_canceled":
+      return "Termination canceled.";
+    case "rate_changed": {
+      const oldC = (oldValue?.rateCents ?? newValue?.rateCents) as number | undefined;
+      const newC = (newValue?.rateCents ?? oldValue?.rateCents) as number | undefined;
+      if (oldC != null && newC != null) return `Rate changed: ${fmt(oldC)} → ${fmt(newC)}`;
+      return "Rate changed.";
+    }
+    case "duration_changed":
+      return "Duration changed.";
+    case "additional_schedule_changed":
+      return "Frequency changed.";
+    default:
+      return eventType.replace(/_/g, " ") + ".";
+  }
 }
 
 /** Parse "5:00pm" / "5:00 PM" style to minutes from midnight; return null if unparseable. */
@@ -93,7 +141,7 @@ function getScheduledDateKeysInMonth(student: Student, year: number, month: numb
   const last = new Date(year, month, 0);
   for (const d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
     const dateKey = toDateKey(d);
-    if (student.terminatedFromDate && dateKey > student.terminatedFromDate) continue;
+    if (!isStudentActive(student, dateKey)) continue;
     const dayOfWeek = d.getDay();
     const schedules = getEffectiveSchedules(student, dateKey);
     if (schedules.some((s) => s.dayOfWeek === dayOfWeek)) result.push(dateKey);
@@ -104,7 +152,7 @@ function getScheduledDateKeysInMonth(student: Student, year: number, month: numb
 export default function StudentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { data, updateStudent, deleteStudent, addLesson, updateLesson } = useStoreContext();
+  const { data, updateStudent, deleteStudent, addLesson, updateLesson, reload } = useStoreContext();
   const { t } = useLanguage();
   const student = data.students.find((s) => s.id === id);
   const completedForStudent = data.lessons.filter((l) => l.studentId === id && l.completed);
@@ -220,6 +268,14 @@ export default function StudentDetail() {
   const [changeScheduleOpen, setChangeScheduleOpen] = useState(false);
   const [terminateStudentOpen, setTerminateStudentOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [scheduleChangeSaveMessage, setScheduleChangeSaveMessage] = useState("");
+  const [scheduleChangeCancelMessage, setScheduleChangeCancelMessage] = useState("");
+  const [scheduleChangeError, setScheduleChangeError] = useState("");
+  const [terminationSaveMessage, setTerminationSaveMessage] = useState("");
+  const [terminationCancelMessage, setTerminationCancelMessage] = useState("");
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyEvents, setHistoryEvents] = useState<StudentChangeEvent[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     if (student) {
@@ -232,6 +288,15 @@ export default function StudentDetail() {
       setTerminatedFromDate(student.terminatedFromDate ?? "");
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!historyOpen || !student || !data.user || !hasSupabase()) return;
+    setHistoryLoading(true);
+    fetchStudentChangeEvents(data.user.id, student.id)
+      .then(setHistoryEvents)
+      .catch(() => setHistoryEvents([]))
+      .finally(() => setHistoryLoading(false));
+  }, [historyOpen, student?.id, data.user?.id]);
 
   if (!student) return <p style={{ padding: 24 }}>Student not found</p>;
 
@@ -326,6 +391,119 @@ export default function StudentDetail() {
     }
   };
 
+  const handleSaveScheduleChange = async () => {
+    setScheduleChangeError("");
+    const fromDateTrimmed = scheduleChangeFromDate.trim();
+    if (!fromDateTrimmed) {
+      setScheduleChangeError(t("studentDetail.fromDateRequired"));
+      return;
+    }
+    const first = schedChangeEntries[0];
+    if (!first) {
+      setScheduleChangeError(t("studentDetail.scheduleChangeFirstEntryRequired"));
+      return;
+    }
+    if (!first.timeOfDay.trim() || first.timeOfDay.trim() === "\u2014") {
+      setScheduleChangeError(t("studentDetail.scheduleChangeTimeRequired"));
+      return;
+    }
+    if (!/am|pm/i.test(first.timeOfDay.trim())) {
+      setScheduleChangeError(t("studentDetail.scheduleChangeTimeAmPm"));
+      return;
+    }
+    const rateCents = first.rateDollars.trim() ? Math.round(parseFloat(first.rateDollars) * 100) : undefined;
+    if (rateCents == null || rateCents < 0) {
+      setScheduleChangeError(t("studentDetail.scheduleChangeRateRequired"));
+      return;
+    }
+    const additionalSched: DaySchedule[] = schedChangeEntries.slice(1).map((sce) => ({
+      dayOfWeek: sce.dayOfWeek,
+      timeOfDay: sce.timeOfDay.trim() || "\u2014",
+      durationMinutes: sce.durationMinutes,
+      rateCents: sce.rateDollars.trim() ? Math.round(parseFloat(sce.rateDollars) * 100) || 0 : 0,
+    }));
+    const updates: Partial<Student> = {
+      scheduleChangeFromDate: fromDateTrimmed,
+      scheduleChangeDayOfWeek: first.dayOfWeek,
+      scheduleChangeTimeOfDay: first.timeOfDay.trim(),
+      scheduleChangeDurationMinutes: first.durationMinutes,
+      scheduleChangeRateCents: rateCents,
+      scheduleChangeAdditionalSchedules: additionalSched.length > 0 ? additionalSched : undefined,
+    };
+    try {
+      const oldValue = {
+        base: { dayOfWeek: student.dayOfWeek, timeOfDay: student.timeOfDay, durationMinutes: student.durationMinutes, rateCents: student.rateCents, additionalSchedules: student.additionalSchedules ?? null },
+        scheduleChange: student.scheduleChangeFromDate ? { fromDate: student.scheduleChangeFromDate, dayOfWeek: student.scheduleChangeDayOfWeek, timeOfDay: student.scheduleChangeTimeOfDay, durationMinutes: student.scheduleChangeDurationMinutes, rateCents: student.scheduleChangeRateCents, additionalSchedules: student.scheduleChangeAdditionalSchedules ?? null } : null,
+      };
+      const newValue = { scheduleChange: { fromDate: fromDateTrimmed, dayOfWeek: first.dayOfWeek, timeOfDay: first.timeOfDay.trim(), durationMinutes: first.durationMinutes, rateCents: rateCents!, additionalSchedules: additionalSched.length > 0 ? additionalSched : null } };
+      await updateStudent(student.id, updates);
+      if (data.user && hasSupabase()) {
+        await insertStudentChangeEvent(data.user.id, student.id, { eventType: "schedule_change_saved", effectiveFromDate: fromDateTrimmed, oldValue, newValue });
+      }
+      setScheduleChangeSaveMessage(t("studentDetail.scheduleChangeSaved"));
+      setTimeout(() => setScheduleChangeSaveMessage(""), 2500);
+      await reload();
+    } catch (e) {
+      const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : e instanceof Error ? e.message : "Could not save. Try again.";
+      setScheduleChangeError(msg);
+    }
+  };
+
+  const handleCancelUpcomingChange = async () => {
+    try {
+      const oldValue = student.scheduleChangeFromDate ? { scheduleChange: { fromDate: student.scheduleChangeFromDate, dayOfWeek: student.scheduleChangeDayOfWeek, timeOfDay: student.scheduleChangeTimeOfDay, durationMinutes: student.scheduleChangeDurationMinutes, rateCents: student.scheduleChangeRateCents, additionalSchedules: student.scheduleChangeAdditionalSchedules ?? null } } : null;
+      await updateStudent(student.id, {
+        scheduleChangeFromDate: undefined,
+        scheduleChangeDayOfWeek: undefined,
+        scheduleChangeTimeOfDay: undefined,
+        scheduleChangeDurationMinutes: undefined,
+        scheduleChangeRateCents: undefined,
+        scheduleChangeAdditionalSchedules: undefined,
+      });
+      if (data.user && hasSupabase() && oldValue) {
+        await insertStudentChangeEvent(data.user.id, student.id, { eventType: "schedule_change_canceled", oldValue, newValue: null });
+      }
+      setScheduleChangeCancelMessage(t("studentDetail.upcomingChangeCanceled"));
+      setTimeout(() => setScheduleChangeCancelMessage(""), 2500);
+      await reload();
+    } catch (e) {
+      const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : e instanceof Error ? e.message : "Could not cancel. Try again.";
+      setScheduleChangeCancelMessage(msg);
+    }
+  };
+
+  const handleSaveTermination = async () => {
+    const dateTrimmed = terminatedFromDate.trim();
+    if (!dateTrimmed) return;
+    try {
+      await updateStudent(student.id, { terminatedFromDate: dateTrimmed });
+      if (data.user && hasSupabase()) {
+        await insertStudentChangeEvent(data.user.id, student.id, { eventType: "termination_saved", effectiveFromDate: dateTrimmed });
+      }
+      setTerminationSaveMessage(t("studentDetail.terminationScheduled"));
+      setTimeout(() => setTerminationSaveMessage(""), 2500);
+      await reload();
+    } catch (e) {
+      const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : e instanceof Error ? e.message : "Could not save. Try again.";
+      setTerminationSaveMessage(msg);
+    }
+  };
+
+  const handleCancelTermination = async () => {
+    try {
+      await updateStudent(student.id, { terminatedFromDate: undefined });
+      if (data.user && hasSupabase()) {
+        await insertStudentChangeEvent(data.user.id, student.id, { eventType: "termination_canceled" });
+      }
+      setTerminationCancelMessage(t("studentDetail.terminationCanceled"));
+      setTimeout(() => setTerminationCancelMessage(""), 2500);
+      await reload();
+    } catch (e) {
+      const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : e instanceof Error ? e.message : "Could not cancel. Try again.";
+      setTerminationCancelMessage(msg);
+    }
+  };
+
   const handleDelete = async () => {
     setDeleteConfirmOpen(false);
     setError("");
@@ -359,6 +537,38 @@ export default function StudentDetail() {
           )}
         </div>
       </div>
+
+      {!editing && student.scheduleChangeFromDate && (
+        <div className="float-card" style={{ marginBottom: 20, padding: "14px 18px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, ...fontStyle }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
+              {student.scheduleChangeDayOfWeek != null && student.scheduleChangeTimeOfDay
+                ? t("studentDetail.upcomingChangesText", {
+                    fromDate: student.scheduleChangeFromDate,
+                    weekday: DAYS_FULL[student.scheduleChangeDayOfWeek],
+                    time: student.scheduleChangeTimeOfDay,
+                    duration: student.scheduleChangeDurationMinutes ?? student.durationMinutes,
+                    rate: ((student.scheduleChangeRateCents ?? student.rateCents) / 100).toFixed(2),
+                  })
+                : t("studentDetail.upcomingChangesTextShort", { fromDate: student.scheduleChangeFromDate })}
+            </p>
+            {scheduleChangeCancelMessage ? <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--success, #16a34a)" }}>{scheduleChangeCancelMessage}</p> : null}
+          </div>
+          <button type="button" onClick={handleCancelUpcomingChange} className="btn" style={{ border: "1px solid var(--border)", background: "var(--card)", ...fontStyle }}>{t("common.cancel")}</button>
+        </div>
+      )}
+
+      {!editing && student.terminatedFromDate && student.terminatedFromDate >= toDateKey(new Date()) && (
+        <div className="float-card" style={{ marginBottom: 20, padding: "14px 18px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, ...fontStyle }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--text)" }}>
+              {t("studentDetail.upcomingTerminationText", { date: student.terminatedFromDate })}
+            </p>
+            {terminationCancelMessage ? <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--success, #16a34a)" }}>{terminationCancelMessage}</p> : null}
+          </div>
+          <button type="button" onClick={handleCancelTermination} className="btn" style={{ border: "1px solid var(--border)", background: "var(--card)", ...fontStyle }}>{t("common.cancel")}</button>
+        </div>
+      )}
 
       {editing ? (
         <div>
@@ -472,9 +682,12 @@ export default function StudentDetail() {
                   </button>
                 </div>
               ))}
-              <button type="button" onClick={addSchedChangeEntry} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--text-muted)", ...fontStyle }}>
+              <button type="button" onClick={addSchedChangeEntry} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--text-muted)", marginBottom: 16, ...fontStyle }}>
                 + Day
               </button>
+              {scheduleChangeError ? <p style={{ color: "#dc2626", marginBottom: 12, ...fontStyle }}>{scheduleChangeError}</p> : null}
+              {scheduleChangeSaveMessage ? <p style={{ color: "var(--success, #16a34a)", marginBottom: 12, ...fontStyle }}>{scheduleChangeSaveMessage}</p> : null}
+              <button type="button" onClick={handleSaveScheduleChange} className="btn btn-primary" style={{ ...fontStyle }}>{t("studentDetail.saveScheduleChanges")}</button>
             </div>
           )}
           {terminateStudentOpen && (
@@ -484,6 +697,8 @@ export default function StudentDetail() {
               <div style={{ marginBottom: 16 }}>
                 <DatePicker value={terminatedFromDate} onChange={setTerminatedFromDate} placeholder="Select date" />
               </div>
+              {terminationSaveMessage ? <p style={{ color: "var(--success, #16a34a)", marginBottom: 12, ...fontStyle }}>{terminationSaveMessage}</p> : null}
+              <button type="button" onClick={handleSaveTermination} className="btn btn-primary" style={{ ...fontStyle }} disabled={!terminatedFromDate.trim()}>{t("common.save")}</button>
             </div>
           )}
         </div>
@@ -758,7 +973,7 @@ export default function StudentDetail() {
                                       }}
                                     >
                                       <span style={{ fontSize: 14 }}>{dateKey}</span>
-                                      <span style={{ fontWeight: 600 }}>{attended ? formatCurrency(lesson!.amountCents) : "—"}</span>
+                                      <span style={{ fontWeight: 600 }}>{attended ? formatCurrency(computeLessonAmountCents(student, lesson!, dateKey)) : "—"}</span>
                                     </div>
                                   );
                                 })}
@@ -774,6 +989,53 @@ export default function StudentDetail() {
             });
           })()}
         </>
+      )}
+
+      <div style={{ paddingTop: 24, paddingBottom: 32 }}>
+        <button
+          type="button"
+          onClick={() => setHistoryOpen(true)}
+          className="btn"
+          style={{ border: "1px solid var(--border)", background: "var(--card)", color: "var(--text-muted)", ...fontStyle }}
+        >
+          {t("studentDetail.history")}
+        </button>
+      </div>
+
+      {historyOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: "rgba(0,0,0,0.3)" }}
+          onClick={() => setHistoryOpen(false)}
+        >
+          <div
+            className="float-card"
+            style={{ maxHeight: "70vh", display: "flex", flexDirection: "column", borderBottomLeftRadius: 0, borderBottomRightRadius: 0, overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+              <span style={{ fontWeight: 600, fontSize: 18, ...fontStyle }}>{t("studentDetail.history")}</span>
+              <button type="button" onClick={() => setHistoryOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 24, color: "var(--text-muted)", lineHeight: 1 }} aria-label="Close">×</button>
+            </div>
+            <div style={{ overflow: "auto", padding: 16 }}>
+              {historyLoading ? (
+                <p style={{ color: "var(--text-muted)", ...fontStyle }}>Loading…</p>
+              ) : historyEvents.length === 0 ? (
+                <p style={{ color: "var(--text-muted)", ...fontStyle }}>No changes yet.</p>
+              ) : (
+                <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                  {historyEvents.map((ev) => (
+                    <li key={ev.id} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid var(--border)" }}>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
+                        {new Date(ev.createdAt).toLocaleDateString(undefined, { dateStyle: "medium" })} {new Date(ev.createdAt).toLocaleTimeString(undefined, { timeStyle: "short" })}
+                      </div>
+                      <div style={{ fontSize: 14, color: "var(--text)", ...fontStyle }}>{formatHistoryEventSentence(ev)}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

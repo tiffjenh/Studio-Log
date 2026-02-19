@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
-import { formatCurrency, getAllScheduledDays } from "@/utils/earnings";
+import { formatCurrency, getAllScheduledDays, toDateKey, isStudentActive, isStudentHistorical } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Student } from "@/types";
 
@@ -59,28 +59,50 @@ export default function Students() {
   const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [dayFilter, setDayFilter] = useState<number | null>(null);
+  const [rosterTab, setRosterTab] = useState<"active" | "historical">("active");
+  const [historicalSort, setHistoricalSort] = useState<"az" | "za">("az");
   const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  let filtered = data.students.filter((s) =>
-    (dayFilter === null || getAllScheduledDays(s).some((sched) => sched.dayOfWeek === dayFilter)) &&
-    (!search.trim() || `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase()))
-  );
+  const todayKey = toDateKey(new Date());
+  const activeStudents = data.students.filter((s) => isStudentActive(s, todayKey));
+  const historicalStudents = data.students.filter((s) => isStudentHistorical(s, todayKey));
+
+  let filtered: Student[] =
+    rosterTab === "active"
+      ? activeStudents.filter(
+          (s) =>
+            (dayFilter === null || getAllScheduledDays(s).some((sched) => sched.dayOfWeek === dayFilter)) &&
+            (!search.trim() || `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase()))
+        )
+      : historicalStudents.filter(
+          (s) => !search.trim() || `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase())
+        );
 
   const byDayThenTime: { dayIndex: number; students: Student[] }[] =
-    dayFilter === null
-      ? DAY_LABELS.map((_, dayIndex) => ({
-          dayIndex,
-          students: sortStudentsByTime(filtered.filter((s) => getAllScheduledDays(s).some((sched) => sched.dayOfWeek === dayIndex))),
-        })).filter((g) => g.students.length > 0)
-      : [{ dayIndex: dayFilter, students: sortStudentsByTime(filtered) }];
+    rosterTab === "active"
+      ? dayFilter === null
+        ? DAY_LABELS.map((_, dayIndex) => ({
+            dayIndex,
+            students: sortStudentsByTime(filtered.filter((s) => getAllScheduledDays(s).some((sched) => sched.dayOfWeek === dayIndex))),
+          })).filter((g) => g.students.length > 0)
+        : [{ dayIndex: dayFilter, students: sortStudentsByTime(filtered) }]
+      : [];
+
+  const historicalSorted =
+    rosterTab === "historical"
+      ? [...filtered].sort((a, b) => {
+          const cmp = a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
+          return historicalSort === "za" ? -cmp : cmp;
+        })
+      : [];
 
   const durationStr = (s: Student) =>
     s.durationMinutes === 60 ? "1 hour" : s.durationMinutes === 30 ? "30 min" : s.durationMinutes === 45 ? "45 min" : `${s.durationMinutes / 60} hours`;
 
-  const totalCount = data.students.length;
+  const totalCount = rosterTab === "active" ? activeStudents.length : historicalStudents.length;
   const countPerDay = DAY_LABELS.map((_, dayIndex) =>
-    data.students.filter((s) => getAllScheduledDays(s).some((sched) => sched.dayOfWeek === dayIndex)).length
+    activeStudents.filter((s) => getAllScheduledDays(s).some((sched) => sched.dayOfWeek === dayIndex)).length
   );
 
   const handleConfirmDeleteAll = async () => {
@@ -131,47 +153,119 @@ export default function Students() {
           </Link>
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <button
           type="button"
-          onClick={() => setDayFilter(null)}
+          onClick={() => { setRosterTab("active"); setDayFilter(null); }}
+          className="pill"
           style={{
-            ...roundBtnStyle,
-            background: dayFilter === null ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
-            color: dayFilter === null ? "white" : "var(--text)",
-            flexShrink: 0,
+            padding: "10px 18px",
+            fontSize: 14,
+            fontWeight: 600,
+            fontFamily: "var(--font-sans)",
+            background: rosterTab === "active" ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
+            color: rosterTab === "active" ? "white" : "var(--text)",
+            border: "none",
+            cursor: "pointer",
           }}
         >
-          {t("students.all")}
+          {t("students.active")}
         </button>
-        <input
-          type="search"
-          placeholder={t("students.searchPlaceholder")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="search-frosted"
-          style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
-        />
+        <button
+          type="button"
+          onClick={() => setRosterTab("historical")}
+          className="pill"
+          style={{
+            padding: "10px 18px",
+            fontSize: 14,
+            fontWeight: 600,
+            fontFamily: "var(--font-sans)",
+            background: rosterTab === "historical" ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
+            color: rosterTab === "historical" ? "white" : "var(--text)",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          {t("students.historical")}
+        </button>
       </div>
-      <div style={{ display: "flex", flexWrap: "nowrap", gap: 10, marginBottom: 20 }}>
-        {DAY_SHORT.map((label, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => setDayFilter(i)}
+
+      {rosterTab === "active" && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={() => setDayFilter(null)}
+              style={{
+                ...roundBtnStyle,
+                background: dayFilter === null ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
+                color: dayFilter === null ? "white" : "var(--text)",
+                flexShrink: 0,
+              }}
+            >
+              {t("students.all")}
+            </button>
+            <input
+              type="search"
+              placeholder={t("students.searchPlaceholder")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="search-frosted"
+              style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
+            />
+          </div>
+          <div style={{ display: "flex", flexWrap: "nowrap", gap: 10, marginBottom: 20 }}>
+            {DAY_SHORT.map((label, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setDayFilter(i)}
+                style={{
+                  ...roundBtnStyle,
+                  background: dayFilter === i ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
+                  color: dayFilter === i ? "white" : "var(--text)",
+                  flexShrink: 0,
+                }}
+                title={`${DAY_FULL[i]} (${countPerDay[i]})`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {rosterTab === "historical" && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 16 }}>
+          <input
+            type="search"
+            placeholder={t("students.searchPlaceholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="search-frosted"
+            style={{ flex: 1, minWidth: 120, marginBottom: 0 }}
+          />
+          <select
+            value={historicalSort}
+            onChange={(e) => setHistoricalSort(e.target.value as "az" | "za")}
             style={{
-              ...roundBtnStyle,
-              background: dayFilter === i ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
-              color: dayFilter === i ? "white" : "var(--text)",
-              flexShrink: 0,
+              padding: "8px 12px",
+              fontSize: 14,
+              borderRadius: 10,
+              border: "1px solid var(--border)",
+              background: "var(--card)",
+              fontFamily: "var(--font-sans)",
+              color: "var(--text)",
+              cursor: "pointer",
             }}
-            title={`${DAY_FULL[i]} (${countPerDay[i]})`}
           >
-            {label}
-          </button>
-        ))}
-      </div>
-      {filtered.length === 0 ? (
+            <option value="az">A–Z</option>
+            <option value="za">Z–A</option>
+          </select>
+        </div>
+      )}
+
+      {rosterTab === "active" && filtered.length === 0 && (
         <div className="float-card" style={{ padding: 28, textAlign: "center" }}>
           <p style={{ color: "var(--text-muted)", marginBottom: 8, fontSize: 15 }}>
             {search ? t("students.noMatch") : dayFilter !== null ? `${t("students.noStudentsOnDay")} ${DAY_LABELS[dayFilter!]}` : t("students.noStudentsYet")}
@@ -182,7 +276,17 @@ export default function Students() {
             </p>
           )}
         </div>
-      ) : (
+      )}
+
+      {rosterTab === "historical" && historicalSorted.length === 0 && (
+        <div className="float-card" style={{ padding: 28, textAlign: "center" }}>
+          <p style={{ color: "var(--text-muted)", fontSize: 15 }}>
+            {search ? t("students.noMatch") : t("students.noHistoricalStudents")}
+          </p>
+        </div>
+      )}
+
+      {rosterTab === "active" && filtered.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {byDayThenTime.map(({ dayIndex, students }) => (
             <div key={dayIndex}>
@@ -198,6 +302,9 @@ export default function Students() {
                         <div style={{ fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
                         <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{durationStr(s)} / {formatCurrency(s.rateCents)}</div>
                         <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{getAllScheduledDays(s).map((sched) => DAY_LABELS[sched.dayOfWeek]).join(", ")}{s.timeOfDay && s.timeOfDay !== "\u2014" ? ` at ${s.timeOfDay}` : ""}</div>
+                        {s.terminatedFromDate && (
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4, fontStyle: "italic" }}>{t("studentDetail.terminatingOn", { date: s.terminatedFromDate })}</div>
+                        )}
                       </div>
                       <span style={{ color: "var(--text-muted)", fontSize: 18 }}>›</span>
                     </div>
@@ -205,6 +312,23 @@ export default function Students() {
                 ))}
               </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {rosterTab === "historical" && historicalSorted.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {historicalSorted.map((s) => (
+            <Link key={s.id} to={`/students/${s.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+              <div className="float-card" style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <StudentAvatar student={s} size={48} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{t("students.terminatedOn", { date: s.terminatedFromDate ?? "" })}</div>
+                </div>
+                <span style={{ color: "var(--text-muted)", fontSize: 18 }}>›</span>
+              </div>
+            </Link>
           ))}
         </div>
       )}

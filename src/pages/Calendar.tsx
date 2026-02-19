@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatCurrency, getStudentsForDay, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, getStudentIdsWithLessonOnDate, toDateKey, dedupeLessonsById, getWeekBounds, getSuppressedGeneratedSlotIds } from "@/utils/earnings";
+import { formatCurrency, getStudentsForDay, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, getStudentIdsWithLessonOnDate, toDateKey, dedupeLessonsById, getWeekBounds, getSuppressedGeneratedSlotIds, computeLessonAmountCents, isStudentActive } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Lesson, Student } from "@/types";
 
@@ -41,7 +41,9 @@ export default function Calendar() {
   const scheduledForDay = getStudentsForDay(data.students, dayOfWeek, dateKey).filter((s) => !suppressedGeneratedIds.has(s.id));
   const studentIdsWithLessonOnDate = getStudentIdsWithLessonOnDate(dedupedLessons, dateKey);
   const scheduledIds = new Set(scheduledForDay.map((s) => s.id));
-  const rescheduledOnly = data.students.filter((s) => studentIdsWithLessonOnDate.has(s.id) && !scheduledIds.has(s.id));
+  const rescheduledOnly = data.students.filter(
+    (s) => studentIdsWithLessonOnDate.has(s.id) && !scheduledIds.has(s.id) && isStudentActive(s, dateKey)
+  );
   const todaysStudents = [...scheduledForDay, ...rescheduledOnly].sort((a, b) => {
     const lessonA = getLessonForStudentOnDate(dedupedLessons, a.id, dateKey);
     const lessonB = getLessonForStudentOnDate(dedupedLessons, b.id, dateKey);
@@ -280,10 +282,9 @@ export default function Calendar() {
           const lesson = getLessonForStudentOnDate(dedupedLessons, student.id, dateKey);
           const completed = lesson?.completed ?? false;
           const effectiveDuration = getEffectiveDurationMinutes(student, dateKey);
-          const effectiveRate = getEffectiveRateCents(student, dateKey);
-          const amount = lesson?.amountCents ?? effectiveRate;
           const duration = lesson?.durationMinutes ?? effectiveDuration;
-          const display = duration >= 60 ? `${duration / 60} hour / ${formatCurrency(effectiveRate)}` : `${duration} mins ${formatCurrency(effectiveRate)}`;
+          const effectiveAmountCents = computeLessonAmountCents(student, lesson ?? undefined, dateKey);
+          const display = duration >= 60 ? `${duration / 60} hour / ${formatCurrency(effectiveAmountCents)}` : `${duration} mins / ${formatCurrency(effectiveAmountCents)}`;
           return (
             <div key={student.id} className="float-card" style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
               <div style={{ marginRight: 14, flexShrink: 0 }} onClick={() => handlePressLesson(student)}>
@@ -295,7 +296,7 @@ export default function Calendar() {
               </div>
               <label className="toggle-wrap">
                 <input type="checkbox" checked={completed} onChange={(e) => handleToggle(student.id, e.target.checked)} />
-                {completed && <span style={{ color: "var(--success)", fontWeight: 600 }}>{formatCurrency(amount)}</span>}
+                {completed && <span style={{ color: "var(--success)", fontWeight: 600 }}>{formatCurrency(effectiveAmountCents)}</span>}
               </label>
             </div>
           );

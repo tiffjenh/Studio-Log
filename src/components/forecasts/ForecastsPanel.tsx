@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { runForecast } from "@/lib/forecasts/runForecast";
 import type { EarningsRow, ForecastResponse, StudentSummary, SupportedLocale } from "@/lib/forecasts/types";
 import { useLanguage } from "@/context/LanguageContext";
+import { translateForInsights } from "@/utils/insightsLanguage";
 
 type Props = {
   earnings: EarningsRow[];
@@ -68,7 +69,25 @@ export default function ForecastsPanel({ earnings, students, rangeContext, voice
         earnings,
         students,
       });
-      setRes(data);
+      if (lang === "es" || lang === "zh") {
+        const [summaryTrans, detailsTrans] = await Promise.all([
+          translateForInsights(data.summary, lang),
+          data.details ? translateForInsights(data.details, lang) : Promise.resolve(""),
+        ]);
+        const answerTrans = data.answer?.body != null ? await translateForInsights(data.answer.body, lang) : null;
+        const titleTrans = data.answer?.title != null ? await translateForInsights(data.answer.title, lang) : null;
+        setRes({
+          ...data,
+          summary: summaryTrans,
+          details: detailsTrans,
+          answer:
+            data.answer && (titleTrans != null || answerTrans != null)
+              ? { title: titleTrans ?? data.answer.title, body: answerTrans ?? data.answer.body }
+              : data.answer,
+        });
+      } else {
+        setRes(data);
+      }
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Something went wrong");
     } finally {

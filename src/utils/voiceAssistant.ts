@@ -183,6 +183,33 @@ function parseDate(text: string, todayKey: string): DateInfo {
     }
   }
 
+  // Chinese: 上周一, 上周二, ... 上周日 (last Monday ... last Sunday)
+  const zhLastDayMatch = text.match(/上周([一二三四五六日])/);
+  if (zhLastDayMatch) {
+    const zhDayMap: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0 };
+    const targetDay = zhDayMap[zhLastDayMatch[1]];
+    if (targetDay != null) {
+      const d = new Date(today);
+      const diff = (today.getDay() - targetDay + 7) % 7 || 7;
+      d.setDate(d.getDate() - diff);
+      return { date: toYMD(d), isExplicitNonToday: true };
+    }
+  }
+
+  // Spanish: "el martes pasado", "el lunes pasado"
+  const esLastDayRe = /\b(?:el\s+)?(lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\s+pasado\b/i;
+  const esLastMatch = lower.match(esLastDayRe);
+  if (esLastMatch) {
+    const esToNum: Record<string, number> = { lunes: 1, martes: 2, miércoles: 3, miercoles: 3, jueves: 4, viernes: 5, sábado: 6, sabado: 6, domingo: 0 };
+    const targetDay = esToNum[esLastMatch[1].toLowerCase()];
+    if (targetDay != null) {
+      const d = new Date(today);
+      const diff = (today.getDay() - targetDay + 7) % 7 || 7;
+      d.setDate(d.getDate() - diff);
+      return { date: toYMD(d), isExplicitNonToday: true };
+    }
+  }
+
   // "Monday February 9", "Feb 9", "February 9th", "Monday Feb 9"
   const monthDayMatch = lower.match(
     /(?:(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\s+)?(?:go\s+to\s+)?(?:(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thurs|fri|sat)\s+)?(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/

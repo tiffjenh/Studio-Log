@@ -59,3 +59,13 @@ export interface AppData {
   students: Student[];
   lessons: Lesson[];
 }
+
+export interface StudentChangeEvent {
+  id: string;
+  studentId: string;
+  eventType: string;
+  effectiveFromDate: string | null;
+  oldValue: Record<string, unknown> | null;
+  newValue: Record<string, unknown> | null;
+  createdAt: string;
+}

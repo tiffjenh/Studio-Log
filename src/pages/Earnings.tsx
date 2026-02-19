@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -10,6 +11,8 @@ import {
   getWeeksInMonth,
   getDailyTotalsForWeek,
   getYAxisTicks,
+  isStudentActive,
+  isStudentHistorical,
 } from "@/utils/earnings";
 import type { Lesson } from "@/types";
 
@@ -35,6 +38,23 @@ const LINE_CHART = {
 
 const EMPTY_TICKS = [0, 5000, 10000, 15000, 20000];
 
+/** Format for bar value labels: no cents, with commas (e.g. $3,180). */
+function formatBarLabel(cents: number): string {
+  return "$" + (cents / 100).toLocaleString("en-US", { maximumFractionDigits: 0, minimumFractionDigits: 0 });
+}
+
+/** Compact format for bar labels to avoid overlap (e.g. $3.1K, $3.4K). */
+function formatBarLabelCompact(cents: number): string {
+  const d = cents / 100;
+  if (d >= 1000) {
+    const k = d / 1000;
+    const s = k % 1 === 0 ? `${k}K` : k.toFixed(1).replace(/\.0$/, "") + "K";
+    return "$" + s;
+  }
+  if (d >= 1) return "$" + Math.round(d);
+  return d > 0 ? "$" + d.toFixed(0) : "$0";
+}
+
 function BarChart({
   data,
   xLabels,
@@ -45,6 +65,11 @@ function BarChart({
   angleXLabels = false,
   noEarningsText = "No earnings",
   yAxisStepCents,
+  maxBarWidth = 40,
+  barWidthPct = 75,
+  whitePlotBackground = false,
+  staggerValueLabels = false,
+  compactBarLabels = false,
 }: {
   data: number[];
   xLabels: string[];
@@ -56,6 +81,16 @@ function BarChart({
   noEarningsText?: string;
   /** When set, Y-axis uses this step in cents (e.g. 500000 = $5000). Used for yearly graph. */
   yAxisStepCents?: number;
+  /** Max width per bar in px (e.g. 22 for 12 skinny bars). */
+  maxBarWidth?: number;
+  /** Bar width as % of slot (e.g. 50 for skinny). */
+  barWidthPct?: number;
+  /** White plot area (e.g. for Monthly chart). */
+  whitePlotBackground?: boolean;
+  /** Stagger value labels above bars to avoid overlap (e.g. for Monthly). */
+  staggerValueLabels?: boolean;
+  /** Use short labels like $3.1K to fit above bars (e.g. for Monthly). */
+  compactBarLabels?: boolean;
 }) {
   const isEmpty = maxVal <= 0 || data.every((v) => v === 0);
   const ticks = isEmpty
@@ -73,6 +108,10 @@ function BarChart({
   const showSubLabels = xSubLabels && xSubLabels.length === data.length;
   const isClickable = Boolean(dateKeys?.length && onBarClick && dateKeys.length === data.length);
 
+  const labelTopPadding = staggerValueLabels ? 28 : 0;
+  const gridLineColor = whitePlotBackground ? "rgba(0,0,0,0.08)" : "var(--border)";
+  const plotBorderColor = whitePlotBackground ? "rgba(180, 160, 180, 0.25)" : "var(--border)";
+
   const formatAxis = yAxisStepCents != null ? formatCurrencyWithCommas : formatCurrency;
   return (
     <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
@@ -82,7 +121,22 @@ function BarChart({
         ))}
       </div>
       <div style={{ flex: 1, position: "relative" }}>
-        <div style={{ position: "relative", height: CHART_HEIGHT, borderBottom: "1px solid var(--border)" }}>
+        {labelTopPadding > 0 && <div style={{ height: labelTopPadding, flexShrink: 0 }} aria-hidden="true" />}
+        <div
+          style={{
+            position: "relative",
+            height: CHART_HEIGHT,
+            borderBottom: `1px solid ${plotBorderColor}`,
+            ...(whitePlotBackground
+              ? {
+                  background: "#ffffff",
+                  borderRadius: "var(--radius-card)",
+                  border: `1px solid ${plotBorderColor}`,
+                  borderBottom: `1px solid ${plotBorderColor}`,
+                }
+              : {}),
+          }}
+        >
           {ticks.slice(1).map((t) => (
             <div
               key={t}
@@ -92,7 +146,7 @@ function BarChart({
                 right: 0,
                 bottom: `${(t / chartMax) * 100}%`,
                 height: 1,
-                background: "var(--border)",
+                background: gridLineColor,
               }}
             />
           ))}
@@ -106,6 +160,10 @@ function BarChart({
               const heightPct = chartMax > 0 ? (v / chartMax) * 100 : 0;
               const barHeight = Math.max(v > 0 ? 6 : 0, (heightPct / 100) * CHART_HEIGHT);
               const dateKey = dateKeys?.[i];
+              const staggerOffset = staggerValueLabels ? (i % 2 === 0 ? -8 : 8) : 0;
+              const labelStyle = staggerValueLabels
+                ? { fontSize: 10, fontWeight: 600, marginBottom: 4, color: "var(--text)", transform: `translateY(${staggerOffset}px)` }
+                : { fontSize: 11, fontWeight: 600, marginBottom: 4 };
               return (
                 <div
                   key={i}
@@ -117,15 +175,15 @@ function BarChart({
                     flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "flex-end",
-                    maxWidth: 40,
+                    maxWidth: maxBarWidth,
                     cursor: isClickable ? "pointer" : "default",
                   }}
                 >
-                  <span style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>{v > 0 ? formatCurrency(v) : ""}</span>
+                  <span style={labelStyle}>{compactBarLabels ? formatBarLabelCompact(v) : formatBarLabel(v)}</span>
                   <div
                     title={formatCurrency(v)}
                     style={{
-                      width: "75%",
+                      width: `${barWidthPct}%`,
                       height: barHeight,
                       minHeight: v > 0 ? 6 : 0,
                       background: "var(--avatar-gradient)",
@@ -368,6 +426,7 @@ export default function Earnings() {
   const [selectedYearKey, setSelectedYearKey] = useState<string | null>(null);
   const [studentsSearch, setStudentsSearch] = useState("");
   const [studentsSort, setStudentsSort] = useState<"az" | "za" | "high" | "low">("high");
+  const [studentsStatusFilter, setStudentsStatusFilter] = useState<"active" | "inactive">("active");
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [dlYear, setDlYear] = useState(0); // 0 = unset; will init on open
   const [dlFormat, setDlFormat] = useState<"csv" | "pdf">("csv");
@@ -835,13 +894,18 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
           {monthsToShow > 0 && (
             <>
               <div style={{ marginBottom: 24 }}>
-                <LineChart
+                <BarChart
                   data={visibleMonthlyTotals}
                   xLabels={visibleMonthLabels}
                   maxVal={maxMonthly}
                   noEarningsText={t("earnings.noEarnings")}
                   dateKeys={visibleMonthLabels.map((_, i) => `${displayYear}-${String(i + 1).padStart(2, "0")}`)}
-                  onPointClick={(key) => setSelectedMonthKey((prev) => (prev === key ? null : key))}
+                  onBarClick={(key) => setSelectedMonthKey((prev) => (prev === key ? null : key))}
+                  maxBarWidth={22}
+                  barWidthPct={50}
+                  whitePlotBackground
+                  staggerValueLabels
+                  compactBarLabels
                 />
               </div>
               <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
@@ -1111,12 +1175,25 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
           student: s,
           total: lessonsForStudentsYear.filter((l) => l.studentId === s.id).reduce((a, l) => a + l.amountCents, 0),
         }));
+        const studentsWithEarnings = studentTotals.filter(({ total }) => total > 0);
+        const cutoffDate =
+          studentsDisplayYear === thisYear ? todayKey : `${studentsDisplayYear}-12-31`;
+        let activeCount = 0;
+        let inactiveCount = 0;
+        for (const { student } of studentsWithEarnings) {
+          if (isStudentActive(student, cutoffDate)) activeCount += 1;
+          else inactiveCount += 1;
+        }
+        const filteredByStatus =
+          studentsStatusFilter === "active"
+            ? studentTotals.filter(({ student }) => isStudentActive(student, cutoffDate))
+            : studentTotals.filter(({ student }) => isStudentHistorical(student, cutoffDate));
         const q = studentsSearch.trim().toLowerCase();
         const filtered = q
-          ? studentTotals.filter(({ student: s }) =>
+          ? filteredByStatus.filter(({ student: s }) =>
               `${s.firstName} ${s.lastName}`.toLowerCase().includes(q)
             )
-          : studentTotals;
+          : filteredByStatus;
         const sorted = [...filtered].sort((a, b) => {
           switch (studentsSort) {
             case "az":
@@ -1131,6 +1208,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
               return 0;
           }
         });
+        const isEmptyInactive = studentsStatusFilter === "inactive" && sorted.length === 0;
         return (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
@@ -1165,16 +1243,96 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                 <option value="low">Low–High</option>
               </select>
             </div>
+            <div className="hero-card" style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 12 }}>
+                {studentsDisplayYear === thisYear ? `${studentsDisplayYear} ${t("earnings.earningsYTD")}` : `${t("earnings.earningsYear")} ${studentsDisplayYear}`}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.activeStudents")}</div>
+                  <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{activeCount}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.inactiveStudents")}</div>
+                  <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{inactiveCount}</div>
+                </div>
+              </div>
+            </div>
+            {/* Active / Inactive segmented toggle */}
+            <div style={{ display: "flex", gap: 0, marginBottom: 20, borderRadius: "var(--radius-pill)", padding: 4, background: "rgba(180, 160, 180, 0.08)", border: "1px solid var(--border)", width: "fit-content" }}>
+              <button
+                type="button"
+                onClick={() => setStudentsStatusFilter("active")}
+                style={{
+                  padding: "10px 20px",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  border: studentsStatusFilter === "active" ? "1px solid var(--border)" : "1px solid transparent",
+                  borderRadius: "var(--radius-pill)",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-sans)",
+                  background: studentsStatusFilter === "active" ? "var(--avatar-gradient)" : "transparent",
+                  boxShadow: studentsStatusFilter === "active" ? "var(--shadow-soft)" : "none",
+                  color: studentsStatusFilter === "active" ? "var(--text)" : "var(--text-muted)",
+                }}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setStudentsStatusFilter("inactive")}
+                style={{
+                  padding: "10px 20px",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  border: studentsStatusFilter === "inactive" ? "1px solid var(--border)" : "1px solid transparent",
+                  borderRadius: "var(--radius-pill)",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-sans)",
+                  background: studentsStatusFilter === "inactive" ? "var(--avatar-gradient)" : "transparent",
+                  boxShadow: studentsStatusFilter === "inactive" ? "var(--shadow-soft)" : "none",
+                  color: studentsStatusFilter === "inactive" ? "var(--text)" : "var(--text-muted)",
+                }}
+              >
+                Inactive
+              </button>
+            </div>
             <div className="float-card" style={{ padding: 0, overflow: "hidden" }}>
-              {sorted.length === 0 && (
-                <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>No students found</div>
+              {isEmptyInactive && (
+                <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>No inactive students this year.</div>
               )}
-              {sorted.map(({ student: s, total }) => (
-                <div key={s.id} className="card-list-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingLeft: 20, paddingRight: 20 }}>
+              {sorted.length > 0 && !isEmptyInactive && sorted.map(({ student: s, total }) => (
+                <Link
+                  key={s.id}
+                  to={`/students/${s.id}`}
+                  className="card-list-item"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingLeft: 20,
+                    paddingRight: 20,
+                    paddingTop: 14,
+                    paddingBottom: 14,
+                    textDecoration: "none",
+                    color: "inherit",
+                    cursor: "pointer",
+                    transition: "background 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(180, 160, 180, 0.06)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
                   <span>{s.firstName} {s.lastName}</span>
                   <span style={{ fontWeight: 600 }}>{formatCurrency(total)}</span>
-                </div>
+                </Link>
               ))}
+              {sorted.length === 0 && !isEmptyInactive && (
+                <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>No students found</div>
+              )}
             </div>
           </>
         );

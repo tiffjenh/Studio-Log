@@ -323,15 +323,6 @@ export function useStore() {
       const removeIds = new Set(allToRemove.map((l) => l.id));
 
       if (hasSupabase() && data.user) {
-        // TEMP DEBUG: lessonId being saved; DB call is update only (no insert/upsert)
-        console.log("[RESCHEDULE DEBUG] updateLesson Supabase path", {
-          lessonId: id,
-          oldDate: oldDate ?? null,
-          newDate: newDate ?? null,
-          isDateMove,
-          dbCall: "update",
-          method: isDateMove && oldDate ? "deleteOtherLessonsForStudentOnDates + updateLessonSupabase (update only)" : "updateLessonSupabase only",
-        });
         if (isDateMove && oldDate) {
           await deleteOtherLessonsForStudentOnDates(
             data.user.id,
@@ -372,16 +363,7 @@ export function useStore() {
             console.warn("[Reschedule] Safe cleanup on old date failed:", e);
           }
           await load();
-          // TEMP DEBUG: after save, query DB for this student on old/new date. If 2 rows → DB bug (delete didn't work). If 1 → DB OK.
           const rows = await debugFetchLessonsForStudentOnDates(data.user.id, cur.studentId, oldDate, newDate as string);
-          console.log("[RESCHEDULE DEBUG] After save: lessons in DB for this student on old/new date", {
-            count: rows.length,
-            rows: rows.map((r) => ({ id: r.id, student_id: r.student_id, lesson_date: r.lesson_date, created_at: r.created_at })),
-            rootCause: rows.length > 1 ? "DB: delete did not remove the other row" : "DB has 1 row (OK)",
-          });
-          if (rows.length > 1) {
-            console.log("[RESCHEDULE DEBUG] Two rows — both IDs and created_at:", rows.map((r) => ({ id: r.id, created_at: r.created_at })));
-          }
           // Fix: if DB still has 2 rows, delete the other(s) by id so only our lesson remains
           if (rows.length > 1) {
             for (const r of rows) {

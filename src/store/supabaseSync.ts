@@ -1,5 +1,5 @@
 import { supabase, hasSupabase } from "@/lib/supabase";
-import type { AppData, Lesson, Student, User } from "@/types";
+import type { AppData, Lesson, Student, StudentChangeEvent, User } from "@/types";
 
 function rowToStudent(r: Record<string, unknown>): Student {
   return {
@@ -62,7 +62,7 @@ export async function fetchUser(uid: string): Promise<User | null> {
 const STUDENTS_FETCH_PAGE_SIZE = 1000;
 
 /** Base columns from 001; optional columns from later migrations may be missing in some projects. */
-const STUDENTS_SELECT = "id, first_name, last_name, duration_minutes, rate_cents, day_of_week, time_of_day, location";
+const STUDENTS_SELECT = "id, first_name, last_name, duration_minutes, rate_cents, day_of_week, time_of_day, location, schedule_change_from_date, schedule_change_day_of_week, schedule_change_time_of_day, schedule_change_duration_minutes, schedule_change_rate_cents, schedule_change_additional_schedules, terminated_from_date, avatar_icon, additional_schedules";
 
 export async function fetchStudents(uid: string): Promise<Student[]> {
   if (!supabase) return [];
@@ -162,15 +162,76 @@ export async function updatePasswordSupabase(newPassword: string): Promise<{ err
   return {};
 }
 
+/** Today as YYYY-MM-DD (local date) for comparing with lesson_date / schedule_change_from_date. */
+function getTodayDateKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * When schedule_change_from_date <= today, copy schedule_change_* into base fields and clear schedule_change_*.
+ * Called after fetch so calendar/home and profile always see finalized schedules. One place, no duplication.
+ */
+async function applyEffectiveScheduleChanges(uid: string, students: Student[]): Promise<Student[]> {
+  const todayKey = getTodayDateKey();
+  const toApply = students.filter(
+    (s) => s.scheduleChangeFromDate && s.scheduleChangeFromDate <= todayKey && s.scheduleChangeDayOfWeek != null && s.scheduleChangeTimeOfDay != null
+  );
+  for (const s of toApply) {
+    try {
+      const oldBase = {
+        dayOfWeek: s.dayOfWeek,
+        timeOfDay: s.timeOfDay,
+        durationMinutes: s.durationMinutes,
+        rateCents: s.rateCents,
+        additionalSchedules: s.additionalSchedules ?? null,
+      };
+      const newBase = {
+        dayOfWeek: s.scheduleChangeDayOfWeek,
+        timeOfDay: s.scheduleChangeTimeOfDay,
+        durationMinutes: s.scheduleChangeDurationMinutes ?? s.durationMinutes,
+        rateCents: s.scheduleChangeRateCents ?? s.rateCents,
+        additionalSchedules: s.scheduleChangeAdditionalSchedules ?? s.additionalSchedules ?? null,
+      };
+      await insertStudentChangeEvent(uid, s.id, {
+        eventType: "schedule_change_applied",
+        effectiveFromDate: s.scheduleChangeFromDate ?? undefined,
+        oldValue: oldBase,
+        newValue: newBase,
+      });
+      await updateStudentSupabase(uid, s.id, {
+        dayOfWeek: s.scheduleChangeDayOfWeek,
+        timeOfDay: s.scheduleChangeTimeOfDay,
+        durationMinutes: s.scheduleChangeDurationMinutes ?? s.durationMinutes,
+        rateCents: s.scheduleChangeRateCents ?? s.rateCents,
+        additionalSchedules: s.scheduleChangeAdditionalSchedules ?? s.additionalSchedules,
+        scheduleChangeFromDate: undefined,
+        scheduleChangeDayOfWeek: undefined,
+        scheduleChangeTimeOfDay: undefined,
+        scheduleChangeDurationMinutes: undefined,
+        scheduleChangeRateCents: undefined,
+        scheduleChangeAdditionalSchedules: undefined,
+      });
+    } catch (e) {
+      console.warn("[Studio Log] Apply schedule change failed for student", s.id, e);
+    }
+  }
+  if (toApply.length > 0) {
+    return fetchStudents(uid);
+  }
+  return students;
+}
+
 export async function loadFromSupabase(): Promise<AppData | null> {
   if (!hasSupabase() || !supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { user: null, students: [], lessons: [] };
-  const [profile, students, lessons] = await Promise.all([
+  const [profile, studentsRaw, lessons] = await Promise.all([
     fetchUser(user.id),
     fetchStudents(user.id),
     fetchLessons(user.id),
   ]);
+  const students = await applyEffectiveScheduleChanges(user.id, studentsRaw);
   return { user: profile, students, lessons };
 }
 
@@ -313,14 +374,14 @@ export async function updateStudentSupabase(uid: string, id: string, updates: Pa
   if (updates.dayOfWeek != null) row.day_of_week = updates.dayOfWeek;
   if (updates.timeOfDay != null) row.time_of_day = updates.timeOfDay;
   if (updates.location !== undefined) row.location = updates.location ?? null;
-  if (updates.scheduleChangeFromDate !== undefined) row.schedule_change_from_date = updates.scheduleChangeFromDate || null;
-  if (updates.scheduleChangeDayOfWeek !== undefined) row.schedule_change_day_of_week = updates.scheduleChangeDayOfWeek ?? null;
-  if (updates.scheduleChangeTimeOfDay !== undefined) row.schedule_change_time_of_day = updates.scheduleChangeTimeOfDay || null;
-  if (updates.scheduleChangeDurationMinutes !== undefined) row.schedule_change_duration_minutes = updates.scheduleChangeDurationMinutes ?? null;
-  if (updates.scheduleChangeRateCents !== undefined) row.schedule_change_rate_cents = updates.scheduleChangeRateCents ?? null;
-  if (updates.terminatedFromDate !== undefined) row.terminated_from_date = updates.terminatedFromDate || null;
+  if ("scheduleChangeFromDate" in updates) row.schedule_change_from_date = updates.scheduleChangeFromDate || null;
+  if ("scheduleChangeDayOfWeek" in updates) row.schedule_change_day_of_week = updates.scheduleChangeDayOfWeek ?? null;
+  if ("scheduleChangeTimeOfDay" in updates) row.schedule_change_time_of_day = updates.scheduleChangeTimeOfDay || null;
+  if ("scheduleChangeDurationMinutes" in updates) row.schedule_change_duration_minutes = updates.scheduleChangeDurationMinutes ?? null;
+  if ("scheduleChangeRateCents" in updates) row.schedule_change_rate_cents = updates.scheduleChangeRateCents ?? null;
+  if ("terminatedFromDate" in updates) row.terminated_from_date = updates.terminatedFromDate || null;
   if (updates.additionalSchedules !== undefined) row.additional_schedules = updates.additionalSchedules?.length ? JSON.stringify(updates.additionalSchedules) : null;
-  if (updates.scheduleChangeAdditionalSchedules !== undefined) row.schedule_change_additional_schedules = updates.scheduleChangeAdditionalSchedules?.length ? JSON.stringify(updates.scheduleChangeAdditionalSchedules) : null;
+  if ("scheduleChangeAdditionalSchedules" in updates) row.schedule_change_additional_schedules = updates.scheduleChangeAdditionalSchedules?.length ? JSON.stringify(updates.scheduleChangeAdditionalSchedules) : null;
   if (updates.avatarIcon !== undefined) row.avatar_icon = updates.avatarIcon || null;
   if (Object.keys(row).length) await supabase.from("students").update(row).eq("id", id).eq("user_id", uid);
 }
@@ -522,6 +583,62 @@ export async function deleteLessonSupabase(_uid: string, lessonId: string): Prom
   if (!data || !Array.isArray(data) || data.length === 0) {
     throw new Error("Lesson not found or could not be deleted. Try logging out and back in, then try again.");
   }
+}
+
+const STUDENT_CHANGE_EVENTS_SELECT = "id, student_id, event_type, effective_from_date, old_value, new_value, created_at";
+
+function rowToStudentChangeEvent(r: Record<string, unknown>): StudentChangeEvent {
+  const created = r.created_at;
+  const createdStr = typeof created === "string" ? created : created != null ? new Date(created as number).toISOString() : "";
+  return {
+    id: r.id as string,
+    studentId: r.student_id as string,
+    eventType: r.event_type as string,
+    effectiveFromDate: r.effective_from_date != null ? String(r.effective_from_date).slice(0, 10) : null,
+    oldValue: (r.old_value as Record<string, unknown>) ?? null,
+    newValue: (r.new_value as Record<string, unknown>) ?? null,
+    createdAt: createdStr,
+  };
+}
+
+export async function fetchStudentChangeEvents(uid: string, studentId: string): Promise<StudentChangeEvent[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("student_change_events")
+    .select(STUDENT_CHANGE_EVENTS_SELECT)
+    .eq("user_id", uid)
+    .eq("student_id", studentId)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.warn("[Studio Log] Failed to fetch student change events:", error.message);
+    return [];
+  }
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => rowToStudentChangeEvent(r));
+}
+
+export type StudentChangeEventInsert = {
+  eventType: string;
+  effectiveFromDate?: string | null;
+  oldValue?: Record<string, unknown> | null;
+  newValue?: Record<string, unknown> | null;
+};
+
+export async function insertStudentChangeEvent(
+  uid: string,
+  studentId: string,
+  payload: StudentChangeEventInsert
+): Promise<void> {
+  if (!supabase) return;
+  const row: Record<string, unknown> = {
+    user_id: uid,
+    student_id: studentId,
+    event_type: payload.eventType,
+    effective_from_date: payload.effectiveFromDate ?? null,
+    old_value: payload.oldValue ?? null,
+    new_value: payload.newValue ?? null,
+  };
+  const { error } = await supabase.from("student_change_events").insert(row);
+  if (error) console.warn("[Studio Log] Failed to insert student change event:", error.message);
 }
 
 export async function deleteAllLessonsSupabase(uid: string): Promise<void> {

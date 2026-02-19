@@ -175,13 +175,15 @@ export function parseQueryParams(query: string): ParsedQuery {
 
   // Dollar amounts: look for "100000" / "$100,000" / "100k" and "70/hour" / "$70/hr"
   const amounts = extractDollarAmounts(query);
+  const targetIncomePattern =
+    /\b(make|earn|reach|get\s+to|hit|goal|target|income|ingresos|收入|require|necesito|alcanzar|llegar\s+a|要赚|需要|才能赚)\s*(?:of\s*)?\$?[\d,]+\s*(k|K)?|\$?[\d,]+\s*(k|K)?\s*(?:this\s+year|per\s+year|yearly|require|para\s+llegar)/i;
   if (
-    (/\b(make|earn|reach|get\s+to|hit|goal|target|income|ingresos|收入|require)\s*(?:of\s*)?\$?[\d,]+\s*(k|K)?|\$?[\d,]+\s*(k|K)?\s*(?:this\s+year|per\s+year|yearly|require)/i.test(q) || /\bwhat\s+does\s+\$?[\d,]+\s*(k|K)?\s+require/i.test(q)) &&
+    (targetIncomePattern.test(q) || /\bwhat\s+does\s+\$?[\d,]+\s*(k|K)?\s+require/i.test(q) || /(?:cuántos|cuantas)\s+estudiantes?\s+necesito|多少学生.*才能|需要多少学生/i.test(q)) &&
     amounts.length >= 1
   ) {
     parsed.target_income = amounts[0]!;
   }
-  if (/\b(\$?\d+\s*\/?\s*(?:per\s+)?(?:hour|hr|hora|小时)|hourly\s+rate|rate\s+per\s+hour)/i.test(q)) {
+  if (/\b(\$?\d+\s*\/?\s*(?:per\s+)?(?:hour|hr|hora|小时)|hourly\s+rate|rate\s+per\s+hour|tarifa\s+por\s+hora|时薪)/i.test(q)) {
     const hrMatch = query.match(/(\d+(?:\.\d+)?)\s*(?:\/|per)\s*(?:hour|hr|hora|小时)/i) ?? query.match(/(?:hourly|rate)\s*[:\s]*\$?\s*(\d+(?:\.\d+)?)/i);
     if (hrMatch) parsed.hourly_rate = parseFloat(hrMatch[1]!);
     else if (amounts.length >= 2) parsed.hourly_rate = amounts[1]!;
@@ -197,8 +199,12 @@ export function parseQueryParams(query: string): ParsedQuery {
   const hpwMatch = query.match(/(\d+(?:\.\d+)?)\s*(?:hour|hr)s?\s*per\s*(?:student|week)/i) ?? query.match(/(?:per\s+student|per\s+week)[^\d]*(\d+(?:\.\d+)?)/i);
   if (hpwMatch) parsed.avg_hours_per_student_per_week = parseFloat(hpwMatch[1]!);
 
-  // Rate increase: $10/hour or 5%
-  const rateIncDol = query.match(/(?:raise|increase|raise\s+rates?\s+by)\s+\$?\s*(\d+(?:\.\d+)?)/i) ?? query.match(/\$(\d+)\s*(?:per\s+)?hour/i);
+  // Rate increase: $10/hour or 5% (EN: raise by $10; ES: aumentar 10, subir 10; ZH: 涨价10, 涨10美元)
+  const rateIncDol =
+    query.match(/(?:raise|increase|raise\s+rates?\s+by)\s+\$?\s*(\d+(?:\.\d+)?)/i) ??
+    query.match(/(?:aumentar|subir|subo)\s+(?:las?\s+tarifas?\s+)?(?:en\s+)?\$?\s*(\d+(?:\.\d+)?)/i) ??
+    query.match(/(?:涨价|涨|加价)\s*(\d+(?:\.\d+)?)\s*(?:美元|块|元)?/i) ??
+    query.match(/\$(\d+)\s*(?:per\s+)?hour/i);
   if (rateIncDol) parsed.rate_increase_dollars = parseFloat(rateIncDol[1]!);
   const rateIncPct = query.match(/(\d+(?:\.\d+)?)\s*%\s*(?:rate|increase)/i) ?? query.match(/increase\s+(?:rates?\s+)?(?:by\s+)?(\d+)\s*%/i);
   if (rateIncPct) parsed.rate_increase_percent = parseFloat(rateIncPct[1]!);
@@ -207,12 +213,20 @@ export function parseQueryParams(query: string): ParsedQuery {
   const newRateMatch = query.match(/(?:charged?|at|rate\s+of)\s+\$?\s*(\d+)\s*(?:\/|\s*per)\s*(?:hour|hr)/i) ?? query.match(/\$(\d+)\s*\/?\s*hr?/);
   if (newRateMatch) parsed.new_rate = parseFloat(newRateMatch[1]!);
 
-  // Add N new students
-  const addStudentsMatch = query.match(/(?:add(?:ed)?|adding)\s+(\d+)\s+(?:new\s+)?(?:weekly\s+)?students?/i) ?? query.match(/(\d+)\s+new\s+students?/i);
+  // Add N new students (EN: add 3 new students; ES: añadir 3 estudiantes; ZH: 增加3个学生)
+  const addStudentsMatch =
+    query.match(/(?:add(?:ed)?|adding)\s+(\d+)\s+(?:new\s+)?(?:weekly\s+)?students?/i) ??
+    query.match(/(\d+)\s+new\s+students?/i) ??
+    query.match(/(?:añadir|agregar)\s+(\d+)\s+(?:nuevos?\s+)?estudiantes?/i) ??
+    query.match(/(?:增加|加)\s*(\d+)\s*(?:个)?学生/i);
   if (addStudentsMatch) parsed.new_students_added = parseInt(addStudentsMatch[1]!, 10);
 
-  // Take N weeks off
-  const weeksOffMatch = query.match(/(?:take|taking)\s+(\d+)\s+weeks?\s+off/i) ?? query.match(/(\d+)\s+weeks?\s+off/i);
+  // Take N weeks off (EN; ES: tomar X semanas libre; ZH: 休X周)
+  const weeksOffMatch =
+    query.match(/(?:take|taking)\s+(\d+)\s+weeks?\s+off/i) ??
+    query.match(/(\d+)\s+weeks?\s+off/i) ??
+    query.match(/(?:tomar|tomando)\s+(\d+)\s+semanas?\s+(?:libre|libres)/i) ??
+    query.match(/(?:休|休息)\s*(\d+)\s*周/i);
   if (weeksOffMatch) parsed.weeks_off = parseInt(weeksOffMatch[1]!, 10);
 
   return parsed;

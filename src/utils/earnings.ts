@@ -207,12 +207,47 @@ export function getEffectiveRateCents(student: Student, dateKey: string): number
   return student.rateCents;
 }
 
+/**
+ * Effective amount (cents) for a specific lesson instance.
+ * Uses lesson.amountCents if set and > 0; otherwise computes from the student's default rate for that date and the lesson's duration (pro-rated).
+ * All math in cents; rounds to nearest cent.
+ */
+export function computeLessonAmountCents(
+  student: Student,
+  lesson: Lesson | undefined,
+  dateKey: string
+): number {
+  if (lesson?.amountCents != null && lesson.amountCents > 0) return lesson.amountCents;
+  const defaultRate = getEffectiveRateCents(student, dateKey);
+  const defaultDuration = getEffectiveDurationMinutes(student, dateKey);
+  if (defaultDuration <= 0) return defaultRate;
+  const duration = lesson?.durationMinutes ?? defaultDuration;
+  return Math.round((defaultRate * duration) / defaultDuration);
+}
+
+/**
+ * Whether a student is active for a given view date (YYYY-MM-DD).
+ * terminated_from_date = last lesson date. Active when: no termination OR viewDate <= terminated_from_date.
+ */
+export function isStudentActive(student: Student, viewDateKey: string): boolean {
+  if (!student.terminatedFromDate) return true;
+  return viewDateKey <= student.terminatedFromDate;
+}
+
+/**
+ * Whether a student is historical (inactive) for a given view date.
+ * Historical when: terminated_from_date is set AND viewDate > terminated_from_date.
+ */
+export function isStudentHistorical(student: Student, viewDateKey: string): boolean {
+  return !isStudentActive(student, viewDateKey);
+}
+
 /** Students who have a lesson on the given day. Pass dateKey to respect schedule changes and termination.
  *  Now supports multi-day students (primary + additional schedules). */
 export function getStudentsForDay(students: Student[], dayOfWeek: number, dateKey?: string): Student[] {
   return students
     .filter((s) => {
-      if (s.terminatedFromDate && dateKey && dateKey > s.terminatedFromDate) return false;
+      if (dateKey && !isStudentActive(s, dateKey)) return false;
       if (dateKey) {
         return getEffectiveSchedules(s, dateKey).some((sched) => sched.dayOfWeek === dayOfWeek);
       }

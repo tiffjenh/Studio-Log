@@ -31,7 +31,7 @@ function getNested(
 type LanguageContextValue = {
   lang: LangCode;
   setLang: (code: LangCode) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
@@ -54,12 +54,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const t = useCallback(
-    (key: string): string => {
+    (key: string, params?: Record<string, string | number>): string => {
       const dict = translations[lang];
-      const value = getNested(dict as Record<string, unknown>, key);
-      if (value !== undefined) return value;
-      const fallback = getNested(en as Record<string, unknown>, key);
-      return fallback ?? key;
+      let value = getNested(dict as Record<string, unknown>, key);
+      if (value === undefined) value = getNested(en as Record<string, unknown>, key);
+      let out = value ?? key;
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          out = out.replace(new RegExp(`\\{\\{${k}\\}\\}`, "g"), String(v));
+        }
+      }
+      return out;
     },
     [lang]
   );

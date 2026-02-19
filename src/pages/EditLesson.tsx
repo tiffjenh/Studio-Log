@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatCurrency } from "@/utils/earnings";
+import { formatCurrency, getEffectiveRateCents, getEffectiveDurationMinutes } from "@/utils/earnings";
 import DatePicker, { parseToDateKey } from "@/components/DatePicker";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Lesson } from "@/types";
@@ -76,8 +76,9 @@ export default function EditLesson() {
 
   if (!lesson || !student) return <p style={{ padding: 24 }}>Lesson not found</p>;
 
-  const ratePerHour = student.rateCents / (student.durationMinutes / 60);
-  const amountCents = Math.round((ratePerHour * durationMinutes) / 60);
+  const defaultRate = getEffectiveRateCents(student, lessonDate);
+  const defaultDuration = getEffectiveDurationMinutes(student, lessonDate);
+  const amountCents = defaultDuration <= 0 ? defaultRate : Math.round((defaultRate * durationMinutes) / defaultDuration);
   const [y, m, d] = lessonDate.split("-").map(Number);
   const date = new Date(y, m - 1, d);
   const dateFormatted = isNaN(date.getTime()) ? lessonDate : date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -103,15 +104,6 @@ export default function EditLesson() {
         note: note.trim() || undefined,
         timeOfDay: lessonTime.trim() || undefined,
       };
-      // TEMP DEBUG: lessonId being saved; edit path uses update only (no insert/upsert)
-      console.log("[RESCHEDULE DEBUG] EditLesson save", {
-        lessonId: lesson.id,
-        oldDate: lesson.date,
-        newDate: normalizedDate,
-        oldTime: lesson.timeOfDay,
-        newTime: lessonTime.trim() || undefined,
-        method: "update only (no insert/upsert)",
-      });
       await updateLesson(lesson.id, updates);
       // After rescheduling, go back to dashboard with the new date selected
       if (normalizedDate && normalizedDate !== lesson.date) {
