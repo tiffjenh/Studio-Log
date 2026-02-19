@@ -32,6 +32,11 @@ import {
   getEffectiveRateCents,
   toDateKey,
 } from "@/utils/earnings";
+import { parseVoiceCommand } from "@/lib/voice/parseVoiceCommand";
+import { resolveVoiceCommand } from "@/lib/voice/resolveEntities";
+import { executeVoiceIntent } from "@/lib/voice/executeVoiceIntent";
+import type { ResolvedVoiceCommand } from "@/lib/voice/types";
+import { VoiceConfirmationCard } from "@/components/VoiceAssistant";
 
 /* ------------------------------------------------------------------ */
 /*  Web Speech API types (not in lib.dom for all TS configs)           */
@@ -70,7 +75,7 @@ declare global {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-type Phase = "idle" | "listening" | "processing" | "result" | "error";
+type Phase = "idle" | "listening" | "processing" | "result" | "error" | "confirm";
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -91,13 +96,15 @@ export default function VoiceButton({
   dayOfWeek: number;
   onDateChange?: (date: Date) => void;
 }) {
-  const { data, addLesson, updateLesson } = useStoreContext();
+  const { data, addLesson, updateLesson, reload } = useStoreContext();
   const { lang } = useLanguage();
   const [phase, setPhase] = useState<Phase>("idle");
   const [transcript, setTranscript] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [unmatchedItems, setUnmatchedItems] = useState<{ text: string; reason: string }[]>([]);
   const [showPanel, setShowPanel] = useState(false);
+  const [pendingResolved, setPendingResolved] = useState<ResolvedVoiceCommand | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   const supported =
@@ -498,7 +505,40 @@ export default function VoiceButton({
       setPhase("processing");
 
       try {
-        // Try the LLM API first
+        // 1) Voice Command Router: local parse + resolve (attendance + reschedule)
+        const payload = parseVoiceCommand(text, dateKey);
+        const resolveContext = {
+          students: data.students,
+          lessons: data.lessons,
+          dashboardDateKey: dateKey,
+        };
+        const resolved = resolveVoiceCommand(payload, resolveContext);
+
+        if (
+          (payload.intent === "ATTENDANCE_MARK" || payload.intent === "LESSON_RESCHEDULE") &&
+          resolved
+        ) {
+          const executeContext = {
+            updateLesson,
+            addLesson,
+            lessons: data.lessons,
+            students: data.students,
+          };
+          if (payload.confidence >= 0.75) {
+            await executeVoiceIntent(resolved, executeContext);
+            await reload?.();
+            setFeedback(resolved.summary);
+            setUnmatchedItems([]);
+            setPhase("result");
+            return;
+          }
+          setPendingResolved(resolved);
+          setFeedback(resolved.summary);
+          setPhase("confirm");
+          return;
+        }
+
+        // 2) Fallback: LLM API
         const context = buildVoiceContext(data.students, data.lessons, dateKey);
         const apiResult = await callVoiceAPI(text, context);
 
@@ -589,7 +629,7 @@ export default function VoiceButton({
     };
 
     recognition.start();
-  }, [data, dateKey, applyAPIActions, applyVoiceLoggingActions, applyLocalActions, onDateChange]);
+  }, [data, dateKey, applyAPIActions, applyVoiceLoggingActions, applyLocalActions, onDateChange, updateLesson, addLesson, reload]);
 
   /* ---- Stop listening ---- */
   const stopListening = useCallback(() => {
@@ -604,6 +644,34 @@ export default function VoiceButton({
     setTranscript("");
     setFeedback(null);
     setUnmatchedItems([]);
+    setPendingResolved(null);
+  }, []);
+
+  /* ---- Confirm / Cancel voice command (when confidence < 0.75) ---- */
+  const handleConfirmVoice = useCallback(async () => {
+    if (!pendingResolved) return;
+    setConfirmLoading(true);
+    try {
+      const executeContext = {
+        updateLesson,
+        addLesson,
+        lessons: data.lessons,
+        students: data.students,
+      };
+      await executeVoiceIntent(pendingResolved, executeContext);
+      await reload?.();
+      setFeedback(pendingResolved.summary);
+      setPhase("result");
+    } finally {
+      setPendingResolved(null);
+      setConfirmLoading(false);
+    }
+  }, [pendingResolved, updateLesson, addLesson, data.lessons, data.students, reload]);
+
+  const handleCancelConfirm = useCallback(() => {
+    setPendingResolved(null);
+    setFeedback("Cancelled.");
+    setPhase("result");
   }, []);
 
   if (!supported) return null;
@@ -624,7 +692,7 @@ export default function VoiceButton({
           width: 56,
           height: 56,
           borderRadius: "50%",
-          background: isListening ? "#dc2626" : "var(--primary, #c97b94)",
+          background: "var(--avatar-gradient)",
           color: "#fff",
           border: "none",
           boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
@@ -695,7 +763,9 @@ export default function VoiceButton({
                 ? "Listening..."
                 : phase === "processing"
                   ? "Processing..."
-                  : "Voice Input"}
+                  : phase === "confirm"
+                    ? "Confirm?"
+                    : "Voice Input"}
             </span>
             <button
               type="button"
@@ -728,7 +798,7 @@ export default function VoiceButton({
                   width: 12,
                   height: 12,
                   borderRadius: "50%",
-                  background: "#dc2626",
+                  background: "var(--avatar-gradient)",
                   animation: "voicePulse 1.2s ease-in-out infinite",
                 }}
               />
@@ -754,6 +824,19 @@ export default function VoiceButton({
                 </p>
               )}
               <span>Processing...</span>
+            </div>
+          )}
+
+          {/* Confirmation card (low confidence or ambiguous) */}
+          {phase === "confirm" && pendingResolved && (
+            <div style={{ padding: "4px 0" }}>
+              <VoiceConfirmationCard
+                summary={pendingResolved.summary}
+                transcript={transcript}
+                onConfirm={handleConfirmVoice}
+                onCancel={handleCancelConfirm}
+                isLoading={confirmLoading}
+              />
             </div>
           )}
 

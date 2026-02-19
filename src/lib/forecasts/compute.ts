@@ -271,6 +271,50 @@ function sumInRange(rows: EarningsRow[], startDate: string, endDate: string): nu
   }, 0);
 }
 
+/** Total earnings in a calendar year (completed lessons only). */
+function sumForYear(rows: EarningsRow[], year: number): number {
+  return sumInRange(rows, `${year}-01-01`, `${year}-12-31`);
+}
+
+/**
+ * Percent change between two years (e.g. 2025 vs 2024).
+ * Returns answer string and optional dollar delta. If prior year is 0, percent is undefined.
+ */
+export function computePercentChange(
+  earnings: EarningsRow[],
+  laterYear: number,
+  earlierYear: number
+): { totalEarlier: number; totalLater: number; percentChange: number | null; answer: string; dollarDelta?: string } {
+  const totalEarlier = roundTo2(sumForYear(earnings, earlierYear));
+  const totalLater = roundTo2(sumForYear(earnings, laterYear));
+  let percentChange: number | null = null;
+  if (totalEarlier > 0) {
+    percentChange = roundTo2(((totalLater - totalEarlier) / totalEarlier) * 100);
+  }
+  const dollarDelta = totalLater - totalEarlier;
+  const dollarDeltaStr = dollarDelta >= 0 ? `+${fmtDollars(dollarDelta)}` : fmtDollars(dollarDelta);
+
+  if (totalEarlier === 0) {
+    return {
+      totalEarlier: 0,
+      totalLater,
+      percentChange: null,
+      answer: `No earnings recorded in ${earlierYear}, so percent change isn't defined. You earned ${fmtDollars(totalLater)} in ${laterYear}.`,
+      dollarDelta: fmtDollars(totalLater),
+    };
+  }
+  const pct = percentChange!;
+  const direction = pct >= 0 ? "more" : "less";
+  const answer = `You made ${Math.abs(pct).toFixed(1)}% ${direction} in ${laterYear} than ${earlierYear}.`;
+  return {
+    totalEarlier,
+    totalLater,
+    percentChange: pct,
+    answer,
+    dollarDelta: dollarDeltaStr,
+  };
+}
+
 export function computeWhatIf(
   parsed: ParsedQuery,
   earnings: EarningsRow[],

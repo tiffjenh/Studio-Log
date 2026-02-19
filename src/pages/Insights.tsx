@@ -1,17 +1,23 @@
-import { useMemo, useState, useRef } from "react";
+/**
+ * Insights — AI assistant for studio data (earnings, students, rates, forecasts).
+ * Supports typed search + voice (EN/ES/ZH), multi-turn conversation, categories and suggestions.
+ * UI: pastel background, floating cards, centered search (no background), gradient mic, chat-style results.
+ */
+
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { dedupeLessons, getEffectiveRateCents } from "@/utils/earnings";
 import type { StudentSummary } from "@/lib/forecasts/types";
-import { runForecast } from "@/lib/forecasts/runForecast";
-import type { ForecastResponse, SupportedLocale } from "@/lib/forecasts/types";
-import { detectQueryLanguage, translateForInsights } from "@/utils/insightsLanguage";
-import { INSIGHTS_CATEGORIES, SUGGESTION_CHIPS } from "./insightsConstants";
+import { INSIGHTS_CATEGORIES } from "./insightsConstants";
+import { useInsightsConversation } from "./insights/useInsightsConversation";
+import { useVoiceInput } from "./insights/useVoiceInput";
 
 export default function Insights() {
   const { data } = useStoreContext();
   const { lang } = useLanguage();
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLTextAreaElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const completedLessons = dedupeLessons(data.lessons.filter((l) => l.completed));
   const studentById = useMemo(() => new Map(data.students.map((s) => [s.id, s])), [data.students]);
@@ -45,334 +51,347 @@ export default function Insights() {
     [data.students]
   );
 
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const locale = lang === "es" ? "es-ES" : lang === "zh" ? "zh-CN" : "en-US";
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const { messages, sendMessage, clear, isLoading, error } = useInsightsConversation({
+    earnings,
+    students,
+    locale,
+    timezone,
+  });
+
   const [queryText, setQueryText] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [answer, setAnswer] = useState<ForecastResponse | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
 
-  const locale: SupportedLocale = lang === "es" ? "es-ES" : lang === "zh" ? "zh-CN" : "en-US";
-  const rangeContext = { mode: "forecasts" as const };
+  const preferredLang = lang === "es" ? "es" : lang === "zh" ? "zh" : "en";
+  const voice = useVoiceInput({
+    preferredLang,
+    onTranscript(text) {
+      setQueryText(text);
+      sendMessage(text);
+    },
+  });
 
-  async function runSearch(q: string) {
-    const trimmed = q.trim();
-    const query = trimmed || "Show my earnings summary";
-    setIsLoading(true);
-    setErr(null);
-    setAnswer(null);
-    try {
-      const res = await runForecast({
-        query,
-        locale,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        rangeContext,
-        earnings,
-        students,
-      });
-      const responseLang = detectQueryLanguage(query);
-      if (responseLang === "es" || responseLang === "zh") {
-        const [summaryTrans, detailsTrans] = await Promise.all([
-          translateForInsights(res.summary, responseLang),
-          res.details ? translateForInsights(res.details, responseLang) : Promise.resolve(""),
-        ]);
-        const answerTrans =
-          res.answer?.body != null
-            ? await translateForInsights(res.answer.body, responseLang)
-            : null;
-        const titleTrans =
-          res.answer?.title != null
-            ? await translateForInsights(res.answer.title, responseLang)
-            : null;
-        setAnswer({
-          ...res,
-          summary: summaryTrans,
-          details: detailsTrans,
-          answer:
-            res.answer && (titleTrans != null || answerTrans != null)
-              ? { title: titleTrans ?? res.answer.title, body: answerTrans ?? res.answer.body }
-              : res.answer,
-        });
-      } else {
-        setAnswer(res);
-      }
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Auto-grow textarea: ~5 lines max (≈120px) then scroll; smooth height transition.
+  const TEXTAREA_MAX_HEIGHT = 120;
+  useEffect(() => {
+    const el = searchInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, TEXTAREA_MAX_HEIGHT)}px`;
+  }, [queryText]);
 
   function onSubmit() {
-    runSearch(queryText);
+    const q = queryText.trim();
+    if (q) sendMessage(q);
+    else sendMessage("Show my earnings summary");
   }
 
-  function onSuggestionChip(question: string) {
-    setQueryText(question);
-    runSearch(question);
-  }
-
+  /** Clicking a category question populates the input and runs the query immediately. */
   function onCategoryQuestion(question: string) {
     setQueryText(question);
-    searchInputRef.current?.focus();
+    sendMessage(question);
   }
 
-  function copyAnswer() {
-    if (!answer) return;
-    const text = [answer.summary, answer.details].filter(Boolean).join("\n\n");
-    void navigator.clipboard.writeText(text);
-  }
-
-  const cardStyle = {
+  const floatingCard = {
     background: "var(--card)",
     borderRadius: "var(--radius-card)",
     boxShadow: "var(--shadow-card)",
-    border: "1px solid var(--border)",
     padding: "var(--space-md)",
+    border: "1px solid var(--border)",
   };
 
   return (
-    <div style={{ width: "100%", maxWidth: 640, margin: "0 auto" }}>
-      <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: "0 0 20px" }}>
+    <div className="insights-page" style={{ width: "100%", maxWidth: 640, margin: "0 auto", padding: "0 20px 32px" }}>
+      {/* Page title */}
+      <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: "0 0 28px", color: "var(--text)" }}>
         Insights
       </h1>
 
-      {/* 1) Suggestions box */}
-      <div style={{ ...cardStyle, marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-          Try asking…
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {SUGGESTION_CHIPS.map((label) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => onSuggestionChip(label)}
-              disabled={isLoading}
-              style={{
-                padding: "8px 14px",
-                borderRadius: "var(--radius-pill)",
-                border: "1px solid var(--border)",
-                background: "rgba(255,255,255,0.8)",
-                color: "var(--text)",
-                fontSize: 13,
-                fontFamily: "var(--font-sans)",
-                cursor: isLoading ? "default" : "pointer",
-                boxShadow: "var(--shadow-soft)",
-                whiteSpace: "nowrap",
-                maxWidth: "100%",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 2) Category dropdown + question list */}
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>
-          Categories
+      {/* Ask about: dropdown (design-system aligned) + sub-questions panel */}
+      <div style={{ marginBottom: 28 }}>
+        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em", fontFamily: "var(--font-sans)" }}>
+          Ask about
         </label>
-        <select
-          value={selectedCategory ?? ""}
-          onChange={(e) => setSelectedCategory(e.target.value || null)}
-          style={{
-            width: "100%",
-            padding: "12px 14px",
-            borderRadius: "var(--radius-card)",
-            border: "1px solid var(--border)",
-            background: "var(--card)",
-            fontSize: 14,
-            fontFamily: "var(--font-sans)",
-            color: "var(--text)",
-            boxShadow: "var(--shadow-soft)",
-          }}
-          aria-label="Select category"
-        >
-          <option value="">Select a category…</option>
-          {INSIGHTS_CATEGORIES.map((cat) => (
-            <option key={cat.label} value={cat.label}>
-              {cat.label}
-            </option>
-          ))}
-        </select>
+        <div className="insights-dropdown-wrap" style={{ position: "relative", width: "100%" }}>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="insights-dropdown"
+            style={{
+              width: "100%",
+              padding: "14px 44px 14px 16px",
+              borderRadius: 18,
+              border: "1px solid var(--border)",
+              background: "var(--card)",
+              fontSize: 14,
+              fontFamily: "var(--font-sans)",
+              color: "var(--text)",
+              cursor: "pointer",
+              appearance: "none",
+              WebkitAppearance: "none",
+              boxShadow: "var(--shadow-soft)",
+            }}
+            aria-label="Ask about category"
+          >
+            <option value="">Select a category…</option>
+            {INSIGHTS_CATEGORIES.map((cat) => (
+              <option key={cat.label} value={cat.label}>
+                {cat.label}
+              </option>
+            ))}
+          </select>
+          <span className="insights-dropdown-arrow" aria-hidden style={{ position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "var(--text-muted)", transition: "transform 0.2s ease" }}>
+            ▼
+          </span>
+        </div>
         {selectedCategory && (
-          <div style={{ marginTop: 8, ...cardStyle, padding: "8px 0" }}>
-            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {INSIGHTS_CATEGORIES.find((c) => c.label === selectedCategory)?.questions.map((q, idx, arr) => (
-                <li key={q} style={{ borderBottom: idx < arr.length - 1 ? "1px solid var(--border)" : undefined }}>
-                  <button
-                    type="button"
-                    onClick={() => onCategoryQuestion(q)}
-                    disabled={isLoading}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      textAlign: "left",
-                      border: "none",
-                      background: "transparent",
-                      color: "var(--text)",
-                      fontSize: 14,
-                      fontFamily: "var(--font-sans)",
-                      cursor: isLoading ? "default" : "pointer",
-                      borderRadius: 8,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {q.length > 56 ? `${q.slice(0, 55)}…` : q}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <ul className="insights-category-list" style={{ listStyle: "none", margin: "12px 0 0", padding: 0, border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", background: "var(--card)", boxShadow: "var(--shadow-card)" }}>
+            {INSIGHTS_CATEGORIES.find((c) => c.label === selectedCategory)?.questions.map((q, i, arr) => (
+              <li key={q} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border)" : "none" }}>
+                <button
+                  type="button"
+                  onClick={() => onCategoryQuestion(q)}
+                  disabled={isLoading}
+                  className="insights-category-item"
+                  style={{
+                    width: "100%",
+                    padding: "12px 18px",
+                    textAlign: "left",
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--text)",
+                    fontSize: 14,
+                    fontFamily: "var(--font-sans)",
+                    cursor: isLoading ? "default" : "pointer",
+                    borderRadius: 0,
+                    transition: "background 0.15s ease",
+                  }}
+                >
+                  {q}
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
-      {/* 3) Search input */}
-      <div style={{ marginBottom: 8 }}>
-        <input
-          ref={searchInputRef}
-          value={queryText}
-          onChange={(e) => setQueryText(e.target.value)}
-          onKeyDown={(e) => (e.key === "Enter" ? onSubmit() : null)}
-          placeholder="Ask a question about your studio…"
-          aria-label="Ask a question"
+      {/* Search row: white container around textarea + voice button */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
+        <div
           style={{
+            display: "flex",
+            alignItems: "flex-end",
             width: "100%",
-            padding: "14px 18px",
-            borderRadius: "var(--radius-card)",
-            border: "1px solid var(--border)",
+            maxWidth: 440,
+            gap: 14,
+            padding: "16px 18px",
             background: "var(--card)",
-            fontSize: 16,
-            fontFamily: "var(--font-sans)",
-            color: "var(--text)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-card)",
             boxShadow: "var(--shadow-soft)",
           }}
-        />
-        <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "6px 0 0", paddingLeft: 2 }}>
-          Examples: revenue, rates, students, taxes
-        </p>
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <textarea
+              ref={searchInputRef}
+              value={queryText}
+              onChange={(e) => setQueryText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onSubmit();
+                }
+              }}
+              placeholder="Ask about your students and earnings…"
+              aria-label="Ask a question"
+              rows={1}
+              style={{
+                display: "block",
+                width: "100%",
+                padding: 0,
+                border: "none",
+                background: "transparent",
+                fontSize: 16,
+                fontFamily: "var(--font-sans)",
+                color: "var(--text)",
+                outline: "none",
+                resize: "none",
+                minHeight: 24,
+                maxHeight: 120,
+                lineHeight: 1.4,
+                transition: "height 0.15s ease",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={voice.phase === "recording" ? voice.stopRecording : voice.startRecording}
+            disabled={!voice.supported || isLoading}
+            aria-label={voice.phase === "recording" ? "Stop recording" : "Voice input"}
+            className="insights-voice-btn"
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              border: "none",
+              background: "var(--avatar-gradient)",
+              color: "#fff",
+              cursor: voice.supported && !isLoading ? "pointer" : "default",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              boxShadow: "var(--shadow-soft)",
+              animation: voice.phase === "recording" ? "insights-voice-pulse 1.2s ease-in-out infinite" : "none",
+              transition: "filter 0.2s ease, transform 0.15s ease",
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+              <line x1="8" y1="23" x2="16" y2="23" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      {/* 4) Search button */}
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
+      {voice.phase === "recording" && (
+        <p style={{ textAlign: "center", fontSize: 13, color: "var(--text-muted)", margin: "4px 0 8px" }}>
+          Listening…
+        </p>
+      )}
+      {voice.error && (
+        <p style={{ textAlign: "center", fontSize: 13, color: "#dc2626", margin: "4px 0 8px" }}>{voice.error}</p>
+      )}
+
+      {/* Ask button + New chat: side by side, centered */}
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 24 }}>
         <button
           type="button"
           onClick={onSubmit}
           className="pill"
           disabled={isLoading}
           style={{
-            padding: "12px 24px",
-            fontSize: 15,
+            padding: "10px 22px",
+            fontSize: 14,
             fontFamily: "var(--font-sans)",
             fontWeight: 600,
-            boxShadow: "var(--shadow-soft)",
+            background: "#ffffff",
+            color: "#1a1a1a",
             border: "1px solid var(--border)",
-            background: "var(--card)",
+            boxShadow: "var(--shadow-soft)",
+            cursor: isLoading ? "default" : "pointer",
           }}
         >
-          {isLoading ? "…" : "Search"}
+          {isLoading ? "…" : "Ask"}
+        </button>
+        <button
+          type="button"
+          onClick={clear}
+          className="pill"
+          style={{
+            padding: "8px 14px",
+            fontSize: 13,
+            fontWeight: 600,
+            fontFamily: "var(--font-sans)",
+            border: "1px solid var(--border)",
+            background: "var(--card)",
+            color: "var(--text-muted)",
+            cursor: "pointer",
+            boxShadow: "var(--shadow-soft)",
+          }}
+        >
+          New chat
         </button>
       </div>
 
-      {/* 5) Loading: gradient wave */}
+      {/* Gradient loader while thinking */}
       {isLoading && (
-        <div className="insights-wave-loader" aria-hidden="true">
+        <div className="insights-wave-loader" aria-hidden="true" style={{ marginBottom: 24 }}>
           {[1, 2, 3, 4, 5, 6, 7].map((i) => (
             <span key={i} className="insights-wave-loader__dot" />
           ))}
         </div>
       )}
 
-      {/* 6) Results area */}
-      {!isLoading && err && (
-        <div style={{ ...cardStyle, marginTop: 8 }}>
-          <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>Error</div>
-          <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{err}</div>
-        </div>
-      )}
-
-      {!isLoading && answer && (
-        <div style={{ ...cardStyle, marginTop: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              {answer.answer?.title ?? "Answer"}
-            </div>
-            <button
-              type="button"
-              onClick={copyAnswer}
-              aria-label="Copy answer"
-              style={{
-                padding: 6,
-                border: "none",
-                background: "transparent",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                borderRadius: 8,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-            </button>
+      {/* Conversation (chat-style) */}
+      <div
+        style={{
+          minHeight: 120,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        {error && (
+          <div style={{ ...floatingCard, borderLeft: "4px solid #dc2626" }}>
+            <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{error}</div>
           </div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, lineHeight: 1.4 }}>{answer.summary}</div>
-          {answer.details && (
-            <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 10, whiteSpace: "pre-wrap" }}>
-              {answer.details}
-            </div>
-          )}
-          {answer.assumptions.length > 0 && (
-            <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>
-              <strong>Assumptions:</strong> {answer.assumptions.join(" ")}
-            </div>
-          )}
-          {answer.calculations.length > 0 && (
-            <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 6 }}>
-              <strong>How:</strong> {answer.calculations.join(" → ")}
-            </div>
-          )}
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 10 }}>Confidence: {answer.confidence}</div>
-
-          {answer.missing_info_needed && answer.missing_info_needed.length > 0 && (
-            <div style={{ marginTop: 12, padding: 12, background: "rgba(180, 160, 180, 0.08)", borderRadius: 12, fontSize: 14, color: "var(--text)" }}>
-              <strong>Need a bit more info:</strong> {answer.missing_info_needed.join(", ")}.
-            </div>
-          )}
-
-          {answer.chartData && answer.chartData.length > 0 && (
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>Overview</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {answer.chartData.map((d, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ minWidth: 80, fontSize: 13, color: "var(--text)" }}>{d.label}</span>
-                    <div style={{ flex: 1, height: 24, background: "var(--border)", borderRadius: 6, overflow: "hidden" }}>
-                      <div
-                        style={{
-                          width: `${Math.min(100, (d.value / Math.max(...answer.chartData!.map((x) => x.value), 1)) * 100)}%`,
-                          height: "100%",
-                          background: "var(--avatar-gradient)",
-                          borderRadius: 6,
-                        }}
-                      />
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>${d.value.toFixed(2)}</span>
-                  </div>
-                ))}
+        )}
+        {messages.map((m, idx) => (
+          <div
+            key={idx}
+            style={{
+              display: "flex",
+              justifyContent: m.role === "user" ? "flex-end" : "flex-start",
+            }}
+          >
+            {m.role === "user" ? (
+              <div
+                style={{
+                  maxWidth: "85%",
+                  padding: "12px 16px",
+                  borderRadius: "18px 18px 4px 18px",
+                  background: "rgba(182, 177, 217, 0.2)",
+                  color: "var(--text)",
+                  fontSize: 15,
+                  fontFamily: "var(--font-sans)",
+                  lineHeight: 1.5,
+                }}
+              >
+                {m.content}
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            ) : (
+              <div
+                style={{
+                  maxWidth: "90%",
+                  ...floatingCard,
+                  padding: "16px 18px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontFamily: "var(--font-sans)",
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-wrap",
+                    color: "var(--text)",
+                  }}
+                >
+                  {m.content.split("**").map((part, i) =>
+                    i % 2 === 1 ? (
+                      <strong key={i} style={{ display: "block", marginBottom: 8 }}>
+                        {part}
+                      </strong>
+                    ) : (
+                      <span key={i}>{part}</span>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        <div ref={chatEndRef} />
+      </div>
     </div>
   );
 }

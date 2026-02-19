@@ -145,8 +145,8 @@ function BarChart({
               const dateKey = dateKeys?.[i];
               const staggerOffset = staggerValueLabels ? (i % 2 === 0 ? -8 : 8) : 0;
               const labelStyle = staggerValueLabels
-                ? { fontSize: 10, fontWeight: 600, marginBottom: 4, color: "var(--text)", transform: `translateY(${staggerOffset}px)` }
-                : { fontSize: 11, fontWeight: 600, marginBottom: 4 };
+                ? { fontSize: 10, fontWeight: 600, marginBottom: 8, color: "var(--text)", transform: `translateY(${staggerOffset}px)` }
+                : { fontSize: 11, fontWeight: 600, marginBottom: 6 };
               return (
                 <div
                   key={i}
@@ -170,7 +170,10 @@ function BarChart({
                       height: barHeight,
                       minHeight: v > 0 ? 6 : 0,
                       background: "var(--avatar-gradient)",
-                      borderRadius: 6,
+                      borderTopLeftRadius: 6,
+                      borderTopRightRadius: 6,
+                      borderBottomLeftRadius: 0,
+                      borderBottomRightRadius: 0,
                     }}
                   />
                 </div>
@@ -922,12 +925,12 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
         <>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
             <div className="hero-card" style={{ flex: "0 0 auto", width: "fit-content", padding: "12px 16px" }}>
-              <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 4 }}>{dailyRangeStart}–{dailyRangeEnd} week total</div>
+              <div style={{ fontSize: 14, color: "var(--text)", marginBottom: 4 }}>{dailyRangeStart} – {dailyRangeEnd} week total</div>
               <div className="headline-serif" style={{ fontSize: 26, fontWeight: 400 }}>{formatCurrency(dailyWeekTotal)}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, paddingBottom: 2 }}>
               <button type="button" onClick={() => setDailyWeekOffset((o) => o - 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Previous week">‹</button>
-              <span style={{ fontSize: 15, color: "var(--text-muted)" }}>{dailyRangeStart}–{dailyRangeEnd}</span>
+              <span style={{ fontSize: 15, color: "var(--text)" }}>{dailyRangeStart} – {dailyRangeEnd}</span>
               <button type="button" onClick={() => setDailyWeekOffset((o) => o + 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next week">›</button>
             </div>
           </div>

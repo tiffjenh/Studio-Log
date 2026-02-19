@@ -339,13 +339,13 @@ export default function Students() {
           disabled={totalCount === 0}
           style={{
             fontFamily: "var(--font-sans)",
-            fontSize: 12,
+            fontSize: 14,
             fontWeight: 600,
-            color: "#b91c1c",
-            background: "#ffffff",
-            border: "1px solid rgba(201, 123, 148, 0.6)",
+            color: "#dc2626",
+            background: "transparent",
+            border: "1px solid #dc2626",
             borderRadius: 999,
-            padding: "6px 14px",
+            padding: "10px 20px",
             cursor: totalCount === 0 ? "default" : "pointer",
             opacity: totalCount === 0 ? 0.5 : 1,
             boxShadow: "none",

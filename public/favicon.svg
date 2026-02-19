@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <title>Studio Log</title>
+  <!-- Solid white circle, clean edges -->
+  <circle cx="50" cy="50" r="50" fill="#FFFFFF"/>
+  <!-- Flower: dark charcoal center + petal outlines, ~10% internal padding -->
+  <g transform="translate(50,50)">
+    <circle r="6" fill="#3d3639"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(0)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(25.714)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(51.428)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(77.142)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(102.856)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(128.57)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(154.284)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(180)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(205.714)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(231.428)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(257.142)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(282.856)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(308.57)"/>
+    <path d="M 2 0 C 2 -19.5 0 -39 0 -39 C 0 -39 -2 -19.5 -2 0 Z" stroke="#3d3639" stroke-width="1.6" fill="none" stroke-linejoin="round" transform="rotate(334.284)"/>
+  </g>
+</svg>

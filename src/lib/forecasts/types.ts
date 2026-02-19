@@ -10,7 +10,16 @@ export type EarningsRow = {
   durationMinutes?: number;
 };
 
-export type ForecastIntent = "forecast" | "tax_estimate" | "cash_flow" | "insight" | "question_answer" | "what_if" | "general_qa";
+export type ForecastIntent = "forecast" | "tax_estimate" | "cash_flow" | "insight" | "question_answer" | "what_if" | "general_qa" | "percent_change";
+
+/** Strict output for Insights: answer only what was asked, optional supporting bullets. */
+export type InsightsStructuredAnswer = {
+  answer: string;
+  type: "percent_change" | "dollar_change" | "forecast" | "ranking" | "what_if" | "other";
+  supporting: string[];
+  needs_clarification: boolean;
+  clarifying_question: string | null;
+};
 
 /** Parsed from user query for what-if and general Q&A. */
 export type ParsedQuery = {
@@ -57,6 +66,8 @@ export type ForecastResponse = {
   missing_info_needed?: string[];
   /** Optional chart data for simple bar/list display (e.g. best months, payment methods). */
   chartData?: { label: string; value: number }[];
+  /** Strict format for Insights UI: render only answer + supporting. */
+  structuredAnswer?: InsightsStructuredAnswer;
   cards?: {
     general?: { title: string; body: string };
     forecast?: { title: string; body: string };
@@ -85,4 +96,9 @@ export type ForecastRequestBody = {
   earnings: EarningsRow[];
   /** When provided, enables pricing/rate and student-level answers (lowest rate, below average, etc.). */
   students?: StudentSummary[];
+  /** Optional conversation history for multi-turn follow-ups (Insights). */
+  conversationContext?: {
+    lastTurns: { role: string; content: string }[];
+    lastComputedMetrics?: Record<string, unknown>;
+  };
 };

@@ -531,7 +531,7 @@ export default function StudentDetail() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {!editing ? (
-            <button type="button" onClick={handleStartEdit} className="pill pill--active" style={{ padding: "10px 18px" }}>{t("common.edit")}</button>
+            <button type="button" onClick={handleStartEdit} className="pill pill--active" style={{ padding: "10px 18px", fontFamily: "var(--font-sans)" }}>{t("common.edit")}</button>
           ) : (
             <button type="button" onClick={() => setDeleteConfirmOpen(true)} className="btn" style={{ padding: "4px 10px", fontSize: 12, fontWeight: 600, border: "1px solid rgba(220,38,38,0.4)", background: "transparent", color: "#dc2626", ...fontStyle }}>{t("common.delete")}</button>
           )}
@@ -577,6 +577,12 @@ export default function StudentDetail() {
           <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" style={inputStyle} required />
           <label style={labelStyle}>Last name</label>
           <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" style={inputStyle} required />
+          {/* + Day above first lesson module, right side */}
+          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 12 }}>
+            <button type="button" onClick={addScheduleEntry} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 999, border: "none", background: "var(--avatar-gradient)", color: "#ffffff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-sans)", boxShadow: "var(--shadow-soft)" }}>
+              + Day
+            </button>
+          </div>
           {/* Schedule entries */}
           {scheduleEntries.map((entry) => (
             <div key={entry.id} style={{ marginBottom: 20, padding: 16, borderRadius: 12, border: "1px solid var(--border)", background: "var(--bg)" }}>
@@ -610,14 +616,11 @@ export default function StudentDetail() {
               </button>
             </div>
           ))}
-          <button type="button" onClick={addScheduleEntry} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--text-muted)", marginBottom: 16, ...fontStyle }}>
-            + Day
-          </button>
 
           {error ? <p style={{ color: "#dc2626", marginBottom: 16, ...fontStyle }}>{error}</p> : null}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 16 }}>
-            <button type="submit" className="btn btn-primary" style={fontStyle}>{t("common.save")}</button>
-            <button type="button" onClick={handleCancelEdit} className="btn" style={{ border: "1px solid var(--border)", background: "#ffffff", color: "var(--text)", ...fontStyle }}>{t("common.cancel")}</button>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 16, justifyContent: "center" }}>
+            <button type="submit" className="btn btn-primary" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, ...fontStyle }}>{t("common.save")}</button>
+            <button type="button" onClick={handleCancelEdit} className="btn" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, border: "1px solid var(--border)", background: "#ffffff", color: "var(--text)", ...fontStyle }}>{t("common.cancel")}</button>
           </div>
         </form>
 
@@ -649,6 +652,11 @@ export default function StudentDetail() {
               <label style={labelStyle}>{t("studentDetail.fromDate")}</label>
               <div style={{ marginBottom: 16 }}>
                 <DatePicker value={scheduleChangeFromDate} onChange={setScheduleChangeFromDate} placeholder="Select date" />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 12 }}>
+                <button type="button" onClick={addSchedChangeEntry} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 999, border: "none", background: "var(--avatar-gradient)", color: "#ffffff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-sans)", boxShadow: "var(--shadow-soft)" }}>
+                  + Day
+                </button>
               </div>
               {schedChangeEntries.map((entry) => (
                 <div key={entry.id} style={{ marginBottom: 20, padding: 16, borderRadius: 12, border: "1px solid var(--border)", background: "var(--bg)" }}>
@@ -682,12 +690,12 @@ export default function StudentDetail() {
                   </button>
                 </div>
               ))}
-              <button type="button" onClick={addSchedChangeEntry} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--text-muted)", marginBottom: 16, ...fontStyle }}>
-                + Day
-              </button>
               {scheduleChangeError ? <p style={{ color: "#dc2626", marginBottom: 12, ...fontStyle }}>{scheduleChangeError}</p> : null}
               {scheduleChangeSaveMessage ? <p style={{ color: "var(--success, #16a34a)", marginBottom: 12, ...fontStyle }}>{scheduleChangeSaveMessage}</p> : null}
-              <button type="button" onClick={handleSaveScheduleChange} className="btn btn-primary" style={{ ...fontStyle }}>{t("studentDetail.saveScheduleChanges")}</button>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12, justifyContent: "center" }}>
+                <button type="button" onClick={handleSaveScheduleChange} className="btn btn-primary" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, ...fontStyle }}>{t("studentDetail.saveScheduleChanges")}</button>
+                <button type="button" onClick={() => setChangeScheduleOpen(false)} className="btn" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, border: "1px solid var(--border)", background: "#ffffff", color: "var(--text)", ...fontStyle }}>{t("common.cancel")}</button>
+              </div>
             </div>
           )}
           {terminateStudentOpen && (
@@ -698,7 +706,10 @@ export default function StudentDetail() {
                 <DatePicker value={terminatedFromDate} onChange={setTerminatedFromDate} placeholder="Select date" />
               </div>
               {terminationSaveMessage ? <p style={{ color: "var(--success, #16a34a)", marginBottom: 12, ...fontStyle }}>{terminationSaveMessage}</p> : null}
-              <button type="button" onClick={handleSaveTermination} className="btn btn-primary" style={{ ...fontStyle }} disabled={!terminatedFromDate.trim()}>{t("common.save")}</button>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, justifyContent: "center" }}>
+                <button type="button" onClick={handleSaveTermination} className="btn btn-primary" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, ...fontStyle }} disabled={!terminatedFromDate.trim()}>{t("common.save")}</button>
+                <button type="button" onClick={() => setTerminateStudentOpen(false)} className="btn" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, border: "1px solid var(--border)", background: "#ffffff", color: "var(--text)", ...fontStyle }}>{t("common.cancel")}</button>
+              </div>
             </div>
           )}
         </div>
@@ -991,12 +1002,12 @@ export default function StudentDetail() {
         </>
       )}
 
-      <div style={{ paddingTop: 24, paddingBottom: 32 }}>
+      <div style={{ paddingTop: 24, paddingBottom: 32, display: "flex", justifyContent: "center" }}>
         <button
           type="button"
           onClick={() => setHistoryOpen(true)}
-          className="btn"
-          style={{ border: "1px solid var(--border)", background: "var(--card)", color: "var(--text-muted)", ...fontStyle }}
+          className="btn pill"
+          style={{ background: "#ffffff", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, padding: "8px 16px", fontFamily: "var(--font-sans)", boxShadow: "var(--shadow-soft)" }}
         >
           {t("studentDetail.history")}
         </button>

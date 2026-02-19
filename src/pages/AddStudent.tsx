@@ -234,7 +234,7 @@ export default function AddStudent() {
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, ...fontStyle }}>{t("addStudent.title")}</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} />
-          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} className="pill" style={{ minHeight: 40, ...fontStyle }} title={t("students.importStudents")}>
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} className="pill" style={{ minHeight: 40, background: "#ffffff", ...fontStyle }} title={t("students.importStudents")}>
             {importing ? "..." : t("students.importStudents")}
           </button>
           <button

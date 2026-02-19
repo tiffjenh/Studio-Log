@@ -561,6 +561,35 @@ input, select, textarea {
 .insights-wave-loader__dot:nth-child(6) { animation-delay: 0.75s; }
 .insights-wave-loader__dot:nth-child(7) { animation-delay: 0.9s; }
 
+/* Insights: voice button pulse while recording */
+@keyframes insights-voice-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.05); }
+}
+
+/* Insights: dropdown arrow rotation when open (focus-within) */
+.insights-dropdown-wrap:focus-within .insights-dropdown-arrow {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+/* Insights: category list hover (soft tint) */
+.insights-category-item:hover:not(:disabled) {
+  background: rgba(182, 177, 217, 0.08);
+}
+
+/* Insights: voice button hover + active */
+.insights-voice-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.insights-voice-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+/* Insights: muted placeholder */
+.insights-page textarea::placeholder {
+  color: var(--text-muted);
+}
+
 /* iPad and up: optional sidebar or wider content */
 @media (min-width: 768px) {
   body {

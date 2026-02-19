@@ -7,8 +7,9 @@ import {
   computeWhatIf,
   computeScenarioWhatIf,
   computeGeneralAnalytics,
+  computePercentChange,
 } from "./compute";
-import type { ForecastRequestBody, ForecastResponse } from "./types";
+import type { ForecastRequestBody, ForecastResponse, InsightsStructuredAnswer } from "./types";
 
 function detectIntent(q: string): ForecastResponse["intent"] {
   const s = q.toLowerCase().trim();
@@ -26,6 +27,8 @@ function detectIntent(q: string): ForecastResponse["intent"] {
   if (/\bcash\s+flow|cashflow|trend|stable|volatile|volatility|稳定|波动|flujo|recurring\s+%/i.test(s)) return "cash_flow";
   // Forecast: earn this month, on track, projected
   if (/\bhow\s+much\s+will\s+i\s+earn|\bearn\s+this\s+month\b|on\s+track|projected|forecast|project|预计|本月.*赚|今年.*目标|pronóstico/i.test(s)) return "forecast";
+  // Percent change: "what % more did I make in 2025 than 2024?", "percent", "percentage", "growth rate"
+  if (/%|percent(age)?|growth\s+rate|how\s+much\s+more\s+did\s+i\s+make\s+in\s+\d{4}\s+than\s+\d{4}|同比|环比|增长/i.test(s) || /\d{4}\s+than\s+\d{4}|\d{4}\s+vs\s+\d{4}/.test(q)) return "percent_change";
   // General Q&A: best/worst month, student pays most/least, rates, lessons, operational, comparative, concentration
   if (
     /\bbest\s+month|worst\s+month|slow\s+months?|mejor\s+mes|peor\s+mes|最好|最差|最慢/i.test(s) ||
@@ -49,6 +52,7 @@ export async function runForecast(body: ForecastRequestBody): Promise<ForecastRe
   const earnings = Array.isArray(body.earnings) ? body.earnings : [];
   const parsed = parseQueryParams(query);
   const intent = detectIntent(query);
+  // conversationContext (lastTurns) available for future follow-up refinement
 
   const fc = computeForecast(earnings);
   const tax = computeTaxEstimate(fc.projectedYearly);
@@ -118,6 +122,23 @@ export async function runForecast(body: ForecastRequestBody): Promise<ForecastRe
       }
     }
   }
+  // Percent change: "what % more did I make in 2025 than 2024?"
+  else if (intent === "percent_change") {
+    const yearMatch = query.match(/(\d{4})\s+than\s+(\d{4})|(\d{4})\s+vs\s+(\d{4})|(\d{4})\s+and\s+(\d{4})/i);
+    const currentYear = new Date().getFullYear();
+    const laterYear = yearMatch ? parseInt(yearMatch[1] ?? yearMatch[3] ?? yearMatch[5] ?? String(currentYear), 10) : currentYear;
+    const earlierYear = yearMatch ? parseInt(yearMatch[2] ?? yearMatch[4] ?? yearMatch[6] ?? String(currentYear - 1), 10) : currentYear - 1;
+    const actualLater = Math.max(laterYear, earlierYear);
+    const actualEarlier = Math.min(laterYear, earlierYear);
+    const pctResult = computePercentChange(earnings, actualLater, actualEarlier);
+    summary = pctResult.answer;
+    details = pctResult.dollarDelta ? `Dollar difference: ${pctResult.dollarDelta}.` : "";
+    assumptions = [];
+    calculations = [];
+    confidence = "high";
+    answer = { title: "Percent change", body: summary + (pctResult.dollarDelta ? `\n\n${pctResult.dollarDelta} difference.` : "") };
+    used_timeframe = { startDate: `${actualEarlier}-01-01`, endDate: `${actualLater}-12-31`, label: `${actualEarlier} vs ${actualLater}` };
+  }
   // General Q&A: best month, top student, hourly rate, cash vs Venmo, lessons count, etc.
   else if (intent === "general_qa") {
     const analytics = computeGeneralAnalytics(query, earnings, baseMetrics, students);
@@ -157,7 +178,7 @@ export async function runForecast(body: ForecastRequestBody): Promise<ForecastRe
     }
     answer = { title: "Forecast", body: summary + (details ? "\n\n" + details : "") };
   }
-  // Legacy intents: tax, cash flow
+  // Legacy intents: tax, cash flow, insight — answer only what was asked; no extra metrics.
   else {
     summary =
       intent === "tax_estimate"
@@ -172,15 +193,27 @@ export async function runForecast(body: ForecastRequestBody): Promise<ForecastRe
             ? "Not enough data to forecast yet."
             : `Projected monthly earnings: $${fc.projectedMonthly}`;
 
-    const detailsParts: string[] = [];
-    if (fc.avgWeekly != null) detailsParts.push(`Recent average: $${fc.avgWeekly}/week. Trend: ${fc.trend}.`);
-    else detailsParts.push("Add a few earnings entries to enable forecasting.");
-    if (tax.estimatedTax != null && tax.monthlySetAside != null) detailsParts.push(`Tax set-aside: ~$${tax.monthlySetAside}/month.`);
-    if (cash.bestWeek && cash.worstWeek) detailsParts.push(`Best week: $${cash.bestWeek.total} (${cash.bestWeek.start}–${cash.bestWeek.end}). Lowest: $${cash.worstWeek.total}.`);
-    details = detailsParts.join(" ");
-
-    answer = { title: "Answer", body: summary + "\n\n" + details };
+    details = "";
+    answer = { title: "Answer", body: summary };
   }
+
+  // Build strict structured output for Insights UI: answer only + optional supporting (max 2 bullets).
+  const structuredAnswer: InsightsStructuredAnswer = {
+    answer: summary,
+    type:
+      intent === "percent_change"
+        ? "percent_change"
+        : intent === "what_if"
+          ? "what_if"
+          : intent === "forecast"
+            ? "forecast"
+            : intent === "general_qa"
+              ? "other"
+              : "other",
+    supporting: assumptions.length > 0 ? assumptions.slice(0, 2) : [],
+    needs_clarification: (missing_info_needed?.length ?? 0) > 0,
+    clarifying_question: missing_info_needed?.[0] ?? null,
+  };
 
   const res: ForecastResponse = {
     intent,
@@ -194,6 +227,7 @@ export async function runForecast(body: ForecastRequestBody): Promise<ForecastRe
     used_timeframe,
     missing_info_needed,
     chartData,
+    structuredAnswer,
     cards: {
       general: answer,
       forecast: {
