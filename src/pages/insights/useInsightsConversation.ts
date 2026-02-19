@@ -86,13 +86,13 @@ export function useInsightsConversation(args: UseInsightsConversationArgs) {
 
         // Use structured output when present: answer only + up to 2 supporting bullets; optional clarifying question.
         const structured = res.structuredAnswer;
-        const parts: string[] = structured
+        const parts: (string | undefined | false)[] = structured
           ? [structured.answer, ...(structured.supporting?.length ? structured.supporting.map((s) => `• ${s}`) : [])]
           : [answer?.title && `**${answer.title}**`, summary, details && details.trim(), res.assumptions?.length ? `Assumptions: ${res.assumptions.join(" ")}` : ""];
         if (structured?.needs_clarification && structured.clarifying_question) {
           parts.push(`Clarifying: ${structured.clarifying_question}`);
         }
-        const assistantContent = parts.filter(Boolean).join("\n\n");
+        const assistantContent = parts.filter((x): x is string => Boolean(x)).join("\n\n");
 
         setMessages((prev) => [
           ...prev,
