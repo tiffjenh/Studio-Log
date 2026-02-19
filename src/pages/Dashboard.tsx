@@ -121,33 +121,41 @@ export default function Dashboard() {
   });
   const isToday = toDateKey(selectedDate) === toDateKey(today);
 
-  // Guard: if the student has a lesson on any OTHER date this week (i.e., was rescheduled away), do not
-  // auto-create a new lesson for this date — the student is still "scheduled" today by dayOfWeek but their
-  // actual lesson is elsewhere. This prevents duplicate lessons when user interacts on the old date.
-  const hasRescheduledElsewhere = (studentId: string): boolean => {
+  // If the student has a lesson on another date this week (rescheduled), return it so we can edit it instead of creating a new one.
+  const getLessonElsewhereThisWeek = (studentId: string): Lesson | undefined => {
     const { start, end } = getWeekBounds(selectedDate);
     const startKey = toDateKey(start);
     const endKey = toDateKey(end);
-    return dedupedLessons.some((l) => l.studentId === studentId && l.date >= startKey && l.date <= endKey && l.date !== dateKey);
+    const inWeek = dedupedLessons.filter((l) => l.studentId === studentId && l.date >= startKey && l.date <= endKey && l.date !== dateKey);
+    return inWeek[0];
   };
 
   const handleToggle = (studentId: string, completed: boolean) => {
     const existing = getLessonForStudentOnDate(dedupedLessons, studentId, dateKey);
     if (existing) updateLesson(existing.id, { completed });
-    else if (!hasRescheduledElsewhere(studentId)) {
-      const student = data.students.find((s) => s.id === studentId);
-      if (!student) return;
-      addLesson({ studentId, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: true });
+    else {
+      const elsewhere = getLessonElsewhereThisWeek(studentId);
+      if (!elsewhere) {
+        const student = data.students.find((s) => s.id === studentId);
+        if (!student) return;
+        addLesson({ studentId, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: true });
+      }
     }
   };
 
   const handleEdit = async (student: Student) => {
     const existing = getLessonForStudentOnDate(dedupedLessons, student.id, dateKey);
-    if (existing) navigate(`/edit-lesson/${existing.id}`);
-    else if (!hasRescheduledElsewhere(student.id)) {
-      const id = await addLesson({ studentId: student.id, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: false });
-      if (id) navigate(`/edit-lesson/${id}`);
+    if (existing) {
+      navigate(`/edit-lesson/${existing.id}`);
+      return;
     }
+    const elsewhere = getLessonElsewhereThisWeek(student.id);
+    if (elsewhere) {
+      navigate(`/edit-lesson/${elsewhere.id}`);
+      return;
+    }
+    const id = await addLesson({ studentId: student.id, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: false });
+    if (id) navigate(`/edit-lesson/${id}`);
   };
 
   return (

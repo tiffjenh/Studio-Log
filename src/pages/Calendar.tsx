@@ -4,7 +4,7 @@ import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatCurrency, getStudentsForDay, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, getStudentIdsWithLessonOnDate, toDateKey, dedupeLessonsById, getWeekBounds } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
-import type { Student } from "@/types";
+import type { Lesson, Student } from "@/types";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -66,32 +66,41 @@ export default function Calendar() {
     return () => document.removeEventListener("mousedown", handle);
   }, [monthPickerOpen]);
 
-  // Guard: if the student already has a lesson on a different date this week (rescheduled away), do not
-  // auto-create a new one for this date — prevents duplicate lessons on the old scheduled day.
-  const hasRescheduledElsewhere = (studentId: string): boolean => {
+  // If the student has a lesson on another date this week (rescheduled), return it so we can edit it instead of creating a new one.
+  const getLessonElsewhereThisWeek = (studentId: string): Lesson | undefined => {
     const { start, end } = getWeekBounds(selectedDate);
     const startKey = toDateKey(start);
     const endKey = toDateKey(end);
-    return dedupedLessons.some((l) => l.studentId === studentId && l.date >= startKey && l.date <= endKey && l.date !== dateKey);
+    const inWeek = dedupedLessons.filter((l) => l.studentId === studentId && l.date >= startKey && l.date <= endKey && l.date !== dateKey);
+    return inWeek[0];
   };
 
   const handleToggle = (studentId: string, completed: boolean) => {
     const existing = getLessonForStudentOnDate(dedupedLessons, studentId, dateKey);
     if (existing) updateLesson(existing.id, { completed });
-    else if (!hasRescheduledElsewhere(studentId)) {
-      const student = data.students.find((s) => s.id === studentId);
-      if (!student) return;
-      addLesson({ studentId, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: true });
+    else {
+      const elsewhere = getLessonElsewhereThisWeek(studentId);
+      if (!elsewhere) {
+        const student = data.students.find((s) => s.id === studentId);
+        if (!student) return;
+        addLesson({ studentId, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: true });
+      }
     }
   };
 
   const handlePressLesson = async (student: Student) => {
     const existing = getLessonForStudentOnDate(dedupedLessons, student.id, dateKey);
-    if (existing) navigate(`/edit-lesson/${existing.id}`);
-    else if (!hasRescheduledElsewhere(student.id)) {
-      const id = await addLesson({ studentId: student.id, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: false });
-      if (id) navigate(`/edit-lesson/${id}`);
+    if (existing) {
+      navigate(`/edit-lesson/${existing.id}`);
+      return;
     }
+    const elsewhere = getLessonElsewhereThisWeek(student.id);
+    if (elsewhere) {
+      navigate(`/edit-lesson/${elsewhere.id}`);
+      return;
+    }
+    const id = await addLesson({ studentId: student.id, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: false });
+    if (id) navigate(`/edit-lesson/${id}`);
   };
 
   return (
