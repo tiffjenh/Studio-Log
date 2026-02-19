@@ -54,6 +54,11 @@ export function toDateKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** One lesson per id. Use before rendering to avoid duplicate rows. */
+export function dedupeLessonsById(lessons: Lesson[]): Lesson[] {
+  return Array.from(new Map(lessons.map((l) => [l.id, l])).values());
+}
+
 /** Dedupe lessons to one per (studentId, date), keeping first (matches getLessonForStudentOnDate). */
 export function dedupeLessons(lessons: Lesson[]): Lesson[] {
   const byKey = new Map<string, Lesson>();

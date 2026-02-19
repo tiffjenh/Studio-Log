@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatCurrency, getStudentsForDay, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, getStudentIdsWithLessonOnDate, toDateKey } from "@/utils/earnings";
+import { formatCurrency, getStudentsForDay, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, getStudentIdsWithLessonOnDate, toDateKey, dedupeLessonsById, getWeekBounds } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Student } from "@/types";
 
@@ -32,24 +32,21 @@ export default function Calendar() {
 
   const dateKey = toDateKey(selectedDate);
   const dayOfWeek = selectedDate.getDay();
-  const lessonsForDisplay = useMemo(
-    () => Array.from(new Map(data.lessons.map((l) => [l.id, l])).values()),
-    [data.lessons]
-  );
+  const dedupedLessons = useMemo(() => dedupeLessonsById(data.lessons), [data.lessons]);
   const scheduledForDay = getStudentsForDay(data.students, dayOfWeek, dateKey);
-  const studentIdsWithLessonOnDate = getStudentIdsWithLessonOnDate(lessonsForDisplay, dateKey);
+  const studentIdsWithLessonOnDate = getStudentIdsWithLessonOnDate(dedupedLessons, dateKey);
   const scheduledIds = new Set(scheduledForDay.map((s) => s.id));
   const rescheduledOnly = data.students.filter((s) => studentIdsWithLessonOnDate.has(s.id) && !scheduledIds.has(s.id));
   const todaysStudents = [...scheduledForDay, ...rescheduledOnly].sort((a, b) => {
-    const lessonA = getLessonForStudentOnDate(lessonsForDisplay, a.id, dateKey);
-    const lessonB = getLessonForStudentOnDate(lessonsForDisplay, b.id, dateKey);
+    const lessonA = getLessonForStudentOnDate(dedupedLessons, a.id, dateKey);
+    const lessonB = getLessonForStudentOnDate(dedupedLessons, b.id, dateKey);
     const timeA = lessonA?.timeOfDay ?? getEffectiveSchedule(a, dateKey)?.timeOfDay ?? a.timeOfDay ?? "";
     const timeB = lessonB?.timeOfDay ?? getEffectiveSchedule(b, dateKey)?.timeOfDay ?? b.timeOfDay ?? "";
     return timeA > timeB ? 1 : -1;
   });
   const todaysStudentIds = new Set(todaysStudents.map((s) => s.id));
   // Only count completed lessons for students who are on today's schedule (avoids orphan lessons and matches Schedule list)
-  const todayEarnings = lessonsForDisplay
+  const todayEarnings = dedupedLessons
     .filter((l) => l.date === dateKey && l.completed && todaysStudentIds.has(l.studentId))
     .reduce((s, l) => s + l.amountCents, 0);
   const stripDates = getFiveDays(viewCenter);
@@ -69,10 +66,19 @@ export default function Calendar() {
     return () => document.removeEventListener("mousedown", handle);
   }, [monthPickerOpen]);
 
+  // Guard: if the student already has a lesson on a different date this week (rescheduled away), do not
+  // auto-create a new one for this date — prevents duplicate lessons on the old scheduled day.
+  const hasRescheduledElsewhere = (studentId: string): boolean => {
+    const { start, end } = getWeekBounds(selectedDate);
+    const startKey = toDateKey(start);
+    const endKey = toDateKey(end);
+    return dedupedLessons.some((l) => l.studentId === studentId && l.date >= startKey && l.date <= endKey && l.date !== dateKey);
+  };
+
   const handleToggle = (studentId: string, completed: boolean) => {
-    const existing = getLessonForStudentOnDate(lessonsForDisplay, studentId, dateKey);
+    const existing = getLessonForStudentOnDate(dedupedLessons, studentId, dateKey);
     if (existing) updateLesson(existing.id, { completed });
-    else {
+    else if (!hasRescheduledElsewhere(studentId)) {
       const student = data.students.find((s) => s.id === studentId);
       if (!student) return;
       addLesson({ studentId, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: true });
@@ -80,9 +86,9 @@ export default function Calendar() {
   };
 
   const handlePressLesson = async (student: Student) => {
-    const existing = getLessonForStudentOnDate(lessonsForDisplay, student.id, dateKey);
+    const existing = getLessonForStudentOnDate(dedupedLessons, student.id, dateKey);
     if (existing) navigate(`/edit-lesson/${existing.id}`);
-    else {
+    else if (!hasRescheduledElsewhere(student.id)) {
       const id = await addLesson({ studentId: student.id, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: false });
       if (id) navigate(`/edit-lesson/${id}`);
     }
@@ -257,7 +263,7 @@ export default function Calendar() {
         <p style={{ color: "var(--text-muted)", textAlign: "center", fontStyle: "italic" }}>No lessons scheduled</p>
       ) : (
         todaysStudents.map((student) => {
-          const lesson = getLessonForStudentOnDate(lessonsForDisplay, student.id, dateKey);
+          const lesson = getLessonForStudentOnDate(dedupedLessons, student.id, dateKey);
           const completed = lesson?.completed ?? false;
           const effectiveDuration = getEffectiveDurationMinutes(student, dateKey);
           const effectiveRate = getEffectiveRateCents(student, dateKey);

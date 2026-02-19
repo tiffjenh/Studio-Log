@@ -6,6 +6,7 @@ import LogoIcon from "@/components/LogoIcon";
 import {
   formatCurrency,
   earnedThisWeek,
+  getWeekBounds,
   earnedInDateRange,
   getMonthBounds,
   getStudentsForDay,
@@ -16,6 +17,7 @@ import {
   getStudentIdsWithLessonOnDate,
   toDateKey,
   dedupeLessons,
+  dedupeLessonsById,
   filterLessonsOnScheduledDay,
 } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
@@ -88,12 +90,9 @@ export default function Dashboard() {
   const dateKey = toDateKey(selectedDate);
   const dayOfWeek = selectedDate.getDay();
   // Safety net: dedupe by id so we never show the same lesson twice (e.g. after reschedule)
-  const lessonsForDisplay = useMemo(
-    () => Array.from(new Map(data.lessons.map((l) => [l.id, l])).values()),
-    [data.lessons]
-  );
+  const dedupedLessons = useMemo(() => dedupeLessonsById(data.lessons), [data.lessons]);
   const countableLessons = filterLessonsOnScheduledDay(
-    dedupeLessons(lessonsForDisplay.filter((l) => l.completed)),
+    dedupeLessons(dedupedLessons.filter((l) => l.completed)),
     data.students
   );
   const earned = earnedThisWeek(countableLessons, today);
@@ -110,22 +109,32 @@ export default function Dashboard() {
   const earningsYTD = earnedInDateRange(countableLessons, `${year}-01-01`, ytdEndKey);
 
   const scheduledForDay = getStudentsForDay(data.students, dayOfWeek, dateKey);
-  const studentIdsWithLessonOnDate = getStudentIdsWithLessonOnDate(lessonsForDisplay, dateKey);
+  const studentIdsWithLessonOnDate = getStudentIdsWithLessonOnDate(dedupedLessons, dateKey);
   const scheduledIds = new Set(scheduledForDay.map((s) => s.id));
   const rescheduledOnly = data.students.filter((s) => studentIdsWithLessonOnDate.has(s.id) && !scheduledIds.has(s.id));
   const todaysStudents = [...scheduledForDay, ...rescheduledOnly].sort((a, b) => {
-    const lessonA = getLessonForStudentOnDate(lessonsForDisplay, a.id, dateKey);
-    const lessonB = getLessonForStudentOnDate(lessonsForDisplay, b.id, dateKey);
+    const lessonA = getLessonForStudentOnDate(dedupedLessons, a.id, dateKey);
+    const lessonB = getLessonForStudentOnDate(dedupedLessons, b.id, dateKey);
     const timeA = lessonA?.timeOfDay ?? getEffectiveSchedule(a, dateKey)?.timeOfDay ?? a.timeOfDay ?? "";
     const timeB = lessonB?.timeOfDay ?? getEffectiveSchedule(b, dateKey)?.timeOfDay ?? b.timeOfDay ?? "";
     return timeA > timeB ? 1 : -1;
   });
   const isToday = toDateKey(selectedDate) === toDateKey(today);
 
+  // Guard: if the student has a lesson on any OTHER date this week (i.e., was rescheduled away), do not
+  // auto-create a new lesson for this date — the student is still "scheduled" today by dayOfWeek but their
+  // actual lesson is elsewhere. This prevents duplicate lessons when user interacts on the old date.
+  const hasRescheduledElsewhere = (studentId: string): boolean => {
+    const { start, end } = getWeekBounds(selectedDate);
+    const startKey = toDateKey(start);
+    const endKey = toDateKey(end);
+    return dedupedLessons.some((l) => l.studentId === studentId && l.date >= startKey && l.date <= endKey && l.date !== dateKey);
+  };
+
   const handleToggle = (studentId: string, completed: boolean) => {
-    const existing = getLessonForStudentOnDate(lessonsForDisplay, studentId, dateKey);
+    const existing = getLessonForStudentOnDate(dedupedLessons, studentId, dateKey);
     if (existing) updateLesson(existing.id, { completed });
-    else {
+    else if (!hasRescheduledElsewhere(studentId)) {
       const student = data.students.find((s) => s.id === studentId);
       if (!student) return;
       addLesson({ studentId, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: true });
@@ -133,9 +142,9 @@ export default function Dashboard() {
   };
 
   const handleEdit = async (student: Student) => {
-    const existing = getLessonForStudentOnDate(lessonsForDisplay, student.id, dateKey);
+    const existing = getLessonForStudentOnDate(dedupedLessons, student.id, dateKey);
     if (existing) navigate(`/edit-lesson/${existing.id}`);
-    else {
+    else if (!hasRescheduledElsewhere(student.id)) {
       const id = await addLesson({ studentId: student.id, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: false });
       if (id) navigate(`/edit-lesson/${id}`);
     }
@@ -198,7 +207,7 @@ export default function Dashboard() {
         <p style={{ color: "var(--text-muted)", padding: 28, fontSize: 15, textAlign: "center", fontStyle: "italic" }}>{t("dashboard.noLessonsScheduled")}</p>
       ) : (
         todaysStudents.map((student) => {
-          const lesson = getLessonForStudentOnDate(lessonsForDisplay, student.id, dateKey);
+          const lesson = getLessonForStudentOnDate(dedupedLessons, student.id, dateKey);
           return (
             <LessonRow
               key={student.id}

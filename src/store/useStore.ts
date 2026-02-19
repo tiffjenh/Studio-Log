@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppData, Lesson, Student, User } from "@/types";
+import { dedupeLessonsById } from "@/utils/earnings";
 import { hasSupabase } from "@/lib/supabase";
 import {
   loadFromSupabase,
@@ -48,15 +49,6 @@ function dedupeLessonsByStudentDate(lessons: Lesson[]): Lesson[] {
     }
   }
   return [...byKey.values()];
-}
-
-/** Guardrail: one lesson per id. Use when building lesson lists to avoid duplicates. */
-function dedupeLessonsById(lessons: Lesson[]): Lesson[] {
-  const byId = new Map<string, Lesson>();
-  for (const l of lessons) {
-    if (!byId.has(l.id)) byId.set(l.id, l);
-  }
-  return [...byId.values()];
 }
 
 /** Skip reload for this long after a bulk student import so we don't overwrite with a stale fetch. */
@@ -147,9 +139,10 @@ export function useStore() {
         }
         setData((prev) => ({ ...prev, user, students: [], lessons: [] }));
         (async () => {
-          const full = await loadFromSupabase();
-          if (full?.user) {
-            setData(full);
+        const full = await loadFromSupabase();
+        if (full?.user) {
+          // Always replace (never merge) and dedupe by id so stale state can't survive across setUser calls.
+          setData({ ...full, lessons: dedupeLessonsById(full.lessons) });
             if (full.students.length === 0 && full.lessons.length === 0) {
               try {
                 const raw = localStorage.getItem(STORAGE_KEY);
