@@ -347,7 +347,7 @@ input, select, textarea {
   color: var(--text-muted);
 }
 
-/* Landing (login / registration) – motion gradient + floating card */
+/* Landing (login / registration) – gradient background */
 .landing {
   min-height: 100dvh;
   display: flex;
@@ -359,7 +359,6 @@ input, select, textarea {
 }
 
 .landing--motion {
-  /* Palette: Tender #f7e7d8, Pink Chalk #f3a2bd, Sea Breeze #c9dae7, Delicate Lilac #b6b1d9 – prominent and smooth */
   background: linear-gradient(
     165deg,
     #f7e7d8 0%,
@@ -440,7 +439,7 @@ input, select, textarea {
   display: flex;
   gap: 0;
   margin-bottom: 20px;
-  background: rgba(240, 235, 245, 0.5);
+  background: rgba(0, 0, 0, 0.06);
   border-radius: 12px;
   padding: 4px;
   border: none;
@@ -456,15 +455,22 @@ input, select, textarea {
   color: var(--text-muted);
   background: transparent;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
   font-family: var(--font-sans);
 }
 
 .landing__tab--active {
-  background: var(--card);
+  background: #ffffff;
   color: var(--text);
-  font-weight: 600;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  border-bottom: 2px solid var(--primary, #8b5cf6);
+  outline: none;
+}
+
+.landing__tab--active:focus-visible {
+  outline: 2px solid var(--primary, #8b5cf6);
+  outline-offset: 2px;
 }
 
 .landing__form {

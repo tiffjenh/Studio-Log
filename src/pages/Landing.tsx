@@ -133,28 +133,34 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* Tabs: Log in | Sign up */}
-          <div className="landing__tabs" style={{ display: "flex", gap: 8, marginBottom: 20, background: "rgba(255, 255, 255, 0.45)", borderRadius: 999, padding: 6 }}>
-            <Button
-              variant="secondary"
-              size="sm"
+          {/* Tabs: Log in | Sign up – active tab clearly selected (filled bg, bold, underline) */}
+          <div className="landing__tabs" role="tablist" aria-label="Log in or Sign up">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "login"}
+              aria-controls="landing-login-panel"
+              id="landing-tab-login"
+              className={`landing__tab ${mode === "login" ? "landing__tab--active" : ""}`}
               onClick={() => { setMode("login"); setError(""); setResendMessage("idle"); }}
-              style={{ flex: 1, boxShadow: mode === "login" ? "var(--shadow-subtle)" : "none", opacity: mode === "login" ? 1 : 0.75 }}
             >
               {t("landing.logIn")}
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "signup"}
+              aria-controls="landing-signup-panel"
+              id="landing-tab-signup"
+              className={`landing__tab ${mode === "signup" ? "landing__tab--active" : ""}`}
               onClick={() => { setMode("signup"); setError(""); setResendMessage("idle"); }}
-              style={{ flex: 1, boxShadow: mode === "signup" ? "var(--shadow-subtle)" : "none", opacity: mode === "signup" ? 1 : 0.75 }}
             >
               {t("landing.signUp")}
-            </Button>
+            </button>
           </div>
 
         {mode === "login" ? (
-          <form onSubmit={handleLogin} className="landing__form">
+          <form id="landing-login-panel" role="tabpanel" aria-labelledby="landing-tab-login" onSubmit={handleLogin} className="landing__form">
             <input
               type="email"
               placeholder={t("landing.email")}
@@ -199,7 +205,7 @@ export default function Landing() {
                 )}
               </div>
             )}
-            <Button type="submit" variant="primary" size="lg" fullWidth style={{ marginTop: 6, marginBottom: 14 }}>
+            <Button type="submit" variant="secondary" size="lg" fullWidth style={{ marginTop: 6, marginBottom: 14 }}>
               {t("landing.logInButton")}
             </Button>
             <div className="landing__links">
@@ -209,7 +215,7 @@ export default function Landing() {
             </div>
           </form>
         ) : (
-          <form onSubmit={handleSignUp} className="landing__form">
+          <form id="landing-signup-panel" role="tabpanel" aria-labelledby="landing-tab-signup" onSubmit={handleSignUp} className="landing__form">
             <input
               type="text"
               placeholder={t("landing.name")}
@@ -243,7 +249,7 @@ export default function Landing() {
               </Button>
             </div>
             {error ? <p className="landing__error">{error}</p> : null}
-            <Button type="submit" variant="primary" size="lg" fullWidth style={{ marginTop: 6, marginBottom: 14 }}>
+            <Button type="submit" variant="secondary" size="lg" fullWidth style={{ marginTop: 6, marginBottom: 14 }}>
               {t("landing.signUpButton")}
             </Button>
             <div className="landing__links" />

@@ -8,7 +8,7 @@ export default {
     settings: "設定",
   },
   landing: {
-    title: "Studio Log",
+    title: "Wweekly",
     tagline: "track students, clients and earnings",
     logIn: "登入",
     signUp: "註冊",

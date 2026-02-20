@@ -8,7 +8,7 @@ export default {
     settings: "Ajustes",
   },
   landing: {
-    title: "Studio Log",
+    title: "Wweekly",
     tagline: "track students, clients and earnings",
     logIn: "Iniciar sesión",
     signUp: "Registrarse",

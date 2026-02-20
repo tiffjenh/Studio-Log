@@ -1,6 +1,6 @@
-# Studio Log (Web)
+# Wweekly (Web)
 
-Mobile- and iPad-friendly website for the Studio Log / Mom Piano app. Tracks lessons and earnings for piano teachers. Built from the [Studio Log PRD](../Studio%20Log%20PRD.md).
+Mobile- and iPad-friendly website for tracking lessons and earnings for piano teachers. Built from the Studio Log PRD.
 
 ## Features
 
@@ -70,6 +70,8 @@ Homepage/dashboard voice uses a strict command pipeline: parse -> validate -> ex
   - "Move Leo from Friday Feb 18 to Sunday Feb 20 at 5pm for 1 hour"
 - **Lesson amount/rate for one date:**
   - "Set Chloe rate to 60 per hour"
+  - "Leo's class is now $100" (per-lesson amount for selected date)
+- **Duration:** "Change Ava's lesson to an hour and a half", "Change Emma's lesson to two hours"
 
 ### Safety and clarification behavior
 - If a name is ambiguous (e.g. two Emmas), voice asks a clarifying question and stores a pending command.
@@ -105,3 +107,23 @@ Debug mode:
   - `npx vitest run src/lib/insights/__tests__/pipeline.test.ts`
   - `npx vitest run src/lib/insights/__tests__/cannedQuestionsHarness.test.ts`
 - Build check: `npm run build`
+
+## Developer notes
+
+### Voice disambiguation (pending command)
+
+When the parser detects an ambiguous student name (e.g. two "Leo"s), it returns `needs_clarification` with a **pending command** object (stored in the Voice UI). The object holds the original transcript, intent, resolved date/time/duration, and the list of candidate students. When the user taps a candidate (e.g. "Leo Garcia"), the app calls `resumePendingVoiceCommand(pending, { studentId })`, which re-runs the pipeline with a forced student resolution so the original action (set time, set duration, move, etc.) is applied to the chosen student. "Applied: …" is shown only after that execution succeeds.
+
+### Adding new Insights intents
+
+1. Add the intent to `src/lib/insights/schema.ts` (`insightIntentEnum`).
+2. In `src/lib/insights/parse.ts`, add routing in `routeIntent()` (synonym patterns) and set `deriveTruthKey()` and default date range in `parseToQueryPlan` if needed.
+3. In `src/lib/insights/truthQueries.ts`, implement the handler for the new `sql_truth_query_key` and return the expected output shape.
+4. In `src/lib/insights/formatAnswer.ts` and `respond.ts`, add a formatter and route the intent to it.
+5. In `src/lib/insights/pipeline.ts`, map any router/LLM intent name to the new intent in `mapRouterIntentToPlanIntent` and include new metric outputs in `hasValidMetric` if relevant.
+6. Add tests in `src/lib/insights/__tests__/parse.paraphrase.test.ts` and `pipeline.test.ts` for the new question phrasings and expected outputs.
+
+### Enabling debug logs
+
+- **Voice:** In dev, open the voice panel and enable the "Debug" checkbox; or add `?voiceDebug=1` or `?debug=1` to the URL. The pipeline logs parsed intent, resolved date, student resolution, and plan to the console.
+- **Insights:** Set `localStorage.setItem("insights_debug", "1")` and refresh; or use `?debug=1`. The pipeline logs query, intent, date range, truth query key, and result summary. The Insights UI also shows a "View details" accordion per answer when debug is on.

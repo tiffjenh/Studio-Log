@@ -128,9 +128,13 @@ function routeIntent(normalized: string): InsightIntent {
   if (/^how many lessons did i teach last month$/.test(normalized)) return "lessons_count_in_period";
   if (/^what s my revenue per lesson$/.test(normalized) || /^what is my revenue per lesson$/.test(normalized)) return "revenue_per_lesson_in_period";
   if (/^what day of the week do i earn the most$/.test(normalized)) return "day_of_week_earnings_max";
-  if (/\b(cash flow trend|income trend|revenue trend|earnings trend|cash flow trending|revenue trending|earnings trending)\b/.test(normalized)) return "cash_flow_trend";
   if (/\b(stable|stability|volatile|volatility)\b/.test(normalized) && /\b(income|earnings|revenue|cash flow)\b/.test(normalized)) return "income_stability";
-  if ((/\baverage\b.*\bper week\b/.test(normalized) || /\baverage weekly\b/.test(normalized)) && /\b(earn|revenue|income|cash flow)\b/.test(normalized)) return "avg_weekly_revenue";
+  if (/\bis my income (stable|volatile)\b/.test(normalized)) return "income_stability";
+  if (/\bis my cash flow (stable|volatile)\b/.test(normalized)) return "income_stability";
+  if (/\b(cash flow trend|income trend|revenue trend|earnings trend|cash flow trending|revenue trending|earnings trending|my cash flow|cashflow trend)\b/.test(normalized)) return "cash_flow_trend";
+  if (/\b(what s|what is|whats)\s+my\s+cash flow\b/.test(normalized)) return "cash_flow_trend";
+  if ((/\baverage\b.*\bper week\b/.test(normalized) || /\baverage weekly\b/.test(normalized) || /\bper week\b.*\baverage\b/.test(normalized) || /\bweekly average\b/.test(normalized) || /\bearn on average per week\b/.test(normalized)) && /\b(earn|revenue|income|cash flow|earnings)\b/.test(normalized)) return "avg_weekly_revenue";
+  if (/\bhow much do i earn (on )?average per week\b/.test(normalized)) return "avg_weekly_revenue";
   if (/\bwho missed the most|missed most lessons|most missed lessons|most absences\b/.test(normalized)) return "student_missed_most_lessons_in_year";
   if (/\bhow many lessons\b|\blesson count\b|\bcount lessons\b|\bnumber of lessons\b/.test(normalized)) return "lessons_count_in_period";
   if (/\brevenue per lesson\b|\baverage revenue per lesson\b|\bavg revenue per lesson\b/.test(normalized)) return "revenue_per_lesson_in_period";

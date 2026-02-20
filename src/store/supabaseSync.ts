@@ -47,7 +47,7 @@ export async function fetchUser(uid: string): Promise<User | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from("profiles").select("id, name, phone").eq("id", uid).single();
   if (error) {
-    console.error("[Studio Log] Failed to fetch profile:", error.message, error);
+    console.error("[Wweekly] Failed to fetch profile:", error.message, error);
   }
   if (!data) return null;
   const { data: authUser } = await supabase.auth.getUser();
@@ -77,7 +77,7 @@ export async function fetchStudents(uid: string): Promise<Student[]> {
       .order("created_at", { ascending: true })
       .range(offset, offset + STUDENTS_FETCH_PAGE_SIZE - 1);
     if (error) {
-      console.error("[Studio Log] Failed to fetch students:", error.message, error);
+      console.error("[Wweekly] Failed to fetch students:", error.message, error);
       throw error;
     }
     page = (data ?? []) as Record<string, unknown>[];
@@ -104,7 +104,7 @@ export async function fetchLessons(uid: string): Promise<Lesson[]> {
       .order("lesson_date", { ascending: true })
       .range(offset, offset + LESSONS_PAGE_SIZE - 1);
     if (error) {
-      console.error("[Studio Log] Failed to fetch lessons:", error.message, error);
+      console.error("[Wweekly] Failed to fetch lessons:", error.message, error);
       throw error;
     }
     page = (data ?? []) as Record<string, unknown>[];
@@ -213,7 +213,7 @@ async function applyEffectiveScheduleChanges(uid: string, students: Student[]): 
         scheduleChangeAdditionalSchedules: undefined,
       });
     } catch (e) {
-      console.warn("[Studio Log] Apply schedule change failed for student", s.id, e);
+      console.warn("[Wweekly] Apply schedule change failed for student", s.id, e);
     }
   }
   if (toApply.length > 0) {
@@ -357,7 +357,7 @@ export async function insertStudentsBulkSupabase(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       errors.push(`Row ${i + 1} (${students[i]?.firstName} ${students[i]?.lastName}): ${msg}`);
-      console.warn("[Studio Log] Bulk insert row failed:", msg);
+      console.warn("[Wweekly] Bulk insert row failed:", msg);
     }
     onProgress?.(inserted.length, total);
   }
@@ -610,7 +610,7 @@ export async function fetchStudentChangeEvents(uid: string, studentId: string): 
     .eq("student_id", studentId)
     .order("created_at", { ascending: false });
   if (error) {
-    console.warn("[Studio Log] Failed to fetch student change events:", error.message);
+    console.warn("[Wweekly] Failed to fetch student change events:", error.message);
     return [];
   }
   return ((data ?? []) as Record<string, unknown>[]).map((r) => rowToStudentChangeEvent(r));
@@ -638,7 +638,7 @@ export async function insertStudentChangeEvent(
     new_value: payload.newValue ?? null,
   };
   const { error } = await supabase.from("student_change_events").insert(row);
-  if (error) console.warn("[Studio Log] Failed to insert student change event:", error.message);
+  if (error) console.warn("[Wweekly] Failed to insert student change event:", error.message);
 }
 
 export async function deleteAllLessonsSupabase(uid: string): Promise<void> {

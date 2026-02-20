@@ -97,8 +97,7 @@ export default function Dashboard() {
   // Include all completed lessons for overview (rescheduled lessons have date off recurring schedule)
   const countableLessons = dedupeLessons(dedupedLessons.filter((l) => l.completed));
   const earned = earnedThisWeek(countableLessons, today);
-  const studioOwnerName = data.user?.name?.trim().split(/\s+/)[0] ?? null;
-  const dashboardTitle = studioOwnerName ? `${studioOwnerName}'s Studio Log` : "Studio Log";
+  const dashboardTitle = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   const { start: monthStart, end: monthEnd } = getMonthBounds(today);
   const monthStartKey = toDateKey(monthStart);

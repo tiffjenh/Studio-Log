@@ -929,7 +929,24 @@ function parseTranscriptToCommand(
   }
 
   pushDebugError(debug, "No deterministic intent matched");
-  return { needs_clarification: "I couldn't map that command safely. Please say the student name and action." };
+  const hint = getFallbackClarificationHint(t);
+  return { needs_clarification: hint };
+}
+
+function getFallbackClarificationHint(normalizedText: string): string {
+  if (/\b(hour|hours?|minute|minutes?|half|1\.5|90|120)\b/.test(normalizedText)) {
+    return "I didn't catch the duration. Try: \"Change Ava's lesson to an hour and a half\" or \"Make Emma 90 minutes today\".";
+  }
+  if (/\$|\bdollar|\bamount\b|\bcharge\b|\bprice\b/.test(normalizedText)) {
+    return "For lesson amount, try: \"Leo's class is now $100\". For hourly rate: \"Set Leo to $60 per hour\".";
+  }
+  if (/\b(move|reschedule)\b/.test(normalizedText)) {
+    return "Try: \"Move Leo's lesson to tomorrow at 5pm\" or \"Reschedule Chloe from Friday to Sunday\".";
+  }
+  if (/\b(came|attended|attendance|mark|unmark)\b/.test(normalizedText)) {
+    return "Try: \"Chloe came today\" or \"Mark Leo and Ava attended\" or \"All students came today\".";
+  }
+  return "I couldn't map that command safely. Say the student name and action, e.g. \"Change Ava's lesson to 90 minutes\" or \"Leo's class is now $100\".";
 }
 
 function lessonsById(lessons: Lesson[]): Map<string, Lesson> {
