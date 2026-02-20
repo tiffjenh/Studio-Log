@@ -589,7 +589,6 @@ function createPlan(
       const targetDow = new Date(`${targetDate}T12:00:00`).getDay();
       const scheduledStudents = getStudentsForDay(allStudents, targetDow, targetDate);
       const existingRows = allLessons.filter((l) => l.date === targetDate);
-      const existingByStudent = new Set(existingRows.map((l) => l.studentId));
       const targetStudents = [...scheduledStudents];
       for (const row of existingRows) {
         if (!targetStudents.some((s) => s.id === row.studentId)) {
