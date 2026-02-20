@@ -48,6 +48,7 @@ function makeSeedDB(): TestDB {
     { id: "s-mia", firstName: "Mia", lastName: "Kim", dayOfWeek: 2, timeOfDay: "4:00 PM", durationMinutes: 60, rateCents: 7000 },
     { id: "s-olivia", firstName: "Olivia", lastName: "Chen", dayOfWeek: 2, timeOfDay: "5:00 PM", durationMinutes: 60, rateCents: 7000 },
     { id: "s-sofia", firstName: "Sofia", lastName: "Parker", dayOfWeek: 6, timeOfDay: "3:00 PM", durationMinutes: 90, rateCents: 8000 },
+    { id: "s-mason", firstName: "Mason", lastName: "Lopez", dayOfWeek: 5, timeOfDay: "7:00 PM", durationMinutes: 60, rateCents: 7000 },
     { id: "s-emma-kim", firstName: "Emma", lastName: "Kim", dayOfWeek: 5, timeOfDay: "2:00 PM", durationMinutes: 60, rateCents: 6500 },
     { id: "s-emma-chen", firstName: "Emma", lastName: "Chen", dayOfWeek: 5, timeOfDay: "6:00 PM", durationMinutes: 60, rateCents: 6500 },
     { id: "s-tyler", firstName: "Tyler", lastName: "Chen", dayOfWeek: 5, timeOfDay: "1:00 PM", durationMinutes: 30, rateCents: 6000 },
@@ -193,11 +194,25 @@ describe("home voice command pipeline", () => {
     expect(sqlDurationOnDate(db, "s-chloe", "2026-02-20")).toBe(30);
   });
 
+  it("maps attendance phrasing like 'had his class' to mark attendance", async () => {
+    const db = makeSeedDB();
+    const result = await runVoice(db, "Leo had his class today");
+    expect(result.status).toBe("success");
+    expect(sqlLessonOnDate(db, "s-leo", "2026-02-20")?.completed).toBe(true);
+  });
+
   it("updates time via natural phrasing", async () => {
     const db = makeSeedDB();
     const result = await runVoice(db, "Change Leo's lesson time to 3pm");
     expect(result.status).toBe("success");
     expect(sqlTimeOnDate(db, "s-leo", "2026-02-20")).toBe("3:00 PM");
+  });
+
+  it("supports possessive + 'is now at' time phrasing", async () => {
+    const db = makeSeedDB();
+    const result = await runVoice(db, "Emma Kim's class is now at 10 PM");
+    expect(result.status).toBe("success");
+    expect(sqlTimeOnDate(db, "s-emma-kim", "2026-02-20")).toBe("10:00 PM");
   });
 
   it("matches close STT spelling and updates Sofia from 'Sophia'", async () => {
@@ -230,6 +245,27 @@ describe("home voice command pipeline", () => {
     expect(moved?.date).toBe("2026-02-20");
     expect(moved?.timeOfDay).toBe("5:00 PM");
     expect(moved?.durationMinutes).toBe(60);
+  });
+
+  it("handles create-only duration updates when no row exists yet", async () => {
+    const db = makeSeedDB();
+    const result = await runVoice(db, "Change Mason's lesson to 30 minutes");
+    expect(result.status).toBe("success");
+    const lesson = sqlLessonOnDate(db, "s-mason", "2026-02-20");
+    expect(lesson).not.toBeNull();
+    expect(lesson?.durationMinutes).toBe(30);
+  });
+
+  it("parses change+date+time+duration as move lesson", async () => {
+    const db = makeSeedDB();
+    const result = await runVoice(
+      db,
+      "Change Sofia's lesson to Friday, February 20 at 2 PM for one hour",
+      "2026-02-21"
+    );
+    expect(result.status).toBe("success");
+    expect(sqlLessonOnDate(db, "s-sofia", "2026-02-20")?.timeOfDay).toBe("2:00 PM");
+    expect(sqlLessonOnDate(db, "s-sofia", "2026-02-20")?.durationMinutes).toBe(60);
   });
 
   it("asks clarification for ambiguous bare weekdays in move commands", async () => {

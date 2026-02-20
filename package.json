@@ -11,6 +11,7 @@
     "test:insights": "vitest run src/lib/insights src/features/insights",
     "test:insights:strict": "npx tsx scripts/test-insights.ts",
     "insights:diagnostic": "npx tsx scripts/insights-diagnostic.ts",
+    "voice:diagnostic": "npx tsx scripts/voice-diagnostic.ts",
     "check:buttons": "node scripts/check-buttons.js",
     "db:push": "supabase db push",
     "db:migration-list": "supabase migration list"

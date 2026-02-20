@@ -87,4 +87,30 @@ describe("Insights pipeline", () => {
       expect(res.needsClarification, tc.question).toBe(false);
     }
   });
+
+  it("returns full revenue-per-student breakdown (not truncated)", async () => {
+    const truth = await runTruthQuery(
+      "revenue_per_student_in_period",
+      { user_id: "u1", lessons: LESSONS, students: ROSTER },
+      { start_date: "2026-01-01", end_date: "2026-12-31" }
+    );
+    const rows = (truth.rows as Array<{ student_name: string; total_dollars: number }>) ?? [];
+    expect(rows.length).toBeGreaterThan(2);
+    expect(rows[0].total_dollars).toBeGreaterThanOrEqual(rows[1].total_dollars);
+    expect(rows[1].total_dollars).toBeGreaterThanOrEqual(rows[2].total_dollars);
+  });
+
+  it("never returns a $0 winner day when a positive day exists", async () => {
+    const lessons: Lesson[] = [
+      { id: "d1", studentId: "s1", date: "2026-02-01", durationMinutes: 60, amountCents: 0, completed: true },
+      { id: "d2", studentId: "s2", date: "2026-02-02", durationMinutes: 60, amountCents: 5000, completed: true },
+    ];
+    const truth = await runTruthQuery(
+      "day_of_week_earnings_max",
+      { user_id: "u1", lessons, students: ROSTER },
+      { start_date: "2026-02-01", end_date: "2026-02-28" }
+    );
+    expect(truth.total_dollars as number).toBeGreaterThan(0);
+    expect(typeof truth.dow_label).toBe("string");
+  });
 });

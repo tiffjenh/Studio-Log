@@ -113,10 +113,13 @@ type TruthDataContext = {
 type TruthResult = Record<string, unknown>;
 
 function isInsightsDebugEnabled(): boolean {
+  if (import.meta.env.VITE_DEBUG_INSIGHTS === "1") return true;
   if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
   return (
     Boolean((window as unknown as { DEBUG_INSIGHTS?: boolean }).DEBUG_INSIGHTS) ||
-    localStorage.getItem("insights_debug") === "1"
+    localStorage.getItem("insights_debug") === "1" ||
+    params.get("debug") === "1"
   );
 }
 

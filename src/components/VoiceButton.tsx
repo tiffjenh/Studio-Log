@@ -109,8 +109,10 @@ export default function VoiceButton({
   const dataRef = useRef(data);
   const queryAllowsDebug =
     typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("voiceDebug") === "1";
-  const canUseDebug = import.meta.env.DEV || queryAllowsDebug;
+    (new URLSearchParams(window.location.search).get("voiceDebug") === "1" ||
+      new URLSearchParams(window.location.search).get("debug") === "1");
+  const envAllowsDebug = import.meta.env.VITE_VOICE_DEBUG === "1";
+  const canUseDebug = import.meta.env.DEV || queryAllowsDebug || envAllowsDebug;
 
   useEffect(() => {
     dataRef.current = data;
@@ -169,7 +171,7 @@ export default function VoiceButton({
           return dataRef.current.lessons;
         },
       }, {
-        debug: canUseDebug && debugMode,
+        debug: import.meta.env.DEV || (canUseDebug && debugMode),
         dryRun: canUseDebug && dryRunMode,
       });
 

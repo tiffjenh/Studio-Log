@@ -129,6 +129,7 @@ export type VoiceDebug = {
   intent?: { name: string; router?: string };
   entities?: {
     names?: string[];
+    knownNameMentions?: string[];
     parsedDate?: string;
     parsedTime?: string;
     parsedDurationMinutes?: number;
@@ -350,7 +351,7 @@ function parseRatePerHour(text: string): number | null {
 function extractStudentMentions(text: string): string[] {
   const t = norm(text);
   const cleaned = t
-    .replace(/\b(unmark|mark|set|change|move|reschedule|make|update|undo|toggle|all|students?|attended|attendance|absent|today|tomorrow|yesterday|lesson|lessons|class|classes|from|to|for|at|did not|didnt|didn t|showed|show|came|come|everyone|everybody|nobody|no one|noone|clear|as|the|a|an|of|with|my|on|is|was|were|be|should|start|rate|price|per|hourly|dollars|dollar|and then|duration|time|hour|hours|minute|minutes|min|mins|completed|clock|oclock|o clock)\b/g, " ")
+    .replace(/\b(unmark|mark|set|change|move|reschedule|make|update|undo|toggle|all|students?|attended|attendance|absent|today|tomorrow|yesterday|lesson|lessons|class|classes|from|to|for|at|did not|didnt|didn t|showed|show|came|come|came in|everyone|everybody|nobody|no one|noone|clear|as|the|a|an|of|with|my|on|is|was|were|be|should|start|rate|price|per|hourly|dollars|dollar|and then|duration|time|hour|hours|minute|minutes|min|mins|completed|clock|oclock|o clock|now|had|did|happened|taught)\b/g, " ")
     .replace(/\b\d{1,2}(?:st|nd|rd|th)\b/g, " ")
     .replace(/\b\d{1,2}(?::\d{2})?\s*(am|pm)?\b/g, " ")
     .replace(/\bs\b/g, " ")
@@ -373,6 +374,56 @@ function splitNameSegment(segment: string): string[] {
 
 function stripPossessive(segment: string): string {
   return segment.replace(/'s\s*$/i, "").replace(/s\s+lesson\s*$/i, "").trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractKnownStudentMentions(text: string, students: Student[]): string[] {
+  if (students.length === 0) return [];
+  const lower = text.toLowerCase().replace(/’/g, "'");
+  const fullHits: Array<{ index: number; token: string }> = [];
+  const firstHits: Array<{ index: number; token: string }> = [];
+  for (const student of students) {
+    const first = norm(student.firstName);
+    const full = norm(`${student.firstName} ${student.lastName}`);
+    if (full) {
+      const fullMatch = lower.match(new RegExp(`\\b${escapeRegExp(full)}(?:'s)?\\b`, "i"));
+      if (fullMatch && typeof fullMatch.index === "number") {
+        fullHits.push({ index: fullMatch.index, token: stripPossessive(fullMatch[0]).trim() });
+        continue;
+      }
+    }
+    if (first) {
+      const firstMatch = lower.match(new RegExp(`\\b${escapeRegExp(first)}(?:'s)?\\b`, "i"));
+      if (firstMatch && typeof firstMatch.index === "number") {
+        firstHits.push({ index: firstMatch.index, token: stripPossessive(firstMatch[0]).trim() });
+      }
+    }
+  }
+  const hits = fullHits.length > 0 ? fullHits : firstHits;
+  const ordered = hits.sort((a, b) => a.index - b.index);
+  const deduped: string[] = [];
+  const seen = new Set<string>();
+  for (const hit of ordered) {
+    const key = norm(hit.token);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(hit.token);
+  }
+  return deduped;
+}
+
+function hasExplicitDateReference(text: string): boolean {
+  const t = norm(text);
+  if (/\b(today|tomorrow|yesterday)\b/.test(t)) return true;
+  if (/\b(next|last|this)\s+(sunday|sun|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thurs|friday|fri|saturday|sat)\b/.test(t)) return true;
+  if (/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?\b/.test(t)) return true;
+  if (/\b\d{4}-\d{2}-\d{2}\b/.test(t)) return true;
+  if (/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/.test(t)) return true;
+  if (/\b(sunday|sun|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thurs|friday|fri|saturday|sat)\b/.test(t)) return true;
+  return false;
 }
 
 function levenshtein(a: string, b: string): number {
@@ -483,19 +534,6 @@ function resolveNamesToStudents(
       ambiguous.push({ spoken: titleCaseName(rawName), matches: candidates.slice(0, 2).map((c) => c.student) });
       continue;
     }
-    if (matches.length > 1) {
-      debug?.studentResolution?.push({
-        nameQuery: titleCaseName(rawName),
-        strategy,
-        candidates: candidates.slice(0, 5).map((c) => ({
-          student_id: c.student.id,
-          display_name: `${c.student.firstName} ${c.student.lastName}`,
-          score: c.score,
-        })),
-      });
-      ambiguous.push({ spoken: titleCaseName(rawName), matches: candidates.slice(0, 2).map((c) => c.student) });
-      continue;
-    }
     if (!used.has(matches[0].id)) {
       used.add(matches[0].id);
       resolved.push(matches[0]);
@@ -574,6 +612,7 @@ function pushDebugSupabase(
 function parseTranscriptToCommand(
   transcript: string,
   context: DashboardContext,
+  students: Student[],
   debug?: VoiceDebug
 ): StructuredCommand | { needs_clarification: string; options?: string[] } {
   const text = transcript.trim();
@@ -583,12 +622,14 @@ function parseTranscriptToCommand(
   const parsedDuration = parseDurationMinutes(text);
   const parsedTime = parseTimeString(text);
   const parsedRate = parseRatePerHour(text);
-  const extractedNames = extractStudentMentions(text);
+  const knownNameMentions = extractKnownStudentMentions(text, students);
+  const extractedNames = knownNameMentions.length > 0 ? knownNameMentions : extractStudentMentions(text);
   if (debug) {
     debug.transcriptNormalized = t;
     debug.resolvedDate = targetDate;
     debug.entities = {
       names: extractedNames,
+      knownNameMentions: knownNameMentions.length > 0 ? knownNameMentions : undefined,
       parsedDate: targetDate,
       parsedTime: parsedTime ?? undefined,
       parsedDurationMinutes: parsedDuration ?? undefined,
@@ -617,13 +658,15 @@ function parseTranscriptToCommand(
 
   const allStudents = /\b(all students|everyone|everybody|all lessons|all of them)\b/.test(t);
   const unmark = /\b(unmark|undo|clear attendance|not attended|absent|did not come|didn t come|didnt come|missed|no show|cancelled|canceled|toggle off)\b/.test(t) || /\btoggle\b.*\boff\b/.test(t);
-  const mark = /\b(mark|set|toggle on|attended|came|showed up|was here|present)\b/.test(t);
+  const mark = /\b(mark|set|toggle on|attended|came|came in|showed up|showed|was here|present|had (?:his|her|their) class|had class|did class|lesson happened|taught)\b/.test(t);
 
-  const moveIntent = /\b(move|reschedule)\b/.test(t);
+  const moveIntent =
+    /\b(move|reschedule|rescheduled)\b/.test(t) ||
+    (/\b(change|update)\b/.test(t) && /\b(lesson|class)\b/.test(t) && hasExplicitDateReference(text));
   if (moveIntent) {
     if (debug) debug.intent = { name: "move_lesson", router: "moveIntent" };
     const explicitName =
-      text.match(/\b(?:move|reschedule)\s+([A-Za-z]+)(?:'s)?(?:\s+lesson)?/i)?.[1] ??
+      text.match(/\b(?:move|reschedule|change|update)\s+([A-Za-z]+)(?:['’]s)?(?:\s+(?:lesson|class))?/i)?.[1] ??
       text.match(/\blesson\s+with\s+([A-Za-z]+)\b/i)?.[1] ??
       null;
     const fromTo = rawLower.match(/\bfrom\s+(.+?)\s+to\s+(.+)/);
@@ -657,7 +700,9 @@ function parseTranscriptToCommand(
       return { needs_clarification: "I couldn't parse that time. Please say a valid time like 3pm or 15:00." };
     }
     const duration = parseDurationMinutes(text) ?? undefined;
-    const names = explicitName ? [explicitName] : extractStudentMentions(text);
+    const names = explicitName
+      ? [explicitName]
+      : (knownNameMentions.length > 0 ? knownNameMentions : extractStudentMentions(text));
     if (names.length === 0) return { needs_clarification: "Which student should I move?" };
     return {
       intent: "move_lesson",
@@ -670,9 +715,9 @@ function parseTranscriptToCommand(
   }
 
   const duration = parseDurationMinutes(text);
-  if (duration != null && /\b(change|make|set|update|should be|lesson|duration|minutes?|hour|half hour)\b/.test(t)) {
+  if (duration != null && /\b(change|make|set|update|should be|lesson|class|duration|minutes?|hour|half hour)\b/.test(t)) {
     if (debug) debug.intent = { name: "set_duration", router: "durationIntent" };
-    const names = extractStudentMentions(text);
+    const names = knownNameMentions.length > 0 ? knownNameMentions : extractStudentMentions(text);
     if (names.length === 0) return { needs_clarification: "Which student should I update?" };
     return {
       intent: "set_duration",
@@ -683,9 +728,12 @@ function parseTranscriptToCommand(
   }
 
   const time = parseTimeString(text);
-  if (time && /\b(change|set|move|reschedule|time|start)\b/.test(t)) {
+  const timeIntent =
+    /\b(change|set|move|reschedule|time|start)\b/.test(t) ||
+    /\b(is now at|now at|moved to|push to|pushed to|rescheduled to)\b/.test(t);
+  if (time && timeIntent) {
     if (debug) debug.intent = { name: "set_time", router: "timeIntent" };
-    const names = extractStudentMentions(text);
+    const names = knownNameMentions.length > 0 ? knownNameMentions : extractStudentMentions(text);
     if (names.length === 0) return { needs_clarification: "Which student should I move to that time?" };
     return {
       intent: "set_time",
@@ -698,7 +746,7 @@ function parseTranscriptToCommand(
   const rate = parseRatePerHour(text);
   if (rate != null && /\b(rate|price|raise|increase|hour)\b/.test(t)) {
     if (debug) debug.intent = { name: "set_rate", router: "rateIntent" };
-    const names = extractStudentMentions(text);
+    const names = knownNameMentions.length > 0 ? knownNameMentions : extractStudentMentions(text);
     if (names.length === 0) return { needs_clarification: "Which student's rate should I change?" };
     const goingForward = /\b(starting|effective|going forward|next month)\b/.test(t);
     return {
@@ -719,7 +767,7 @@ function parseTranscriptToCommand(
     };
   }
 
-  let names = extractStudentMentions(text);
+  let names = knownNameMentions.length > 0 ? knownNameMentions : extractStudentMentions(text);
   const namedAttendanceMatch = text.match(/\b(?:mark|unmark|set|toggle)\s+(.+?)\s+(?:as\s+)?(?:(?:to\s+)?(?:not\s+)?attended|absent|completed)\b/i);
   if (namedAttendanceMatch) {
     names = splitNameSegment(namedAttendanceMatch[1]);
@@ -828,6 +876,8 @@ function createPlan(
     }
     return chosen;
   };
+  const findScheduledLessonForStudentOnDate = (studentId: string, date: string): DashboardScheduledLesson | undefined =>
+    adapter.getScheduledLessonsForDate(date).find((row) => row.student_id === studentId);
 
   if (cmd.intent === "mark_attendance" || cmd.intent === "unmark_attendance") {
     const present = cmd.intent === "mark_attendance";
@@ -1066,8 +1116,30 @@ function createPlan(
     }
     const student = resolved.resolved[0];
     const fromDate = cmd.from_date ?? context.selected_date;
-    const source = allLessons.find((l) => l.studentId === student.id && l.date === fromDate);
+    const source = findLessonForStudentOnDate(student.id, fromDate);
     if (!source) {
+      const scheduled = findScheduledLessonForStudentOnDate(student.id, fromDate);
+      if (scheduled) {
+        if (cmd.duration_minutes != null && !VALID_DURATIONS.has(cmd.duration_minutes)) {
+          return { status: "needs_clarification", human_message: "Supported durations are 30, 45, 60, 90, or 120 minutes.", plan: null };
+        }
+        plan.creates.push(
+          createLessonForStudent(student, cmd.to_date, false, {
+            timeOfDay: cmd.to_time ?? scheduled.time,
+            durationMinutes: cmd.duration_minutes ?? scheduled.duration_minutes,
+          })
+        );
+        plan.verification.expected_created = {
+          student_ids: [student.id],
+          date: cmd.to_date,
+          completed: false,
+        };
+        return {
+          status: "success",
+          human_message: `Moved ${student.firstName} ${student.lastName} to ${formatPrettyDate(cmd.to_date)}${cmd.to_time ? ` at ${cmd.to_time}` : ""}.`,
+          plan,
+        };
+      }
       return {
         status: "needs_clarification",
         human_message: `No lesson found for ${student.firstName} ${student.lastName} on ${formatPrettyDate(fromDate)}.`,
@@ -1176,6 +1248,57 @@ async function verifyPlan(plan: CommandPlan, lessons: Lesson[]): Promise<boolean
   return true;
 }
 
+function runVoiceSanityChecks(
+  context: DashboardContext,
+  adapter: VoicePipelineAdapter,
+  plan: CommandPlan,
+  debug: VoiceDebug | undefined
+): void {
+  if (!debug) return;
+  const selectedDateRows = adapter.lessons.filter((l) => l.date === context.selected_date);
+  pushDebugSupabase(debug, {
+    label: "sanity:selected_date_count",
+    table: "lessons",
+    action: "select",
+    filters: { user_id: context.user_id, lesson_date: context.selected_date, timezone: context.timezone },
+    response: { count: selectedDateRows.length, ids: selectedDateRows.slice(0, 5).map((l) => l.id) },
+  });
+
+  const missingScheduled = context.scheduled_lessons.filter(
+    (row) => !adapter.lessons.some((l) => l.studentId === row.student_id && l.date === row.date)
+  );
+  if (missingScheduled.length > 0) {
+    pushDebugWarning(
+      debug,
+      `Scheduled lessons shown in UI but no DB rows on ${context.selected_date}: ${missingScheduled.map((r) => r.student_name).join(", ")}`
+    );
+  }
+
+  const targetPairs = [
+    ...plan.updates.map((u) => ({ student_id: u.student_id, student_name: u.student_name, date: u.date })),
+    ...plan.creates.map((c) => ({ student_id: c.student_id, student_name: c.student_name, date: c.date })),
+  ];
+  for (const pair of targetPairs) {
+    const rows = adapter.lessons.filter((l) => l.studentId === pair.student_id && l.date === pair.date);
+    pushDebugSupabase(debug, {
+      label: "sanity:student_date_lookup",
+      table: "lessons",
+      action: "select",
+      filters: {
+        user_id: context.user_id,
+        student_id: pair.student_id,
+        student_name: pair.student_name,
+        lesson_date: pair.date,
+        timezone: context.timezone,
+      },
+      response: {
+        count: rows.length,
+        ids: rows.map((l) => l.id).slice(0, 5),
+      },
+    });
+  }
+}
+
 export async function handleVoiceCommand(
   transcript: string,
   context: DashboardContext,
@@ -1196,7 +1319,7 @@ export async function handleVoiceCommand(
   const withDebug = (result: CommandResult): CommandResult =>
     debug ? { ...result, debug } : result;
 
-  const parsedOrClarify = parseTranscriptToCommand(transcript, context, debug);
+  const parsedOrClarify = parseTranscriptToCommand(transcript, context, adapter.students, debug);
   if ("needs_clarification" in parsedOrClarify) {
     return withDebug({
       status: "needs_clarification",
@@ -1232,12 +1355,11 @@ export async function handleVoiceCommand(
       ],
     };
   }
-  if (planned.plan.updates.length === 0) {
+  runVoiceSanityChecks(context, adapter, planned.plan, debug);
+  if (planned.plan.updates.length === 0 && planned.plan.creates.length === 0) {
     pushDebugWarning(
       debug,
-      planned.plan.creates.length > 0
-        ? "Creates were planned but existing guard requires at least one update."
-        : "No updates were generated."
+      "No updates or creates were generated."
     );
     return withDebug({
       status: "error",
