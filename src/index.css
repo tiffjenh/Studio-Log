@@ -333,6 +333,7 @@ input, select, textarea {
   background: #ffffff;
   border-radius: 50%;
   box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 
 /* Loading */
@@ -408,6 +409,7 @@ input, select, textarea {
   justify-content: center;
   flex-shrink: 0;
   box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 
 .landing__brand-text {
