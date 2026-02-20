@@ -110,6 +110,61 @@ export type CommandResult = {
   human_message: string;
   plan: CommandPlan | null;
   clarification_options?: string[];
+  debug?: VoiceDebug;
+};
+
+export type VoiceDebugStudentCandidate = {
+  student_id: string;
+  display_name: string;
+  score?: number;
+};
+
+export type VoiceDebug = {
+  ts: string;
+  transcriptRaw: string;
+  transcriptNormalized?: string;
+  timezone: string;
+  uiSelectedDate?: string;
+  resolvedDate?: string;
+  intent?: { name: string; router?: string };
+  entities?: {
+    names?: string[];
+    parsedDate?: string;
+    parsedTime?: string;
+    parsedDurationMinutes?: number;
+    parsedAmountCents?: number;
+    raw?: unknown;
+  };
+  studentResolution?: Array<{
+    nameQuery: string;
+    strategy: "exact" | "contains" | "fuzzy";
+    candidates: VoiceDebugStudentCandidate[];
+    chosen?: VoiceDebugStudentCandidate;
+  }>;
+  lessonResolution?: Array<{
+    student_id?: string;
+    student_name?: string;
+    filters: Record<string, unknown>;
+    resultsCount?: number;
+    resultLessonIds?: string[];
+    chosenLessonId?: string;
+  }>;
+  supabase?: Array<{
+    label: string;
+    table: string;
+    action: "select" | "update" | "insert";
+    filters?: Record<string, unknown>;
+    payload?: Record<string, unknown>;
+    response?: { count?: number; error?: string; ids?: string[] };
+  }>;
+  plan?: { updates?: CommandPlanUpdate[]; inserts?: CommandPlanCreate[]; notes?: string[] };
+  errors?: string[];
+  warnings?: string[];
+};
+
+export type VoiceHandlerOptions = {
+  debug?: boolean;
+  dryRun?: boolean;
 };
 
 export type VoicePipelineAdapter = {
@@ -295,7 +350,8 @@ function parseRatePerHour(text: string): number | null {
 function extractStudentMentions(text: string): string[] {
   const t = norm(text);
   const cleaned = t
-    .replace(/\b(unmark|mark|set|change|move|reschedule|make|update|undo|toggle|all|students?|attended|attendance|absent|today|tomorrow|yesterday|lesson|lessons|from|to|for|at|did not|didnt|didn t|showed|show|came|come|everyone|everybody|nobody|no one|noone|clear|as|the|a|an|of|with|my|on|is|was|were|be|should|start|rate|price|per|hourly|dollars|dollar|and then|duration|time|hour|hours|minute|minutes|min|mins|completed)\b/g, " ")
+    .replace(/\b(unmark|mark|set|change|move|reschedule|make|update|undo|toggle|all|students?|attended|attendance|absent|today|tomorrow|yesterday|lesson|lessons|class|classes|from|to|for|at|did not|didnt|didn t|showed|show|came|come|everyone|everybody|nobody|no one|noone|clear|as|the|a|an|of|with|my|on|is|was|were|be|should|start|rate|price|per|hourly|dollars|dollar|and then|duration|time|hour|hours|minute|minutes|min|mins|completed|clock|oclock|o clock)\b/g, " ")
+    .replace(/\b\d{1,2}(?:st|nd|rd|th)\b/g, " ")
     .replace(/\b\d{1,2}(?::\d{2})?\s*(am|pm)?\b/g, " ")
     .replace(/\bs\b/g, " ")
     .replace(/\s+/g, " ")
@@ -315,32 +371,148 @@ function splitNameSegment(segment: string): string[] {
     .filter((s) => s.length > 0);
 }
 
-function resolveNamesToStudents(names: string[], students: Student[]): { resolved: Student[]; ambiguous: { spoken: string; matches: Student[] }[]; missing: string[] } {
+function stripPossessive(segment: string): string {
+  return segment.replace(/'s\s*$/i, "").replace(/s\s+lesson\s*$/i, "").trim();
+}
+
+function levenshtein(a: string, b: string): number {
+  const an = a.length;
+  const bn = b.length;
+  if (an === 0) return bn;
+  if (bn === 0) return an;
+  const dp: number[][] = Array.from({ length: an + 1 }, () => Array(bn + 1).fill(0));
+  for (let i = 0; i <= an; i++) dp[i][0] = i;
+  for (let j = 0; j <= bn; j++) dp[0][j] = j;
+  for (let i = 1; i <= an; i++) {
+    for (let j = 1; j <= bn; j++) {
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+  }
+  return dp[an][bn];
+}
+
+function scoreStudentNameMatch(
+  rawName: string,
+  student: Student
+): { score: number; strategy: "exact" | "contains" | "fuzzy" } {
+  const spoken = norm(stripPossessive(rawName));
+  if (!spoken) return { score: 0, strategy: "fuzzy" };
+  const first = norm(student.firstName);
+  const last = norm(student.lastName);
+  const full = norm(`${student.firstName} ${student.lastName}`);
+
+  if (spoken === full) return { score: 1, strategy: "exact" };
+  if (spoken === first) return { score: 0.95, strategy: "exact" };
+  if (spoken === last) return { score: 0.9, strategy: "exact" };
+
+  if (
+    full.startsWith(spoken) ||
+    `${first} ${last}`.startsWith(spoken) ||
+    spoken.includes(first) ||
+    spoken.includes(last) ||
+    full.includes(spoken)
+  ) {
+    return { score: 0.8, strategy: "contains" };
+  }
+
+  // Conservative fuzzy matching: primarily catch close STT drift like Sophia -> Sofia.
+  const dFirst = levenshtein(spoken, first);
+  if (spoken.length >= 4 && first.length >= 4 && dFirst <= 2) {
+    return { score: Math.max(0.72, 0.9 - dFirst * 0.12), strategy: "fuzzy" };
+  }
+  const dLast = levenshtein(spoken, last);
+  if (spoken.length >= 4 && last.length >= 4 && dLast <= 2) {
+    return { score: Math.max(0.7, 0.82 - dLast * 0.1), strategy: "fuzzy" };
+  }
+  const dFull = levenshtein(spoken, full);
+  if (spoken.length >= 4 && full.length >= 8 && dFull <= 3) {
+    return { score: Math.max(0.66, 0.78 - dFull * 0.06), strategy: "fuzzy" };
+  }
+  return { score: 0, strategy: "fuzzy" };
+}
+
+function resolveNamesToStudents(
+  names: string[],
+  students: Student[],
+  debug?: VoiceDebug
+): { resolved: Student[]; ambiguous: { spoken: string; matches: Student[] }[]; missing: string[] } {
   const resolved: Student[] = [];
   const ambiguous: { spoken: string; matches: Student[] }[] = [];
   const missing: string[] = [];
   const used = new Set<string>();
 
   for (const rawName of names) {
-    const n = norm(rawName).replace(/\bs\b$/, "").trim();
-    if (!n) continue;
-    const matches = students.filter((s) => {
-      const first = norm(s.firstName);
-      const last = norm(s.lastName);
-      const full = `${first} ${last}`;
-      return full === n || first === n || full.includes(n) || n.includes(full) || `${first} ${last}`.startsWith(n);
-    });
+    const spoken = norm(rawName).replace(/\bs\b$/, "").trim();
+    if (!spoken) continue;
+    const candidates = students
+      .map((s) => {
+        const scored = scoreStudentNameMatch(rawName, s);
+        return {
+          student: s,
+          score: scored.score,
+          strategy: scored.strategy,
+        };
+      })
+      .filter((c) => c.score >= 0.66)
+      .sort((a, b) => b.score - a.score);
+    const matches = candidates.map((c) => c.student);
+    const strategy: "exact" | "contains" | "fuzzy" = candidates[0]?.strategy ?? "fuzzy";
     if (matches.length === 0) {
+      debug?.studentResolution?.push({
+        nameQuery: titleCaseName(rawName),
+        strategy: "fuzzy",
+        candidates: [],
+      });
       missing.push(titleCaseName(rawName));
       continue;
     }
+    if (candidates.length >= 2 && candidates[0].score - candidates[1].score < 0.08) {
+      debug?.studentResolution?.push({
+        nameQuery: titleCaseName(rawName),
+        strategy,
+        candidates: candidates.slice(0, 5).map((c) => ({
+          student_id: c.student.id,
+          display_name: `${c.student.firstName} ${c.student.lastName}`,
+          score: c.score,
+        })),
+      });
+      ambiguous.push({ spoken: titleCaseName(rawName), matches: candidates.slice(0, 2).map((c) => c.student) });
+      continue;
+    }
     if (matches.length > 1) {
-      ambiguous.push({ spoken: titleCaseName(rawName), matches });
+      debug?.studentResolution?.push({
+        nameQuery: titleCaseName(rawName),
+        strategy,
+        candidates: candidates.slice(0, 5).map((c) => ({
+          student_id: c.student.id,
+          display_name: `${c.student.firstName} ${c.student.lastName}`,
+          score: c.score,
+        })),
+      });
+      ambiguous.push({ spoken: titleCaseName(rawName), matches: candidates.slice(0, 2).map((c) => c.student) });
       continue;
     }
     if (!used.has(matches[0].id)) {
       used.add(matches[0].id);
       resolved.push(matches[0]);
+      debug?.studentResolution?.push({
+        nameQuery: titleCaseName(rawName),
+        strategy,
+        candidates: [{
+          student_id: matches[0].id,
+          display_name: `${matches[0].firstName} ${matches[0].lastName}`,
+          score: candidates.find((c) => c.student.id === matches[0].id)?.score,
+        }],
+        chosen: {
+          student_id: matches[0].id,
+          display_name: `${matches[0].firstName} ${matches[0].lastName}`,
+          score: candidates.find((c) => c.student.id === matches[0].id)?.score,
+        },
+      });
     }
   }
 
@@ -381,22 +553,62 @@ function getAmbiguousWeekdayToken(phrase: string): string | null {
   return m ? m[1] : null;
 }
 
-function parseTranscriptToCommand(transcript: string, context: DashboardContext): StructuredCommand | { needs_clarification: string; options?: string[] } {
+function pushDebugError(debug: VoiceDebug | undefined, message: string): void {
+  if (!debug) return;
+  debug.errors = [...(debug.errors ?? []), message];
+}
+
+function pushDebugWarning(debug: VoiceDebug | undefined, message: string): void {
+  if (!debug) return;
+  debug.warnings = [...(debug.warnings ?? []), message];
+}
+
+function pushDebugSupabase(
+  debug: VoiceDebug | undefined,
+  entry: NonNullable<VoiceDebug["supabase"]>[number]
+): void {
+  if (!debug) return;
+  debug.supabase = [...(debug.supabase ?? []), entry];
+}
+
+function parseTranscriptToCommand(
+  transcript: string,
+  context: DashboardContext,
+  debug?: VoiceDebug
+): StructuredCommand | { needs_clarification: string; options?: string[] } {
   const text = transcript.trim();
   const t = norm(text);
   const rawLower = text.toLowerCase();
   const targetDate = parseRelativeOrExplicitDate(text, context.selected_date);
+  const parsedDuration = parseDurationMinutes(text);
+  const parsedTime = parseTimeString(text);
+  const parsedRate = parseRatePerHour(text);
+  const extractedNames = extractStudentMentions(text);
+  if (debug) {
+    debug.transcriptNormalized = t;
+    debug.resolvedDate = targetDate;
+    debug.entities = {
+      names: extractedNames,
+      parsedDate: targetDate,
+      parsedTime: parsedTime ?? undefined,
+      parsedDurationMinutes: parsedDuration ?? undefined,
+      parsedAmountCents: parsedRate != null ? Math.round(parsedRate * 100) : undefined,
+    };
+  }
 
   if (!text) {
+    pushDebugError(debug, "Empty transcript");
     return { needs_clarification: "I didn't catch that. Please try again." };
   }
 
   if (/\bhelp\b|\bwhat can you do\b/.test(t)) {
+    if (debug) debug.intent = { name: "help", router: "help" };
     return { intent: "help" };
   }
 
   const saysNobody = /\b(no one|nobody)\b/.test(t);
   if (saysNobody && !/\b(mark|set|toggle|unmark|undo|clear)\b/.test(t)) {
+    if (debug) debug.intent = { name: "clarify", router: "nobody_without_action" };
     return {
       needs_clarification: "Do you want me to mark all scheduled lessons as not attended?",
       options: ["Yes, mark all absent", "No, cancel"],
@@ -409,6 +621,7 @@ function parseTranscriptToCommand(transcript: string, context: DashboardContext)
 
   const moveIntent = /\b(move|reschedule)\b/.test(t);
   if (moveIntent) {
+    if (debug) debug.intent = { name: "move_lesson", router: "moveIntent" };
     const explicitName =
       text.match(/\b(?:move|reschedule)\s+([A-Za-z]+)(?:'s)?(?:\s+lesson)?/i)?.[1] ??
       text.match(/\blesson\s+with\s+([A-Za-z]+)\b/i)?.[1] ??
@@ -458,6 +671,7 @@ function parseTranscriptToCommand(transcript: string, context: DashboardContext)
 
   const duration = parseDurationMinutes(text);
   if (duration != null && /\b(change|make|set|update|should be|lesson|duration|minutes?|hour|half hour)\b/.test(t)) {
+    if (debug) debug.intent = { name: "set_duration", router: "durationIntent" };
     const names = extractStudentMentions(text);
     if (names.length === 0) return { needs_clarification: "Which student should I update?" };
     return {
@@ -470,6 +684,7 @@ function parseTranscriptToCommand(transcript: string, context: DashboardContext)
 
   const time = parseTimeString(text);
   if (time && /\b(change|set|move|reschedule|time|start)\b/.test(t)) {
+    if (debug) debug.intent = { name: "set_time", router: "timeIntent" };
     const names = extractStudentMentions(text);
     if (names.length === 0) return { needs_clarification: "Which student should I move to that time?" };
     return {
@@ -482,6 +697,7 @@ function parseTranscriptToCommand(transcript: string, context: DashboardContext)
 
   const rate = parseRatePerHour(text);
   if (rate != null && /\b(rate|price|raise|increase|hour)\b/.test(t)) {
+    if (debug) debug.intent = { name: "set_rate", router: "rateIntent" };
     const names = extractStudentMentions(text);
     if (names.length === 0) return { needs_clarification: "Which student's rate should I change?" };
     const goingForward = /\b(starting|effective|going forward|next month)\b/.test(t);
@@ -495,6 +711,7 @@ function parseTranscriptToCommand(transcript: string, context: DashboardContext)
   }
 
   if (allStudents && (mark || unmark)) {
+    if (debug) debug.intent = { name: unmark ? "unmark_attendance" : "mark_attendance", router: "allStudents" };
     return {
       intent: unmark ? "unmark_attendance" : "mark_attendance",
       date: targetDate,
@@ -508,6 +725,7 @@ function parseTranscriptToCommand(transcript: string, context: DashboardContext)
     names = splitNameSegment(namedAttendanceMatch[1]);
   }
   if (names.length > 0 && (mark || unmark)) {
+    if (debug) debug.intent = { name: unmark ? "unmark_attendance" : "mark_attendance", router: "namedStudents" };
     return {
       intent: unmark ? "unmark_attendance" : "mark_attendance",
       date: targetDate,
@@ -515,6 +733,7 @@ function parseTranscriptToCommand(transcript: string, context: DashboardContext)
     };
   }
 
+  pushDebugError(debug, "No deterministic intent matched");
   return { needs_clarification: "I couldn't map that command safely. Please say the student name and action." };
 }
 
@@ -525,7 +744,8 @@ function lessonsById(lessons: Lesson[]): Map<string, Lesson> {
 function createPlan(
   cmd: StructuredCommand,
   context: DashboardContext,
-  adapter: VoicePipelineAdapter
+  adapter: VoicePipelineAdapter,
+  debug?: VoiceDebug
 ): CommandResult {
   if (cmd.intent === "help") {
     return {
@@ -553,6 +773,13 @@ function createPlan(
     creates: [],
     verification: {},
   };
+  if (debug) {
+    debug.plan = {
+      updates: [],
+      inserts: [],
+      notes: [],
+    };
+  }
 
   const createLessonForStudent = (
     student: Student,
@@ -580,8 +807,27 @@ function createPlan(
     };
   };
 
-  const findLessonForStudentOnDate = (studentId: string, date: string): Lesson | undefined =>
-    allLessons.find((l) => l.studentId === studentId && l.date === date);
+  const findLessonForStudentOnDate = (studentId: string, date: string): Lesson | undefined => {
+    const matches = allLessons.filter((l) => l.studentId === studentId && l.date === date);
+    const chosen = matches[0];
+    if (debug) {
+      debug.lessonResolution = [
+        ...(debug.lessonResolution ?? []),
+        {
+          student_id: studentId,
+          filters: {
+            user_id: context.user_id,
+            student_id: studentId,
+            lesson_date: date,
+          },
+          resultsCount: matches.length,
+          resultLessonIds: matches.map((m) => m.id).slice(0, 5),
+          chosenLessonId: chosen?.id,
+        },
+      ];
+    }
+    return chosen;
+  };
 
   if (cmd.intent === "mark_attendance" || cmd.intent === "unmark_attendance") {
     const present = cmd.intent === "mark_attendance";
@@ -639,7 +885,7 @@ function createPlan(
       };
     }
 
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug);
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return {
@@ -710,7 +956,7 @@ function createPlan(
         plan: null,
       };
     }
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug);
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return {
@@ -764,7 +1010,7 @@ function createPlan(
   }
 
   if (cmd.intent === "set_time") {
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug);
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return { status: "needs_clarification", human_message: `Which ${a.spoken}?`, clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`), plan: null };
@@ -810,7 +1056,7 @@ function createPlan(
   }
 
   if (cmd.intent === "move_lesson") {
-    const resolved = resolveNamesToStudents([cmd.target.name], allStudents);
+    const resolved = resolveNamesToStudents([cmd.target.name], allStudents, debug);
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return { status: "needs_clarification", human_message: `Which ${a.spoken}?`, clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`), plan: null };
@@ -862,7 +1108,7 @@ function createPlan(
     }
     const target = cmd.effective_date ?? context.selected_date;
     const rateCentsPerHour = Math.round(cmd.rate_dollars_per_hour * 100);
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug);
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return { status: "needs_clarification", human_message: `Which ${a.spoken}?`, clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`), plan: null };
@@ -933,53 +1179,130 @@ async function verifyPlan(plan: CommandPlan, lessons: Lesson[]): Promise<boolean
 export async function handleVoiceCommand(
   transcript: string,
   context: DashboardContext,
-  adapter: VoicePipelineAdapter
+  adapter: VoicePipelineAdapter,
+  options?: VoiceHandlerOptions
 ): Promise<CommandResult> {
-  const parsedOrClarify = parseTranscriptToCommand(transcript, context);
+  const debug: VoiceDebug | undefined = options?.debug
+    ? {
+      ts: new Date().toISOString(),
+      transcriptRaw: transcript,
+      timezone: context.timezone,
+      uiSelectedDate: context.selected_date,
+      studentResolution: [],
+      lessonResolution: [],
+      supabase: [],
+    }
+    : undefined;
+  const withDebug = (result: CommandResult): CommandResult =>
+    debug ? { ...result, debug } : result;
+
+  const parsedOrClarify = parseTranscriptToCommand(transcript, context, debug);
   if ("needs_clarification" in parsedOrClarify) {
-    return {
+    return withDebug({
       status: "needs_clarification",
       human_message: parsedOrClarify.needs_clarification,
       clarification_options: parsedOrClarify.options,
       plan: null,
-    };
+    });
   }
 
   const parsed = commandSchema.safeParse(parsedOrClarify);
   if (!parsed.success) {
-    return {
+    pushDebugError(debug, "Zod schema parse failed");
+    return withDebug({
       status: "error",
       human_message: "I couldn't parse that command safely.",
       plan: null,
-    };
+    });
+  }
+  if (debug && !debug.intent) {
+    debug.intent = { name: parsed.data.intent, router: "schema" };
   }
 
-  const planned = createPlan(parsed.data, context, adapter);
-  if (planned.status !== "success" || !planned.plan) return planned;
+  const planned = createPlan(parsed.data, context, adapter, debug);
+  if (planned.status !== "success" || !planned.plan) return withDebug(planned);
+  if (debug && planned.plan) {
+    debug.plan = {
+      updates: planned.plan.updates,
+      inserts: planned.plan.creates,
+      notes: [
+        `intent=${planned.plan.intent}`,
+        `updates=${planned.plan.updates.length}`,
+        `creates=${planned.plan.creates.length}`,
+      ],
+    };
+  }
   if (planned.plan.updates.length === 0) {
-    return {
+    pushDebugWarning(
+      debug,
+      planned.plan.creates.length > 0
+        ? "Creates were planned but existing guard requires at least one update."
+        : "No updates were generated."
+    );
+    return withDebug({
       status: "error",
       human_message: "No updates were generated from that command.",
       plan: null,
-    };
+    });
+  }
+
+  if (options?.dryRun) {
+    if (debug) {
+      pushDebugWarning(debug, "Dry run enabled; skipping mutations and verification.");
+      console.log("[voice-debug]", debug);
+    }
+    return withDebug(planned);
   }
 
   for (const step of planned.plan.updates) {
+    pushDebugSupabase(debug, {
+      label: "updateLessonById",
+      table: "lessons",
+      action: "update",
+      filters: { user_id: context.user_id, lesson_id: step.lesson_id },
+      payload: step.updates as Record<string, unknown>,
+    });
     await adapter.updateLessonById(step.lesson_id, step.updates);
   }
   for (const step of planned.plan.creates) {
+    pushDebugSupabase(debug, {
+      label: "addLesson",
+      table: "lessons",
+      action: "insert",
+      filters: { user_id: context.user_id, student_id: step.student_id, lesson_date: step.date },
+      payload: step.lesson as Record<string, unknown>,
+    });
     await adapter.addLesson(step.lesson);
   }
 
+  pushDebugSupabase(debug, {
+    label: "fetchLessonsForVerification",
+    table: "lessons",
+    action: "select",
+    filters: { user_id: context.user_id },
+  });
   const readBackLessons = await adapter.fetchLessonsForVerification();
+  if (debug?.supabase?.length) {
+    const idx = debug.supabase.length - 1;
+    debug.supabase[idx] = {
+      ...debug.supabase[idx],
+      response: {
+        count: readBackLessons.length,
+        ids: readBackLessons.slice(0, 5).map((l) => l.id),
+      },
+    };
+  }
   const verified = await verifyPlan(planned.plan, readBackLessons);
   if (!verified) {
-    return {
+    pushDebugError(debug, "Verification failed against read-back lessons.");
+    if (debug) console.log("[voice-debug]", debug);
+    return withDebug({
       status: "error",
       human_message: "I could not verify all lesson updates. Nothing was confirmed.",
       plan: planned.plan,
-    };
+    });
   }
 
-  return planned;
+  if (debug) console.log("[voice-debug]", debug);
+  return withDebug(planned);
 }

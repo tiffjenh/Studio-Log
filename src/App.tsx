@@ -16,6 +16,7 @@ import Insights from "./pages/Insights";
 import Settings from "./pages/Settings";
 import Calendar from "./pages/Calendar";
 import EditLesson from "./pages/EditLesson";
+import VoiceDebugPage from "./pages/VoiceDebug";
 
 /** Toggle body class so login/forgot-password pages don't reserve space for the bottom nav (removes purple bar). */
 function BodyNavClass() {
@@ -121,6 +122,7 @@ export default function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="edit-lesson/:id" element={<EditLesson />} />
+        {import.meta.env.DEV && <Route path="dev/voice" element={<VoiceDebugPage />} />}
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

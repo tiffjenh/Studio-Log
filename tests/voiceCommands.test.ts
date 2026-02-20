@@ -45,6 +45,9 @@ function makeSeedDB(): TestDB {
     { id: "s-chloe", firstName: "Chloe", lastName: "Parker", dayOfWeek: 5, timeOfDay: "5:00 PM", durationMinutes: 60, rateCents: 6000 },
     { id: "s-leo", firstName: "Leo", lastName: "Garcia", dayOfWeek: 5, timeOfDay: "4:00 PM", durationMinutes: 60, rateCents: 7000 },
     { id: "s-ava", firstName: "Ava", lastName: "Kim", dayOfWeek: 5, timeOfDay: "3:00 PM", durationMinutes: 45, rateCents: 6000 },
+    { id: "s-mia", firstName: "Mia", lastName: "Kim", dayOfWeek: 2, timeOfDay: "4:00 PM", durationMinutes: 60, rateCents: 7000 },
+    { id: "s-olivia", firstName: "Olivia", lastName: "Chen", dayOfWeek: 2, timeOfDay: "5:00 PM", durationMinutes: 60, rateCents: 7000 },
+    { id: "s-sofia", firstName: "Sofia", lastName: "Parker", dayOfWeek: 6, timeOfDay: "3:00 PM", durationMinutes: 90, rateCents: 8000 },
     { id: "s-emma-kim", firstName: "Emma", lastName: "Kim", dayOfWeek: 5, timeOfDay: "2:00 PM", durationMinutes: 60, rateCents: 6500 },
     { id: "s-emma-chen", firstName: "Emma", lastName: "Chen", dayOfWeek: 5, timeOfDay: "6:00 PM", durationMinutes: 60, rateCents: 6500 },
     { id: "s-tyler", firstName: "Tyler", lastName: "Chen", dayOfWeek: 5, timeOfDay: "1:00 PM", durationMinutes: 30, rateCents: 6000 },
@@ -59,6 +62,9 @@ function makeSeedDB(): TestDB {
     { id: "l-6", studentId: "s-tyler", date: "2026-02-20", timeOfDay: "1:00 PM", durationMinutes: 30, amountCents: 3000, completed: false },
     { id: "l-7", studentId: "s-chloe", date: "2026-02-19", timeOfDay: "5:00 PM", durationMinutes: 60, amountCents: 6000, completed: false },
     { id: "l-8", studentId: "s-leo", date: "2026-02-18", timeOfDay: "5:00 PM", durationMinutes: 60, amountCents: 7000, completed: false },
+    { id: "l-9", studentId: "s-sofia", date: "2026-02-21", timeOfDay: "3:00 PM", durationMinutes: 90, amountCents: 8000, completed: false },
+    { id: "l-10", studentId: "s-mia", date: "2026-02-17", timeOfDay: "4:00 PM", durationMinutes: 60, amountCents: 7000, completed: false },
+    { id: "l-11", studentId: "s-olivia", date: "2026-02-17", timeOfDay: "5:00 PM", durationMinutes: 60, amountCents: 7000, completed: false },
   ];
 
   return { students, lessons };
@@ -194,6 +200,28 @@ describe("home voice command pipeline", () => {
     expect(sqlTimeOnDate(db, "s-leo", "2026-02-20")).toBe("3:00 PM");
   });
 
+  it("matches close STT spelling and updates Sofia from 'Sophia'", async () => {
+    const db = makeSeedDB();
+    const result = await runVoice(db, "Change Sophia's lesson to 1 PM", "2026-02-21");
+    expect(result.status).toBe("success");
+    expect(sqlTimeOnDate(db, "s-sofia", "2026-02-21")).toBe("1:00 PM");
+  });
+
+  it("ignores 'class' and ordinal date noise in multi-student attendance", async () => {
+    const db = makeSeedDB();
+    const result = await runVoice(db, "Mia and Olivia attended class on the 17th", "2026-02-17");
+    expect(result.status).toBe("success");
+    expect(sqlLessonOnDate(db, "s-mia", "2026-02-17")?.completed).toBe(true);
+    expect(sqlLessonOnDate(db, "s-olivia", "2026-02-17")?.completed).toBe(true);
+  });
+
+  it("ignores o'clock token when parsing student for duration edits", async () => {
+    const db = makeSeedDB();
+    const result = await runVoice(db, "Change Sofia's lesson to 30 minutes and 1 o'clock", "2026-02-21");
+    expect(result.status).toBe("success");
+    expect(sqlDurationOnDate(db, "s-sofia", "2026-02-21")).toBe(30);
+  });
+
   it("moves a lesson by lesson id and verifies date/time/duration", async () => {
     const db = makeSeedDB();
     const result = await runVoice(db, "Move Leo's lesson from Friday Feb 18 to Sunday Feb 20 at 5pm for 1 hour");
@@ -274,7 +302,7 @@ describe("home voice command pipeline", () => {
     { transcript: "Move Leo to Feb 20 at 5pm", expectedStatus: "success" },
     { transcript: "Set Leo rate to $75 per hour effective July 1", expectedStatus: "needs_clarification" },
     { transcript: "Set Chloe rate to 60 per hour", expectedStatus: "success" },
-    { transcript: "Mark Mia attended", expectedStatus: "needs_clarification" },
+    { transcript: "Mark Nora attended", expectedStatus: "needs_clarification" },
     { transcript: "Move Alex to next Friday", expectedStatus: "needs_clarification" },
     { transcript: "All students attended yesterday", expectedStatus: "success" },
     { transcript: "Move Leo to 25pm", expectedStatus: "needs_clarification" },

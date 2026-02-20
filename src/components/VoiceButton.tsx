@@ -19,6 +19,7 @@ import {
   handleVoiceCommand,
   type DashboardContext,
   type DashboardScheduledLesson,
+  type VoiceDebug,
 } from "@/lib/voice/homeVoicePipeline";
 import type { Lesson } from "@/types";
 
@@ -101,8 +102,15 @@ export default function VoiceButton({
   const [appliedClarification, setAppliedClarification] = useState<string | null>(null);
   const [unmatchedItems, setUnmatchedItems] = useState<{ text: string; reason: string }[]>([]);
   const [showPanel, setShowPanel] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
+  const [dryRunMode, setDryRunMode] = useState(false);
+  const [debugPayload, setDebugPayload] = useState<VoiceDebug | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const dataRef = useRef(data);
+  const queryAllowsDebug =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("voiceDebug") === "1";
+  const canUseDebug = import.meta.env.DEV || queryAllowsDebug;
 
   useEffect(() => {
     dataRef.current = data;
@@ -160,6 +168,9 @@ export default function VoiceButton({
           await new Promise((r) => setTimeout(r, 0));
           return dataRef.current.lessons;
         },
+      }, {
+        debug: canUseDebug && debugMode,
+        dryRun: canUseDebug && dryRunMode,
       });
 
       if (result.plan?.target_date && result.plan.target_date !== dateKey && onDateChange) {
@@ -169,14 +180,16 @@ export default function VoiceButton({
       setFeedback(result.human_message);
       setClarificationOptions(result.clarification_options ?? []);
       setUnmatchedItems([]);
+      setDebugPayload(result.debug ?? null);
       setPhase("result");
     } catch (_err) {
       setFeedback("I couldn't process that command safely. Please try again.");
       setClarificationOptions([]);
       setUnmatchedItems([]);
+      setDebugPayload(null);
       setPhase("error");
     }
-  }, [dateKey, onDateChange, updateLesson, addLesson, getScheduledLessonsForDate]);
+  }, [dateKey, onDateChange, updateLesson, addLesson, getScheduledLessonsForDate, canUseDebug, debugMode, dryRunMode]);
 
   /* ---- Start listening ---- */
   const startListening = useCallback(() => {
@@ -197,6 +210,7 @@ export default function VoiceButton({
     setClarificationOptions([]);
     setAppliedClarification(null);
     setUnmatchedItems([]);
+    setDebugPayload(null);
     setShowPanel(true);
 
     recognition.onresult = async (event: SpeechRecognitionEvent) => {
@@ -250,6 +264,7 @@ export default function VoiceButton({
     setClarificationOptions([]);
     setAppliedClarification(null);
     setUnmatchedItems([]);
+    setDebugPayload(null);
   }, []);
 
   if (!supported) return null;
@@ -345,6 +360,35 @@ export default function VoiceButton({
               &times;
             </IconButton>
           </div>
+          {canUseDebug && (
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+                marginBottom: 12,
+                fontSize: 13,
+                color: "var(--text-muted)",
+              }}
+            >
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={debugMode}
+                  onChange={(e) => setDebugMode(e.target.checked)}
+                />
+                Debug
+              </label>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={dryRunMode}
+                  onChange={(e) => setDryRunMode(e.target.checked)}
+                />
+                Dry run
+              </label>
+            </div>
+          )}
 
           {/* Listening indicator */}
           {phase === "listening" && (
@@ -495,6 +539,102 @@ export default function VoiceButton({
                   Done
                 </Button>
               </div>
+              {canUseDebug && debugMode && debugPayload && (
+                <details style={{ marginTop: 14 }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 600 }}>Debug details</summary>
+                  <div style={{ marginTop: 10, fontSize: 13, color: "var(--text-muted)" }}>
+                    <div>Transcript: {debugPayload.transcriptRaw}</div>
+                    <div>Normalized: {debugPayload.transcriptNormalized ?? "—"}</div>
+                    <div>Intent: {debugPayload.intent?.name ?? "—"}</div>
+                    <div>UI selected date: {debugPayload.uiSelectedDate ?? "—"}</div>
+                    <div>Resolved date: {debugPayload.resolvedDate ?? "—"}</div>
+                    <div>Timezone: {debugPayload.timezone}</div>
+                    <details style={{ marginTop: 8 }}>
+                      <summary style={{ cursor: "pointer" }}>Parsed entities</summary>
+                      <pre
+                        style={{
+                          marginTop: 8,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          overflowX: "auto",
+                          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                        }}
+                      >
+                        {JSON.stringify(debugPayload.entities ?? {}, null, 2)}
+                      </pre>
+                    </details>
+                    <details style={{ marginTop: 8 }}>
+                      <summary style={{ cursor: "pointer" }}>Student resolution</summary>
+                      <pre
+                        style={{
+                          marginTop: 8,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          overflowX: "auto",
+                          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                        }}
+                      >
+                        {JSON.stringify(debugPayload.studentResolution ?? [], null, 2)}
+                      </pre>
+                    </details>
+                    <details style={{ marginTop: 8 }}>
+                      <summary style={{ cursor: "pointer" }}>Lesson resolution + plan</summary>
+                      <pre
+                        style={{
+                          marginTop: 8,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          overflowX: "auto",
+                          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                        }}
+                      >
+                        {JSON.stringify(
+                          {
+                            lessonResolution: debugPayload.lessonResolution ?? [],
+                            plan: debugPayload.plan ?? {},
+                          },
+                          null,
+                          2
+                        )}
+                      </pre>
+                    </details>
+                    <details style={{ marginTop: 8 }}>
+                      <summary style={{ cursor: "pointer" }}>Mutation / data calls</summary>
+                      <pre
+                        style={{
+                          marginTop: 8,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          overflowX: "auto",
+                          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                        }}
+                      >
+                        {JSON.stringify(debugPayload.supabase ?? [], null, 2)}
+                      </pre>
+                    </details>
+                    {!!(debugPayload.warnings?.length || debugPayload.errors?.length) && (
+                      <pre
+                        style={{
+                          marginTop: 8,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          overflowX: "auto",
+                          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                        }}
+                      >
+                        {JSON.stringify(
+                          {
+                            warnings: debugPayload.warnings ?? [],
+                            errors: debugPayload.errors ?? [],
+                          },
+                          null,
+                          2
+                        )}
+                      </pre>
+                    )}
+                  </div>
+                </details>
+              )}
             </div>
           )}
         </div>
