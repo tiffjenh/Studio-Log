@@ -566,6 +566,23 @@ export default function Insights() {
                       <div><strong>Intent:</strong> {m.meta.insightsResult.trace.queryPlan.intent}</div>
                       <div><strong>Router:</strong> {m.meta.metadata?.router_used ?? "regex"}</div>
                       <div><strong>Truth key:</strong> {m.meta.insightsResult.trace.queryPlan.sql_truth_query_key}</div>
+                      <div>
+                        <strong>Params:</strong>{" "}
+                        {JSON.stringify(
+                          {
+                            start_date: m.meta.insightsResult.trace.sqlParams?.start_date ?? null,
+                            end_date: m.meta.insightsResult.trace.sqlParams?.end_date ?? null,
+                            student_name: m.meta.insightsResult.trace.sqlParams?.student_name ?? null,
+                          },
+                          null,
+                          0
+                        )}
+                      </div>
+                      {m.meta.insightsResult.trace.zeroCause && (
+                        <div style={{ color: "#b45309" }}>
+                          <strong>Zero cause:</strong> {m.meta.insightsResult.trace.zeroCause}
+                        </div>
+                      )}
                       {(m.meta.insightsResult.trace.queryPlan.time_range?.label ?? m.meta.insightsResult.trace.queryPlan.time_range?.start) && (
                         <div><strong>Range:</strong> {m.meta.insightsResult.trace.queryPlan.time_range?.label ?? m.meta.insightsResult.trace.queryPlan.time_range?.start}</div>
                       )}

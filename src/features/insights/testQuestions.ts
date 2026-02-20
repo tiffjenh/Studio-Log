@@ -18,6 +18,7 @@ const base: TestQuestion[] = [
   { question: "what is my average hourly rate this month?", expectedIntent: "average_hourly_rate_in_period", expectedMetric: "hourly_dollars", expectedClarificationNeeded: false, notes: "avg rate period" },
   { question: "projected monthly earnings", expectedIntent: "forecast_monthly", expectedMetric: "projected_monthly_dollars", expectedClarificationNeeded: false, notes: "forecast monthly" },
   { question: "projected yearly earnings", expectedIntent: "forecast_yearly", expectedMetric: "projected_yearly_dollars", expectedClarificationNeeded: false, notes: "forecast yearly" },
+  { question: "what day of the week do i earn the most?", expectedIntent: "day_of_week_earnings_max", expectedMetric: "dow_label+total_dollars", expectedClarificationNeeded: false, notes: "dropdown day-of-week" },
   { question: "mark attendance things maybe", expectedIntent: "clarification", expectedMetric: "clarify", expectedClarificationNeeded: true, notes: "ambiguous fallback" },
 ];
 
@@ -48,7 +49,8 @@ const groups: Array<{ seed: TestQuestion; phrases: string[] }> = [
   { seed: base[8]!, phrases: ["avg hourly this month", "what is hourly average this month", "average rate in this month"] },
   { seed: base[9]!, phrases: ["forecast this month", "monthly projection", "expected monthly projection"] },
   { seed: base[10]!, phrases: ["forecast this year", "yearly projection", "expected yearly projection"] },
-  { seed: base[11]!, phrases: ["not sure question", "something random", "help me maybe"] },
+  { seed: base[11]!, phrases: ["what day do i earn the most", "which day of the week is best for earnings", "earn the most on which day"] },
+  { seed: base[12]!, phrases: ["not sure question", "something random", "help me maybe"] },
 ];
 
 const generated: TestQuestion[] = [];

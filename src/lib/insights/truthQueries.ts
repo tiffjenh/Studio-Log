@@ -1,5 +1,6 @@
 import { hasSupabase, supabase } from "@/lib/supabase";
 import { computeForecast } from "@/lib/forecasts/compute";
+import { resolveStudentName } from "@/lib/insights/metrics/entityResolution";
 import type { Lesson, Student } from "@/types";
 
 export const SQL_TRUTH_QUERIES: Record<string, string> = {
@@ -82,6 +83,12 @@ SELECT
 FROM public.lessons
 WHERE user_id = $1 AND student_id = $2 AND lesson_date BETWEEN $3 AND $4;
 `,
+  day_of_week_earnings_max: `
+SELECT EXTRACT(DOW FROM lesson_date) AS dow, COALESCE(SUM(amount_cents),0)::bigint AS total_cents
+FROM public.lessons
+WHERE user_id = $1 AND lesson_date BETWEEN $2 AND $3 AND completed = true
+GROUP BY 1 ORDER BY total_cents DESC LIMIT 1;
+`,
 };
 
 type TruthDataContext = {
@@ -148,13 +155,7 @@ async function loadData(ctx: TruthDataContext): Promise<{ lessons: Lesson[]; stu
 
 function matchStudentIdByName(students: Student[], rawName?: string): string | null {
   if (!rawName) return null;
-  const q = rawName.toLowerCase().trim();
-  const matches = students.filter((s) => {
-    const full = toName(s).toLowerCase();
-    return full === q || full.includes(q) || q.includes(full) || s.firstName.toLowerCase() === q;
-  });
-  if (matches.length !== 1) return null;
-  return matches[0].id;
+  return resolveStudentName(students, rawName);
 }
 
 export async function runTruthQuery(
@@ -170,8 +171,23 @@ export async function runTruthQuery(
 
   switch (key) {
     case "earnings_in_period": {
-      const totalCents = lessons.filter((l) => l.completed).reduce((acc, l) => acc + l.amountCents, 0);
-      return { total_cents: totalCents, total_dollars: centsToDollars(totalCents), data_source: data.source };
+      const completedLessons = lessons.filter((l) => l.completed);
+      const totalCents = completedLessons.reduce((acc, l) => acc + l.amountCents, 0);
+      const zero_cause =
+        totalCents !== 0
+          ? null
+          : completedLessons.length === 0
+            ? lessons.length === 0
+              ? "no_rows_in_range"
+              : "no_completed_lessons_in_range"
+            : "sum_zero_with_rows";
+      return {
+        lesson_count: completedLessons.length,
+        total_cents: totalCents,
+        total_dollars: centsToDollars(totalCents),
+        zero_cause,
+        data_source: data.source,
+      };
     }
     case "revenue_per_student_in_period": {
       const byStudent = new Map<string, number>();
@@ -192,11 +208,27 @@ export async function runTruthQuery(
     case "earnings_ytd_for_student": {
       const studentId =
         typeof params.student_id === "string" ? params.student_id : matchStudentIdByName(data.students, params.student_name as string | undefined);
-      if (!studentId) return { error: "student_not_resolved", data_source: data.source };
-      const totalCents = lessons
-        .filter((l) => l.studentId === studentId && l.completed)
+      if (!studentId) return { error: "student_not_resolved", zero_cause: "student_not_resolved", data_source: data.source };
+      const studentRows = lessons.filter((l) => l.studentId === studentId);
+      const completedRows = studentRows.filter((l) => l.completed);
+      const totalCents = completedRows
         .reduce((acc, l) => acc + l.amountCents, 0);
-      return { student_id: studentId, total_cents: totalCents, total_dollars: centsToDollars(totalCents), data_source: data.source };
+      const zero_cause =
+        totalCents !== 0
+          ? null
+          : completedRows.length === 0
+            ? studentRows.length === 0
+              ? "no_rows_for_student_in_range"
+              : "no_completed_lessons_for_student_in_range"
+            : "sum_zero_with_rows";
+      return {
+        student_id: studentId,
+        total_cents: totalCents,
+        total_dollars: centsToDollars(totalCents),
+        lesson_count: completedRows.length,
+        zero_cause,
+        data_source: data.source,
+      };
     }
     case "student_highest_hourly_rate":
     case "student_lowest_hourly_rate": {
@@ -208,20 +240,31 @@ export async function runTruthQuery(
         current.mins += l.durationMinutes;
         byStudent.set(l.studentId, current);
       }
-      const ranked = [...byStudent.entries()]
-        .map(([studentId, agg]) => ({
-          student_id: studentId,
-          student_name: studentsById.get(studentId) ? toName(studentsById.get(studentId)!) : "Unknown",
-          hourly_cents: agg.mins > 0 ? (agg.cents / agg.mins) * 60 : 0,
-        }))
+      const ranked = data.students
+        .filter((s) => {
+          const agg = byStudent.get(s.id);
+          const fromLessons = agg && agg.mins > 0 ? (agg.cents / agg.mins) * 60 : 0;
+          return (s.rateCents != null && s.rateCents > 0) || fromLessons > 0;
+        })
+        .map((s) => {
+          const agg = byStudent.get(s.id);
+          const fromLessons = agg && agg.mins > 0 ? (agg.cents / agg.mins) * 60 : 0;
+          const hourly_cents = (s.rateCents != null && s.rateCents > 0) ? s.rateCents : fromLessons;
+          return {
+            student_id: s.id,
+            student_name: toName(s),
+            hourly_cents,
+          };
+        })
         .sort((a, b) => (key === "student_highest_hourly_rate" ? b.hourly_cents - a.hourly_cents : a.hourly_cents - b.hourly_cents));
       return ranked[0] ? { ...ranked[0], hourly_dollars: centsToDollars(ranked[0].hourly_cents), data_source: data.source } : { row: null, data_source: data.source };
     }
     case "students_below_average_rate": {
+      const completedOnly = lessons.filter((l) => l.completed);
       const byStudent = new Map<string, { cents: number; mins: number }>();
       let totalCents = 0;
       let totalMins = 0;
-      for (const l of lessons) {
+      for (const l of completedOnly) {
         totalCents += l.amountCents;
         totalMins += l.durationMinutes;
         const current = byStudent.get(l.studentId) ?? { cents: 0, mins: 0 };
@@ -280,10 +323,39 @@ export async function runTruthQuery(
       };
     }
     case "average_hourly_rate_in_period": {
-      const totalCents = lessons.reduce((acc, l) => acc + l.amountCents, 0);
-      const totalMins = lessons.reduce((acc, l) => acc + l.durationMinutes, 0);
+      const completedOnly = lessons.filter((l) => l.completed);
+      const totalCents = completedOnly.reduce((acc, l) => acc + l.amountCents, 0);
+      const totalMins = completedOnly.reduce((acc, l) => acc + l.durationMinutes, 0);
       const hourlyCents = totalMins > 0 ? (totalCents / totalMins) * 60 : 0;
       return { hourly_cents: hourlyCents, hourly_dollars: centsToDollars(hourlyCents), data_source: data.source };
+    }
+    case "day_of_week_earnings_max": {
+      const byDow = new Map<number, number>();
+      for (const l of lessons) {
+        if (!l.completed) continue;
+        const dow = new Date(l.date + "T12:00:00").getDay();
+        byDow.set(dow, (byDow.get(dow) ?? 0) + l.amountCents);
+      }
+      if (byDow.size === 0) {
+        return {
+          dow: 0,
+          dow_label: "Sunday",
+          total_cents: 0,
+          total_dollars: 0,
+          zero_cause: lessons.length === 0 ? "no_rows_in_range" : "no_completed_lessons_in_range",
+          data_source: data.source,
+        };
+      }
+      const sorted = [...byDow.entries()].sort((a, b) => b[1] - a[1]);
+      const [dow, totalCents] = sorted[0]!;
+      const DOW_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      return {
+        dow,
+        dow_label: DOW_LABELS[dow] ?? "Unknown",
+        total_cents: totalCents,
+        total_dollars: centsToDollars(totalCents),
+        data_source: data.source,
+      };
     }
     case "percent_change_yoy": {
       const yearA = Number(params.year_a);

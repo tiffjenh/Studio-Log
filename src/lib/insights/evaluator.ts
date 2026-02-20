@@ -58,10 +58,13 @@ function includesInsensitive(text: string, piece: string): boolean {
 
 function truthMetricValue(truth: Record<string, unknown> | null): string {
   if (!truth) return "null";
+  if (truth.error) return String(truth.error);
   if (typeof truth.total_dollars === "number") return String(truth.total_dollars);
   if (typeof truth.hourly_dollars === "number") return String(truth.hourly_dollars);
   if (typeof truth.percent_change === "number") return String(truth.percent_change);
   if (typeof truth.student_name === "string") return truth.student_name;
+  if (typeof truth.dow_label === "string") return `${truth.dow_label}:${truth.total_dollars ?? 0}`;
+  if (typeof truth.missed_count === "number") return `${truth.student_name ?? ""}:${truth.missed_count}`;
   if (Array.isArray(truth.rows)) return `rows:${truth.rows.length}`;
   return JSON.stringify(truth);
 }
@@ -104,20 +107,39 @@ function gradeAnswer(
   if (truth) {
     if (typeof truth.total_dollars === "number") {
       const parsed = parseDollars(answer);
-      if (parsed.length === 0 || !parsed.some((n) => approxEqual(n, truth.total_dollars as number, Math.max(1, Math.abs(truth.total_dollars as number) * 0.01)))) {
+      const expected = truth.total_dollars as number;
+      const tolerance = Math.max(0.01, Math.abs(expected) * 0.01);
+      if (parsed.length === 0 || !parsed.some((n) => approxEqual(n, expected, tolerance))) {
         reasons.push("numeric_mismatch:total_dollars");
       }
     }
     if (typeof truth.hourly_dollars === "number") {
       const parsed = parseDollars(answer);
-      if (parsed.length === 0) reasons.push("numeric_mismatch:hourly_dollars");
+      const expected = truth.hourly_dollars as number;
+      if (parsed.length === 0 || !parsed.some((n) => approxEqual(n, expected, 0.01))) {
+        reasons.push("numeric_mismatch:hourly_dollars");
+      }
     }
     if (typeof truth.percent_change === "number") {
       const parsedPct = parsePercents(answer);
-      if (parsedPct.length === 0) reasons.push("percent_missing_or_mismatch");
+      const expected = truth.percent_change as number;
+      if (parsedPct.length === 0 || !parsedPct.some((n) => approxEqual(n, expected, 0.1))) {
+        reasons.push("percent_missing_or_mismatch");
+      }
     }
     if (typeof truth.student_name === "string" && !includesInsensitive(answer, truth.student_name)) {
       reasons.push("student_entity_mismatch");
+    }
+    if (typeof truth.dow_label === "string") {
+      if (!includesInsensitive(answer, truth.dow_label)) reasons.push("dow_entity_mismatch");
+      const parsed = parseDollars(answer);
+      const expected = (truth.total_dollars as number) ?? 0;
+      if (parsed.length > 0 && !parsed.some((n) => approxEqual(n, expected, Math.max(0.01, expected * 0.01)))) {
+        reasons.push("numeric_mismatch:day_total");
+      }
+    }
+    if (typeof truth.missed_count === "number" && typeof truth.student_name === "string") {
+      if (!includesInsensitive(answer, truth.student_name)) reasons.push("student_entity_mismatch");
     }
   }
 

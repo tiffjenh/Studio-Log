@@ -59,6 +59,7 @@ function mapRouterIntentToPlanIntent(raw: string): QueryPlan["intent"] {
   if (x === "revenue_per_student_breakdown" || x === "top_student_by_earnings") return "revenue_per_student_in_period";
   if (x === "forecast") return "forecast_monthly";
   if (x === "percent_change_yoy") return "percent_change_yoy";
+  if (x === "best_day_of_week" || x === "day_of_week_earnings") return "day_of_week_earnings_max";
   return "general_fallback";
 }
 
@@ -148,7 +149,8 @@ export async function askInsights(questionText: string, context: AskInsightsCont
                   llmIntent === "revenue_per_student_in_period" ? "revenue_per_student_in_period" :
                     llmIntent === "forecast_monthly" ? "forecast_monthly" :
                       llmIntent === "percent_change_yoy" ? "percent_change_yoy" :
-                        "earnings_in_period",
+                        llmIntent === "day_of_week_earnings_max" ? "day_of_week_earnings_max" :
+                          "earnings_in_period",
       };
     }
   }
@@ -168,6 +170,7 @@ export async function askInsights(questionText: string, context: AskInsightsCont
     computedResult: null,
     verifierPassed: false,
     verifierErrors: [],
+    zeroCause: null,
     finalAnswerText: "",
   };
 
@@ -195,17 +198,32 @@ export async function askInsights(questionText: string, context: AskInsightsCont
   });
   trace.computedResult = computed;
   trace.sqlResultSummary = computed.outputs;
+  trace.zeroCause = (computed.outputs as Record<string, unknown>).zero_cause as string | null | undefined ?? null;
 
   const verifier = runInsightsVerifier(plan, computed);
   trace.verifierPassed = verifier.passed;
   trace.verifierErrors = verifier.errors;
 
   let finalAnswerText = resultToAnswer(computed);
-  if (!verifier.passed || verifier.confidence === "low") {
+  const out = computed.outputs as Record<string, unknown>;
+  const hasValidMetric =
+    !out.error &&
+    (typeof out.total_dollars === "number" ||
+      typeof out.hourly_dollars === "number" ||
+      typeof out.student_name === "string" ||
+      typeof out.dow_label === "string" ||
+      Array.isArray(out.rows) ||
+      out.percent_change != null ||
+      out.projected_monthly_dollars != null ||
+      out.projected_yearly_dollars != null ||
+      out.attended_lessons != null);
+  if (!hasValidMetric && (!verifier.passed || verifier.confidence === "low")) {
     finalAnswerText =
       plan.clarifying_question ??
       "I’m not sure I have enough confidence to answer that. Did you mean earnings, attendance, rate, or forecast?";
   }
+  const finalNeedsClarification =
+    !hasValidMetric && (!verifier.passed || verifier.confidence === "low");
   trace.finalAnswerText = finalAnswerText;
 
   if (debug && verifier.errors.length > 0) {
@@ -219,6 +237,7 @@ export async function askInsights(questionText: string, context: AskInsightsCont
       entities: { student_filter: plan.student_filter, time_range: plan.time_range },
       sql_truth_query_key: plan.sql_truth_query_key,
       sql_params: trace.sqlParams,
+      zero_cause: trace.zeroCause,
       sql_result_summary: trace.sqlResultSummary,
       final_response: finalAnswerText,
     });
@@ -229,8 +248,8 @@ export async function askInsights(questionText: string, context: AskInsightsCont
   return {
     finalAnswerText,
     computedResult: computed,
-      needsClarification: !verifier.passed || verifier.confidence === "low",
-      clarifyingQuestion: !verifier.passed || verifier.confidence === "low" ? finalAnswerText : null,
+    needsClarification: finalNeedsClarification,
+    clarifyingQuestion: finalNeedsClarification ? finalAnswerText : null,
     metadata: meta,
     trace,
     usedPipeline: true,

@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { evaluateInsightsQuestion, type InsightsGeneratedQuestion, type InsightsEvaluationRow } from "../src/lib/insights/evaluator";
 import type { EarningsRow, StudentSummary } from "../src/lib/forecasts/types";
+import type { Lesson, Student } from "../src/types";
 import { INSIGHTS_CATEGORIES } from "../src/pages/insightsConstants";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -10,6 +11,28 @@ const ROOT = path.resolve(__dirname, "..");
 const QUESTIONS_PATH = path.resolve(ROOT, "tests", "insights_questions.generated.json");
 const REPORT_JSON = path.resolve(ROOT, "tests", "insights_report.json");
 const REPORT_MD = path.resolve(ROOT, "tests", "insights_report.md");
+
+function csvEscape(v: string): string {
+  return `"${String(v).replace(/"/g, '""')}"`;
+}
+
+function toCsvRow(row: InsightsEvaluationRow): string {
+  const diff =
+    row.verdict === "FAIL" && row.expected_metric_value !== row.got_metric_value
+      ? `expected=${row.expected_metric_value} got=${row.got_metric_value}`
+      : "";
+  return [
+    csvEscape(row.question),
+    csvEscape(row.detected_intent),
+    csvEscape(row.sql_truth_query_key),
+    csvEscape(row.expected_metric_value),
+    csvEscape(row.got_metric_value),
+    row.verdict,
+    csvEscape(row.fail_reasons.join("; ")),
+    csvEscape(diff),
+    csvEscape(row.llm_answer.slice(0, 120)),
+  ].join(",");
+}
 
 const SEED_EARNINGS: EarningsRow[] = [
   { date: "2024-01-05", amount: 95, customer: "Leo Chen", studentId: "s1", durationMinutes: 60 },
@@ -39,6 +62,33 @@ const SEED_STUDENTS: StudentSummary[] = [
   { id: "s3", name: "Alice Wu", rateCents: 8500, durationMinutes: 60 },
   { id: "s4", name: "Ava Park", rateCents: 9000, durationMinutes: 75 },
 ];
+
+/** Build Lesson[] and Student[] from seed so runTruthQuery uses in-memory data (deterministic truth). */
+function buildSeedContext(): { lessons: Lesson[]; roster: Student[] } {
+  const lessons: Lesson[] = SEED_EARNINGS.map((e, i) => ({
+    id: `lesson-${i}`,
+    studentId: e.studentId,
+    date: e.date,
+    durationMinutes: e.durationMinutes,
+    amountCents: Math.round(e.amount * 100),
+    completed: true,
+  }));
+  const roster: Student[] = SEED_STUDENTS.map((s) => {
+    const parts = s.name.split(" ");
+    const firstName = parts[0] ?? s.name;
+    const lastName = parts.slice(1).join(" ") ?? "";
+    return {
+      id: s.id,
+      firstName,
+      lastName,
+      rateCents: s.rateCents,
+      durationMinutes: s.durationMinutes,
+      dayOfWeek: 0,
+      timeOfDay: "12:00 PM",
+    };
+  });
+  return { lessons, roster };
+}
 
 /** Build InsightsGeneratedQuestion[] from INSIGHTS_CATEGORIES (all category questions). */
 function buildCategoryQuestions(): InsightsGeneratedQuestion[] {
@@ -178,7 +228,14 @@ function markdownReport(rows: InsightsEvaluationRow[]) {
 
 async function main() {
   const timezone = "America/Los_Angeles";
-  const ctx = { earnings: SEED_EARNINGS, students: SEED_STUDENTS, timezone };
+  const { lessons, roster } = buildSeedContext();
+  const ctx = {
+    earnings: SEED_EARNINGS,
+    students: SEED_STUDENTS,
+    lessons,
+    roster,
+    timezone,
+  };
   const rows: InsightsEvaluationRow[] = [];
 
   // 1) Run all category questions (standalone)
@@ -231,6 +288,11 @@ async function main() {
   await fs.writeFile(REPORT_JSON, JSON.stringify(rows, null, 2), "utf8");
   await fs.writeFile(REPORT_MD, markdownReport(rows), "utf8");
 
+  const csvHeaders = "Question,Detected Intent,Truth Query Key,Expected Metric Value,Got Metric Value,Verdict,Fail Reasons,Diff,Response Preview";
+  const csvPath = path.resolve(ROOT, "tests", `insights-test-results-${new Date().toISOString().slice(0, 10)}.csv`);
+  await fs.writeFile(csvPath, [csvHeaders, ...rows.map(toCsvRow)].join("\n"), "utf8");
+  console.log(`CSV report: ${csvPath}`);
+
   const summary = summarize(rows);
   const passRate = Math.round((summary.pass / summary.total) * 100);
   console.log(`\nInsights test summary: ${summary.pass}/${summary.total} passed (${passRate}%)`);
@@ -267,6 +329,10 @@ async function main() {
   }
 
   console.log(`\nReports written to tests/insights_report.{json,md}`);
+
+  if (summary.fail > 0) {
+    process.exit(1);
+  }
 }
 
 main().catch((err) => {

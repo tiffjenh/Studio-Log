@@ -174,7 +174,7 @@ export default function Dashboard() {
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <div className="logo-circle" style={{ width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <LogoIcon size={28} />
+          <LogoIcon />
         </div>
         <h2 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0, color: "var(--text)" }}>{dashboardTitle}</h2>
       </div>

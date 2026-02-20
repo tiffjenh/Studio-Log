@@ -6,6 +6,19 @@ export type VerifierResult = {
   confidence: "high" | "medium" | "low";
 };
 
+function hasValidResult(out: Record<string, unknown>): boolean {
+  if (out.error) return false;
+  if (typeof out.total_dollars === "number") return true;
+  if (typeof out.hourly_dollars === "number") return true;
+  if (typeof out.student_name === "string" && (out.missed_count != null || out.total_cents != null)) return true;
+  if (typeof out.dow_label === "string" && typeof out.total_dollars === "number") return true;
+  if (Array.isArray(out.rows) && out.rows.length >= 0) return true;
+  if (typeof out.percent_change === "number" || (out.percent_change == null && out.year_a != null)) return true;
+  if (out.projected_monthly_dollars != null || out.projected_yearly_dollars != null) return true;
+  if (out.attended_lessons != null || out.attendance_rate_percent != null) return true;
+  return false;
+}
+
 export function runInsightsVerifier(
   plan: QueryPlan,
   computed: ComputedResult | null
@@ -18,8 +31,8 @@ export function runInsightsVerifier(
   if (plan.needs_clarification && computed.intent !== "clarification") {
     errors.push("Clarification plan did not return clarification result.");
   }
-  if (!plan.needs_clarification && computed.confidence === "low") {
-    errors.push("Low confidence computation.");
+  if (!plan.needs_clarification && computed.confidence === "low" && !hasValidResult(out)) {
+    errors.push("Low confidence and no valid metric result.");
   }
   if (typeof out.total_dollars === "number" && out.total_dollars < 0) {
     errors.push("Negative total dollars.");

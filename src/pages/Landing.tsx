@@ -125,7 +125,7 @@ export default function Landing() {
           {/* Logo + app name */}
           <div className="landing__brand">
             <div className="landing__logo" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <LogoIcon size={28} />
+              <LogoIcon />
             </div>
             <div className="landing__brand-text">
               <h1 className="landing__title">{t("landing.title")}</h1>

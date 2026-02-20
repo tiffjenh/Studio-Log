@@ -1,4 +1,5 @@
 import { queryPlanSchema, type InsightIntent, type QueryPlan, type TimeRange } from "./schema";
+import { normalizeDateRange, defaultRangeForIntent } from "./metrics/dateNormalize";
 
 const MONTHS: Record<string, number> = {
   jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
@@ -24,49 +25,20 @@ export function normalizeInsightsQuery(raw: string): string {
     .replace(/\s+/g, " ");
 }
 
-function monthRange(year: number, month: number, label?: string): TimeRange {
-  const start = `${year}-${String(month).padStart(2, "0")}-01`;
-  const lastDay = new Date(year, month, 0).getDate();
-  const end = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-  return { type: "month", start, end, label: label ?? `${year}-${String(month).padStart(2, "0")}` };
+function toTimeRange(nr: { start: string; end: string; label?: string }, type: TimeRange["type"] = "custom"): TimeRange {
+  return { type, start: nr.start, end: nr.end, label: nr.label };
 }
 
-function yearRange(year: number): TimeRange {
-  return { type: "year", start: `${year}-01-01`, end: `${year}-12-31`, label: String(year) };
-}
-
-function extractDateRange(query: string): TimeRange | undefined {
-  const now = new Date();
-  const yearNow = now.getFullYear();
-  if (/\bytd|year to date|this year\b/.test(query)) {
-    return { type: "ytd", start: `${yearNow}-01-01`, end: now.toISOString().slice(0, 10), label: `${yearNow} YTD` };
-  }
-  if (/\blast month\b/.test(query)) {
-    const y = now.getMonth() === 0 ? yearNow - 1 : yearNow;
-    const m = now.getMonth() === 0 ? 12 : now.getMonth();
-    return monthRange(y, m, "last_month");
-  }
-  if (/\bthis month\b/.test(query)) {
-    return monthRange(yearNow, now.getMonth() + 1, "this_month");
-  }
-  if (/\blast year\b/.test(query)) {
-    return yearRange(yearNow - 1);
-  }
-  const explicitYear = query.match(/\b(20\d{2})\b/);
-  const explicitMonth = query.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(20\d{2})\b/);
-  if (explicitMonth) {
-    const m = MONTHS[explicitMonth[1]];
-    const y = Number(explicitMonth[2]);
-    if (m && y) return monthRange(y, m);
-  }
-  if (explicitYear) return yearRange(Number(explicitYear[1]));
-  if (/\blast 7 days|past 7 days\b/.test(query)) {
-    const end = now.toISOString().slice(0, 10);
-    const s = new Date(now);
-    s.setDate(now.getDate() - 6);
-    return { type: "rolling_days", start: s.toISOString().slice(0, 10), end, label: "last_7_days" };
-  }
-  return undefined;
+function extractDateRange(query: string, todayISO?: string): TimeRange | undefined {
+  const nr = normalizeDateRange(query, todayISO);
+  if (!nr) return undefined;
+  if (nr.label?.endsWith("YTD")) return toTimeRange(nr, "ytd");
+  if (nr.label === "last_month") return toTimeRange(nr, "month");
+  if (nr.label === "this_month") return toTimeRange(nr, "month");
+  if (nr.label === "last_7_days" || nr.label === "last_30_days") return toTimeRange(nr, "rolling_days");
+  if (nr.label && /^\d{4}-\d{2}$/.test(nr.label)) return toTimeRange(nr, "month");
+  if (nr.label && /^\d{4}$/.test(nr.label)) return toTimeRange(nr, "year");
+  return toTimeRange(nr);
 }
 
 function extractStudentName(query: string): string | undefined {
@@ -86,6 +58,28 @@ function extractStudentName(query: string): string | undefined {
   return undefined;
 }
 
+function inferMissingParams(
+  routedIntent: InsightIntent,
+  normalized: string,
+  studentName?: string
+): string[] {
+  if (routedIntent === "general_fallback") return ["intent"];
+  if (
+    (routedIntent === "earnings_ytd_for_student" ||
+      routedIntent === "student_attendance_summary") &&
+    !studentName
+  ) {
+    return ["student"];
+  }
+  if (
+    routedIntent === "student_missed_most_lessons_in_year" &&
+    !/\b20\d{2}\b/.test(normalized)
+  ) {
+    return ["year"];
+  }
+  return [];
+}
+
 function deriveTruthKey(intent: InsightIntent): string {
   const map: Record<InsightIntent, string> = {
     student_highest_hourly_rate: "student_highest_hourly_rate",
@@ -100,6 +94,7 @@ function deriveTruthKey(intent: InsightIntent): string {
     forecast_yearly: "forecast_yearly",
     percent_change_yoy: "percent_change_yoy",
     average_hourly_rate_in_period: "average_hourly_rate_in_period",
+    day_of_week_earnings_max: "day_of_week_earnings_max",
     general_fallback: "general_fallback",
     clarification: "clarification",
   };
@@ -113,6 +108,7 @@ function routeIntent(normalized: string): InsightIntent {
   if (/\bbelow my average rate|below my average hourly rate|below average hourly rate|below average hourly|students below average|students below my average|under average rate\b/.test(normalized)) return "students_below_average_rate";
   if (/\baverage hourly rate|avg hourly|hourly average\b/.test(normalized)) return "average_hourly_rate_in_period";
   if (/\baverage rate\b/.test(normalized) && !/\bbelow|under\b/.test(normalized)) return "average_hourly_rate_in_period";
+  if (/\bwhat day (?:of the week )?do i earn the most|(?:which |what )?day (?:of the week )?is best for earnings|day of the week.*earn the most|earn the most on which day|best day for earnings|which day do i earn the most\b/.test(normalized)) return "day_of_week_earnings_max";
   if ((/\bytd\b/.test(normalized) || /\byear to date\b/.test(normalized)) && (/\bearn me\b/.test(normalized) || /\b[a-z]+\s+[a-z]+\s+ytd\b/.test(normalized) || /\bytd from\b/.test(normalized) || /\byear to date earnings\b/.test(normalized))) return "earnings_ytd_for_student";
   if (/\battendance summary\b/.test(normalized)) return "student_attendance_summary";
   if (/\btop 3 students by revenue|top 3 by revenue|revenue per student|revenue ranking|student revenue breakdown\b/.test(normalized)) return "revenue_per_student_in_period";
@@ -127,13 +123,21 @@ function routeIntent(normalized: string): InsightIntent {
 export function parseToQueryPlan(query: string, priorContext?: InsightsPriorContext): QueryPlan {
   const normalized = normalizeInsightsQuery(query || "");
   const routedIntent = routeIntent(normalized);
-  const time_range = extractDateRange(normalized) ?? priorContext?.time_range;
+  const todayISO = new Date().toISOString().slice(0, 10);
+  let time_range = extractDateRange(normalized, todayISO) ?? priorContext?.time_range;
+  // Default date range for intents that support it (e.g. day of week earn most -> YTD)
+  if (!time_range && routedIntent === "day_of_week_earnings_max") {
+    const def = defaultRangeForIntent("day_of_week_earnings_max", todayISO);
+    time_range = toTimeRange(def, "ytd");
+  }
+  if (!time_range && (routedIntent === "earnings_in_period" || routedIntent === "average_hourly_rate_in_period" || routedIntent === "revenue_per_student_in_period")) {
+    const def = defaultRangeForIntent(routedIntent, todayISO);
+    time_range = toTimeRange(def, def.label?.includes("YTD") ? "ytd" : "rolling_days");
+  }
   const student_name = extractStudentName(normalized);
 
-  const needsClarification =
-    routedIntent === "general_fallback" ||
-    ((routedIntent === "earnings_ytd_for_student" || routedIntent === "student_attendance_summary") && !student_name) ||
-    (routedIntent === "student_missed_most_lessons_in_year" && !/\b20\d{2}\b/.test(normalized));
+  const missingParams = inferMissingParams(routedIntent, normalized, student_name);
+  const needsClarification = missingParams.length > 0;
 
   const clarifying_question = needsClarification
     ? routedIntent === "student_missed_most_lessons_in_year"
@@ -160,7 +164,7 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
     requested_metric: /%|percent|percentage/.test(normalized) ? "percent" : /\bwho\b/.test(normalized) ? "who" : "dollars",
     needs_clarification: needsClarification,
     clarifying_question,
-    required_missing_params: needsClarification ? (routedIntent === "student_missed_most_lessons_in_year" ? ["year"] : ["intent"]) : [],
+    required_missing_params: missingParams,
     sql_truth_query_key: deriveTruthKey(intent),
     slots: Object.keys(slots).length ? slots : undefined,
   };

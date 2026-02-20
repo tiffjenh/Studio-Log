@@ -32,6 +32,7 @@ export const insightIntentEnum = z.enum([
   "forecast_yearly",
   "percent_change_yoy",
   "average_hourly_rate_in_period",
+  "day_of_week_earnings_max",
   "general_fallback",
   "clarification",
 ]);
@@ -70,5 +71,7 @@ export type InsightsTrace = {
   computedResult: ComputedResult | null;
   verifierPassed: boolean;
   verifierErrors: string[];
+  /** Diagnostic label for zero-like answers (e.g. no_rows_in_range, sum_zero_with_rows, student_not_resolved). */
+  zeroCause?: string | null;
   finalAnswerText: string;
 };
