@@ -95,6 +95,16 @@ function makeAdapter(db: TestDB): VoicePipelineAdapter {
       const idx = db.lessons.findIndex((l) => l.id === lessonId);
       if (idx >= 0) db.lessons[idx] = { ...db.lessons[idx], ...updates };
     },
+    addLesson: async (lesson: Omit<Lesson, "id">) => {
+      const existing = db.lessons.find((l) => l.studentId === lesson.studentId && l.date === lesson.date);
+      if (existing) {
+        Object.assign(existing, lesson);
+        return existing.id;
+      }
+      const id = `l-new-${db.lessons.length + 1}`;
+      db.lessons.push({ ...lesson, id });
+      return id;
+    },
     fetchLessonsForVerification: async () => db.lessons.map((l) => ({ ...l })),
   };
 }
@@ -194,6 +204,14 @@ describe("home voice command pipeline", () => {
     expect(moved?.durationMinutes).toBe(60);
   });
 
+  it("asks clarification for ambiguous bare weekdays in move commands", async () => {
+    const db = makeSeedDB();
+    const result = await runVoice(db, "Move Chloe's lesson from Friday to Saturday at 2 PM");
+    expect(result.status).toBe("needs_clarification");
+    expect(result.human_message.toLowerCase()).toContain("do you mean");
+    expect((result.clarification_options?.length ?? 0)).toBeGreaterThanOrEqual(2);
+  });
+
   it("fails safely when student is not scheduled on the target day", async () => {
     const db = makeSeedDB();
     const result = await runVoice(db, "Mark Chloe attended yesterday");
@@ -235,6 +253,7 @@ describe("home voice command pipeline", () => {
     { transcript: "Chloe came today", expectedStatus: "success" },
     { transcript: "Mark Chloe as attended", expectedStatus: "success" },
     { transcript: "Chloe and Leo came today", expectedStatus: "success" },
+    { transcript: "Leo and. Chloe attended today", expectedStatus: "success" },
     { transcript: "Mark Chloe, Leo, and Ava as attended", expectedStatus: "success" },
     { transcript: "Everyone attended today", expectedStatus: "success" },
     { transcript: "Mark all lessons attended", expectedStatus: "success" },

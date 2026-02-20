@@ -53,13 +53,17 @@ function mapRouterIntentToPlanIntent(raw: string): QueryPlan["intent"] {
   const x = raw.toLowerCase();
   if (x === "highest_hourly_student" || x === "most_per_hour") return "student_highest_hourly_rate";
   if (x === "lowest_hourly_student" || x === "lowest_student_by_hourly_rate") return "student_lowest_hourly_rate";
+  if (x === "lowest_student_by_revenue") return "revenue_per_student_in_period";
   if (x === "students_below_avg_rate") return "students_below_average_rate";
-  if (x === "earnings_by_range" || x === "earnings_total" || x === "earnings_in_month") return "earnings_in_period";
-  if (x === "student_ytd") return "earnings_ytd_for_student";
+  if (x === "earnings_by_range" || x === "earnings_total" || x === "earnings_in_month" || x === "earnings_by_student") return "earnings_in_period";
+  if (x === "student_ytd" || x === "student_earnings_for_year") return "earnings_ytd_for_student";
   if (x === "revenue_per_student_breakdown" || x === "top_student_by_earnings") return "revenue_per_student_in_period";
+  if (x === "revenue_per_lesson" || x === "avg_monthly_earnings" || x === "best_month" || x === "worst_month") return "earnings_in_period";
+  if (x === "revenue_per_hour" || x === "avg_hourly_rate") return "average_hourly_rate_in_period";
   if (x === "forecast") return "forecast_monthly";
   if (x === "percent_change_yoy") return "percent_change_yoy";
   if (x === "best_day_of_week" || x === "day_of_week_earnings") return "day_of_week_earnings_max";
+  if (x === "lessons_count" || x === "total_hours" || x === "avg_lessons_per_week" || x === "cash_flow" || x === "tax_estimate" || x === "on_track" || x.startsWith("what_if_")) return "general_fallback";
   return "general_fallback";
 }
 
@@ -147,10 +151,11 @@ export async function askInsights(questionText: string, context: AskInsightsCont
               llmIntent === "students_below_average_rate" ? "students_below_average_rate" :
                 llmIntent === "earnings_ytd_for_student" ? "earnings_ytd_for_student" :
                   llmIntent === "revenue_per_student_in_period" ? "revenue_per_student_in_period" :
-                    llmIntent === "forecast_monthly" ? "forecast_monthly" :
-                      llmIntent === "percent_change_yoy" ? "percent_change_yoy" :
-                        llmIntent === "day_of_week_earnings_max" ? "day_of_week_earnings_max" :
-                          "earnings_in_period",
+                    llmIntent === "average_hourly_rate_in_period" ? "average_hourly_rate_in_period" :
+                      llmIntent === "forecast_monthly" ? "forecast_monthly" :
+                        llmIntent === "percent_change_yoy" ? "percent_change_yoy" :
+                          llmIntent === "day_of_week_earnings_max" ? "day_of_week_earnings_max" :
+                            "earnings_in_period",
       };
     }
   }

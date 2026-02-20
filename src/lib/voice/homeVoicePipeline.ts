@@ -1,10 +1,11 @@
 import { z } from "zod";
 import type { Lesson, Student } from "@/types";
+import { getStudentsForDay, getEffectiveDurationMinutes, getEffectiveRateCents } from "@/utils/earnings";
 
 export type CommandStatus = "success" | "needs_clarification" | "error";
 
 export type DashboardScheduledLesson = {
-  lesson_id: string;
+  lesson_id: string | null;
   student_id: string;
   student_name: string;
   date: string;
@@ -82,12 +83,21 @@ export type CommandPlanUpdate = {
   updates: Partial<Lesson>;
 };
 
+export type CommandPlanCreate = {
+  student_id: string;
+  student_name: string;
+  date: string;
+  lesson: Omit<Lesson, "id">;
+};
+
 export type CommandPlan = {
   intent: StructuredCommand["intent"];
   target_date: string | null;
   updates: CommandPlanUpdate[];
+  creates: CommandPlanCreate[];
   verification: {
     expected_completed?: { lesson_ids: string[]; value: boolean };
+    expected_created?: { student_ids: string[]; date: string; completed: boolean };
     expected_duration?: { lesson_ids: string[]; value: number };
     expected_time?: { lesson_ids: string[]; value: string };
     expected_date?: { lesson_ids: string[]; value: string };
@@ -107,6 +117,7 @@ export type VoicePipelineAdapter = {
   lessons: Lesson[];
   getScheduledLessonsForDate: (dateKey: string) => DashboardScheduledLesson[];
   updateLessonById: (lessonId: string, updates: Partial<Lesson>) => Promise<void>;
+  addLesson: (lesson: Omit<Lesson, "id">) => Promise<string>;
   fetchLessonsForVerification: () => Promise<Lesson[]>;
 };
 
@@ -136,6 +147,7 @@ const MONTH_INDEX: Record<string, number> = {
 };
 
 const VALID_DURATIONS = new Set([30, 45, 60, 90, 120]);
+const WEEKDAY_TOKEN_RE = /\b(sunday|sun|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thurs|friday|fri|saturday|sat)\b/i;
 
 function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -340,6 +352,35 @@ function formatPrettyDate(dateKey: string): string {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
+function getLastAndNextWeekdayDateKey(weekdayToken: string, baseDateKey: string): { last: string; next: string } | null {
+  const key = weekdayToken.toLowerCase();
+  const targetDow = DAY_INDEX[key];
+  if (targetDow == null) return null;
+  const base = new Date(`${baseDateKey}T12:00:00`);
+  const last = new Date(base);
+  const back = (base.getDay() - targetDow + 7) % 7 || 7;
+  last.setDate(last.getDate() - back);
+  const next = new Date(base);
+  const fwd = (targetDow - base.getDay() + 7) % 7 || 7;
+  next.setDate(next.getDate() + fwd);
+  return { last: toDateKey(last), next: toDateKey(next) };
+}
+
+/**
+ * Bare weekday like "Friday" is ambiguous for move/reschedule.
+ * We only auto-resolve when phrase is explicit: next/last/this, month+day, ISO/us numeric, today/tomorrow/yesterday.
+ */
+function getAmbiguousWeekdayToken(phrase: string): string | null {
+  const p = norm(phrase);
+  if (/\b(next|last|this)\b/.test(p)) return null;
+  if (/\b(today|tomorrow|yesterday)\b/.test(p)) return null;
+  if (/\b(\d{4}-\d{2}-\d{2})\b/.test(p)) return null;
+  if (/\b(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/.test(p)) return null;
+  if (/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b/.test(p)) return null;
+  const m = p.match(WEEKDAY_TOKEN_RE);
+  return m ? m[1] : null;
+}
+
 function parseTranscriptToCommand(transcript: string, context: DashboardContext): StructuredCommand | { needs_clarification: string; options?: string[] } {
   const text = transcript.trim();
   const t = norm(text);
@@ -374,6 +415,27 @@ function parseTranscriptToCommand(transcript: string, context: DashboardContext)
       null;
     const fromTo = rawLower.match(/\bfrom\s+(.+?)\s+to\s+(.+)/);
     const toPhrase = fromTo ? fromTo[2] : (rawLower.match(/\bto\s+(.+)$/)?.[1] ?? "");
+    const fromPhrase = fromTo ? fromTo[1] : "";
+    const ambiguousFromWeekday = fromPhrase ? getAmbiguousWeekdayToken(fromPhrase) : null;
+    if (ambiguousFromWeekday) {
+      const choices = getLastAndNextWeekdayDateKey(ambiguousFromWeekday, context.selected_date);
+      if (choices) {
+        return {
+          needs_clarification: `For "${ambiguousFromWeekday}", do you mean ${formatPrettyDate(choices.last)} or ${formatPrettyDate(choices.next)}?`,
+          options: [`Last ${ambiguousFromWeekday} (${choices.last})`, `Next ${ambiguousFromWeekday} (${choices.next})`],
+        };
+      }
+    }
+    const ambiguousToWeekday = toPhrase ? getAmbiguousWeekdayToken(toPhrase) : null;
+    if (ambiguousToWeekday) {
+      const choices = getLastAndNextWeekdayDateKey(ambiguousToWeekday, context.selected_date);
+      if (choices) {
+        return {
+          needs_clarification: `For "${ambiguousToWeekday}", do you mean ${formatPrettyDate(choices.last)} or ${formatPrettyDate(choices.next)}?`,
+          options: [`Last ${ambiguousToWeekday} (${choices.last})`, `Next ${ambiguousToWeekday} (${choices.next})`],
+        };
+      }
+    }
     const fromDate = fromTo ? parseRelativeOrExplicitDate(fromTo[1], context.selected_date) : undefined;
     const toDate = parseRelativeOrExplicitDate(toPhrase || text, context.selected_date);
     const toTime = parseTimeString(toPhrase || text) ?? undefined;
@@ -484,53 +546,95 @@ function createPlan(
         ? cmd.effective_date
         : context.selected_date;
 
-  const scheduledOnDate = adapter.getScheduledLessonsForDate(targetDate);
-
   const plan: CommandPlan = {
     intent: cmd.intent,
     target_date: targetDate ?? null,
     updates: [],
+    creates: [],
     verification: {},
   };
 
-  const addAttendanceUpdates = (present: boolean, lessonRows: DashboardScheduledLesson[]) => {
-    for (const row of lessonRows) {
-      plan.updates.push({
-        lesson_id: row.lesson_id,
-        student_id: row.student_id,
-        student_name: row.student_name,
-        date: row.date,
-        updates: { completed: present },
-      });
-    }
-    plan.verification.expected_completed = {
-      lesson_ids: plan.updates.map((u) => u.lesson_id),
-      value: present,
+  const createLessonForStudent = (
+    student: Student,
+    date: string,
+    completed: boolean,
+    overrides?: Partial<Omit<Lesson, "id" | "studentId" | "date" | "completed">>
+  ): CommandPlanCreate => {
+    const baseDuration = getEffectiveDurationMinutes(student, date);
+    const baseRate = getEffectiveRateCents(student, date);
+    const durationMinutes = overrides?.durationMinutes ?? baseDuration;
+    const amountCents = overrides?.amountCents ?? Math.round((baseRate * durationMinutes) / Math.max(1, baseDuration));
+    return {
+      student_id: student.id,
+      student_name: `${student.firstName} ${student.lastName}`,
+      date,
+      lesson: {
+        studentId: student.id,
+        date,
+        timeOfDay: overrides?.timeOfDay ?? student.timeOfDay,
+        durationMinutes,
+        amountCents,
+        completed,
+        note: overrides?.note,
+      },
     };
   };
+
+  const findLessonForStudentOnDate = (studentId: string, date: string): Lesson | undefined =>
+    allLessons.find((l) => l.studentId === studentId && l.date === date);
 
   if (cmd.intent === "mark_attendance" || cmd.intent === "unmark_attendance") {
     const present = cmd.intent === "mark_attendance";
     if (cmd.target.type === "all_students") {
-      if (scheduledOnDate.length === 0) {
+      const targetDow = new Date(`${targetDate}T12:00:00`).getDay();
+      const scheduledStudents = getStudentsForDay(allStudents, targetDow, targetDate);
+      const existingRows = allLessons.filter((l) => l.date === targetDate);
+      const existingByStudent = new Set(existingRows.map((l) => l.studentId));
+      const targetStudents = [...scheduledStudents];
+      for (const row of existingRows) {
+        if (!targetStudents.some((s) => s.id === row.studentId)) {
+          const s = allStudents.find((st) => st.id === row.studentId);
+          if (s) targetStudents.push(s);
+        }
+      }
+
+      if (targetStudents.length === 0) {
         return {
           status: "error",
           human_message: `No lessons scheduled for ${formatPrettyDate(targetDate)}.`,
           plan: null,
         };
       }
-      addAttendanceUpdates(present, scheduledOnDate.filter((l) => !!l.lesson_id));
-      if (plan.updates.length !== scheduledOnDate.length) {
-        return {
-          status: "needs_clarification",
-          human_message: "Some scheduled lessons have no lesson row yet. Please open those lessons first, then retry.",
-          plan: null,
+
+      for (const student of targetStudents) {
+        const existing = findLessonForStudentOnDate(student.id, targetDate);
+        if (existing) {
+          plan.updates.push({
+            lesson_id: existing.id,
+            student_id: student.id,
+            student_name: `${student.firstName} ${student.lastName}`,
+            date: targetDate,
+            updates: { completed: present },
+          });
+        } else if (present) {
+          plan.creates.push(createLessonForStudent(student, targetDate, true));
+        }
+      }
+      plan.verification.expected_completed = {
+        lesson_ids: plan.updates.map((u) => u.lesson_id),
+        value: present,
+      };
+      if (plan.creates.length > 0) {
+        plan.verification.expected_created = {
+          student_ids: plan.creates.map((c) => c.student_id),
+          date: targetDate,
+          completed: present,
         };
       }
       return {
         status: "success",
         human_message: present
-          ? `Marked ${plan.updates.length} lessons attended — ${formatPrettyDate(targetDate)}`
+          ? `Marked ${plan.updates.length + plan.creates.length} lessons attended — ${formatPrettyDate(targetDate)}`
           : `Marked ${plan.updates.length} lessons not attended — ${formatPrettyDate(targetDate)}`,
         plan,
       };
@@ -554,30 +658,47 @@ function createPlan(
       };
     }
 
-    const nameToLessonRows: DashboardScheduledLesson[] = [];
+    const matchedNames: string[] = [];
     for (const student of resolved.resolved) {
-      const found = scheduledOnDate.find((l) => l.student_id === student.id);
-      if (!found) {
+      const existing = findLessonForStudentOnDate(student.id, targetDate);
+      if (existing) {
+        plan.updates.push({
+          lesson_id: existing.id,
+          student_id: student.id,
+          student_name: `${student.firstName} ${student.lastName}`,
+          date: targetDate,
+          updates: { completed: present },
+        });
+        matchedNames.push(`${student.firstName} ${student.lastName}`);
+        continue;
+      }
+      if (present) {
+        plan.creates.push(createLessonForStudent(student, targetDate, true));
+        matchedNames.push(`${student.firstName} ${student.lastName}`);
+        continue;
+      }
+      if (!present) {
         return {
           status: "needs_clarification",
           human_message: `No lesson scheduled for ${student.firstName} ${student.lastName} on ${formatPrettyDate(targetDate)}. Do you mean another date?`,
           plan: null,
         };
       }
-      if (!found.lesson_id) {
-        return {
-          status: "needs_clarification",
-          human_message: `No lesson row exists yet for ${student.firstName} ${student.lastName} on ${formatPrettyDate(targetDate)}.`,
-          plan: null,
-        };
-      }
-      nameToLessonRows.push(found);
     }
-
-    addAttendanceUpdates(present, nameToLessonRows);
+    plan.verification.expected_completed = {
+      lesson_ids: plan.updates.map((u) => u.lesson_id),
+      value: present,
+    };
+    if (plan.creates.length > 0) {
+      plan.verification.expected_created = {
+        student_ids: plan.creates.map((c) => c.student_id),
+        date: targetDate,
+        completed: present,
+      };
+    }
     return {
       status: "success",
-      human_message: `${present ? "Marked attended" : "Marked not attended"}: ${nameToLessonRows.map((r) => r.student_name).join(", ")} — ${formatPrettyDate(targetDate)}`,
+      human_message: `${present ? "Marked attended" : "Marked not attended"}: ${matchedNames.join(", ")} — ${formatPrettyDate(targetDate)}`,
       plan,
     };
   }
@@ -604,33 +725,41 @@ function createPlan(
       return { status: "needs_clarification", human_message: `I couldn't find: ${resolved.missing.join(", ")}.`, plan: null };
     }
     for (const student of resolved.resolved) {
-      const row = scheduledOnDate.find((l) => l.student_id === student.id);
-      if (!row || !row.lesson_id) {
-        return {
-          status: "needs_clarification",
-          human_message: `No lesson scheduled for ${student.firstName} ${student.lastName} on ${formatPrettyDate(targetDate)}.`,
-          plan: null,
-        };
+      const lesson = findLessonForStudentOnDate(student.id, targetDate);
+      if (lesson) {
+        plan.updates.push({
+          lesson_id: lesson.id,
+          student_id: student.id,
+          student_name: `${student.firstName} ${student.lastName}`,
+          date: targetDate,
+          updates: {
+            durationMinutes: cmd.duration_minutes,
+            amountCents: Math.round((lesson.amountCents / Math.max(1, lesson.durationMinutes)) * cmd.duration_minutes),
+          },
+        });
+      } else {
+        plan.creates.push(
+          createLessonForStudent(student, targetDate, false, {
+            durationMinutes: cmd.duration_minutes,
+          })
+        );
       }
-      const lesson = byId.get(row.lesson_id);
-      if (!lesson) {
-        return { status: "error", human_message: "Lesson row not found for update.", plan: null };
-      }
-      plan.updates.push({
-        lesson_id: row.lesson_id,
-        student_id: student.id,
-        student_name: row.student_name,
-        date: targetDate,
-        updates: {
-          durationMinutes: cmd.duration_minutes,
-          amountCents: Math.round((lesson.amountCents / lesson.durationMinutes) * cmd.duration_minutes),
-        },
-      });
     }
     plan.verification.expected_duration = { lesson_ids: plan.updates.map((u) => u.lesson_id), value: cmd.duration_minutes };
+    if (plan.creates.length > 0) {
+      plan.verification.expected_created = {
+        student_ids: plan.creates.map((c) => c.student_id),
+        date: targetDate,
+        completed: false,
+      };
+    }
+    const durationTargets = [
+      ...plan.updates.map((u) => u.student_name),
+      ...plan.creates.map((c) => c.student_name),
+    ];
     return {
       status: "success",
-      human_message: `Updated duration to ${cmd.duration_minutes} min: ${plan.updates.map((u) => u.student_name).join(", ")} — ${formatPrettyDate(targetDate)}`,
+      human_message: `Updated duration to ${cmd.duration_minutes} min: ${durationTargets.join(", ")} — ${formatPrettyDate(targetDate)}`,
       plan,
     };
   }
@@ -645,26 +774,38 @@ function createPlan(
       return { status: "needs_clarification", human_message: `I couldn't find: ${resolved.missing.join(", ")}.`, plan: null };
     }
     for (const student of resolved.resolved) {
-      const row = scheduledOnDate.find((l) => l.student_id === student.id);
-      if (!row || !row.lesson_id) {
-        return {
-          status: "needs_clarification",
-          human_message: `No lesson scheduled for ${student.firstName} ${student.lastName} on ${formatPrettyDate(targetDate)}.`,
-          plan: null,
-        };
+      const lesson = findLessonForStudentOnDate(student.id, targetDate);
+      if (lesson) {
+        plan.updates.push({
+          lesson_id: lesson.id,
+          student_id: student.id,
+          student_name: `${student.firstName} ${student.lastName}`,
+          date: targetDate,
+          updates: { timeOfDay: cmd.start_time },
+        });
+      } else {
+        plan.creates.push(
+          createLessonForStudent(student, targetDate, false, {
+            timeOfDay: cmd.start_time,
+          })
+        );
       }
-      plan.updates.push({
-        lesson_id: row.lesson_id,
-        student_id: student.id,
-        student_name: row.student_name,
-        date: targetDate,
-        updates: { timeOfDay: cmd.start_time },
-      });
     }
     plan.verification.expected_time = { lesson_ids: plan.updates.map((u) => u.lesson_id), value: cmd.start_time };
+    if (plan.creates.length > 0) {
+      plan.verification.expected_created = {
+        student_ids: plan.creates.map((c) => c.student_id),
+        date: targetDate,
+        completed: false,
+      };
+    }
+    const timeTargets = [
+      ...plan.updates.map((u) => u.student_name),
+      ...plan.creates.map((c) => c.student_name),
+    ];
     return {
       status: "success",
-      human_message: `Updated time to ${cmd.start_time}: ${plan.updates.map((u) => u.student_name).join(", ")} — ${formatPrettyDate(targetDate)}`,
+      human_message: `Updated time to ${cmd.start_time}: ${timeTargets.join(", ")} — ${formatPrettyDate(targetDate)}`,
       plan,
     };
   }
@@ -779,6 +920,14 @@ async function verifyPlan(plan: CommandPlan, lessons: Lesson[]): Promise<boolean
     if (u.updates.date != null && row.date !== u.updates.date) return false;
     if (u.updates.amountCents != null && row.amountCents !== u.updates.amountCents) return false;
   }
+  if (plan.verification.expected_created) {
+    const expected = plan.verification.expected_created;
+    for (const studentId of expected.student_ids) {
+      const row = lessons.find((l) => l.studentId === studentId && l.date === expected.date);
+      if (!row) return false;
+      if (row.completed !== expected.completed) return false;
+    }
+  }
   return true;
 }
 
@@ -818,6 +967,9 @@ export async function handleVoiceCommand(
 
   for (const step of planned.plan.updates) {
     await adapter.updateLessonById(step.lesson_id, step.updates);
+  }
+  for (const step of planned.plan.creates) {
+    await adapter.addLesson(step.lesson);
   }
 
   const readBackLessons = await adapter.fetchLessonsForVerification();

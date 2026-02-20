@@ -1,6 +1,7 @@
 import { hasSupabase, supabase } from "@/lib/supabase";
 import { computeForecast } from "@/lib/forecasts/compute";
 import { resolveStudentName } from "@/lib/insights/metrics/entityResolution";
+import { computeLessonAmountCents } from "@/utils/earnings";
 import type { Lesson, Student } from "@/types";
 
 export const SQL_TRUTH_QUERIES: Record<string, string> = {
@@ -111,6 +112,14 @@ function dateInRange(date: string, start: string, end: string): boolean {
   return date >= start && date <= end;
 }
 
+/** Effective amount for a lesson: use stored amount_cents, or student rate × duration when 0 (matches Earnings chart). */
+function effectiveCents(l: Lesson, studentsById: Map<string, Student>): number {
+  if (l.amountCents != null && l.amountCents > 0) return l.amountCents;
+  const student = studentsById.get(l.studentId);
+  if (!student) return 0;
+  return computeLessonAmountCents(student, l, l.date);
+}
+
 async function loadData(ctx: TruthDataContext): Promise<{ lessons: Lesson[]; students: Student[]; source: "supabase" | "memory" }> {
   if (hasSupabase() && supabase && ctx.user_id) {
     const [{ data: lessonsRows, error: lessonErr }, { data: studentRows, error: studentErr }] = await Promise.all([
@@ -172,7 +181,7 @@ export async function runTruthQuery(
   switch (key) {
     case "earnings_in_period": {
       const completedLessons = lessons.filter((l) => l.completed);
-      const totalCents = completedLessons.reduce((acc, l) => acc + l.amountCents, 0);
+      const totalCents = completedLessons.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
       const zero_cause =
         totalCents !== 0
           ? null
@@ -193,7 +202,7 @@ export async function runTruthQuery(
       const byStudent = new Map<string, number>();
       for (const l of lessons) {
         if (!l.completed) continue;
-        byStudent.set(l.studentId, (byStudent.get(l.studentId) ?? 0) + l.amountCents);
+        byStudent.set(l.studentId, (byStudent.get(l.studentId) ?? 0) + effectiveCents(l, studentsById));
       }
       const rows = [...byStudent.entries()]
         .map(([studentId, cents]) => ({
@@ -211,8 +220,7 @@ export async function runTruthQuery(
       if (!studentId) return { error: "student_not_resolved", zero_cause: "student_not_resolved", data_source: data.source };
       const studentRows = lessons.filter((l) => l.studentId === studentId);
       const completedRows = studentRows.filter((l) => l.completed);
-      const totalCents = completedRows
-        .reduce((acc, l) => acc + l.amountCents, 0);
+      const totalCents = completedRows.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
       const zero_cause =
         totalCents !== 0
           ? null
@@ -236,7 +244,7 @@ export async function runTruthQuery(
       for (const l of lessons) {
         if (l.durationMinutes <= 0) continue;
         const current = byStudent.get(l.studentId) ?? { cents: 0, mins: 0 };
-        current.cents += l.amountCents;
+        current.cents += effectiveCents(l, studentsById);
         current.mins += l.durationMinutes;
         byStudent.set(l.studentId, current);
       }
@@ -265,10 +273,11 @@ export async function runTruthQuery(
       let totalCents = 0;
       let totalMins = 0;
       for (const l of completedOnly) {
-        totalCents += l.amountCents;
+        const cents = effectiveCents(l, studentsById);
+        totalCents += cents;
         totalMins += l.durationMinutes;
         const current = byStudent.get(l.studentId) ?? { cents: 0, mins: 0 };
-        current.cents += l.amountCents;
+        current.cents += cents;
         current.mins += l.durationMinutes;
         byStudent.set(l.studentId, current);
       }
@@ -324,7 +333,7 @@ export async function runTruthQuery(
     }
     case "average_hourly_rate_in_period": {
       const completedOnly = lessons.filter((l) => l.completed);
-      const totalCents = completedOnly.reduce((acc, l) => acc + l.amountCents, 0);
+      const totalCents = completedOnly.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
       const totalMins = completedOnly.reduce((acc, l) => acc + l.durationMinutes, 0);
       const hourlyCents = totalMins > 0 ? (totalCents / totalMins) * 60 : 0;
       return { hourly_cents: hourlyCents, hourly_dollars: centsToDollars(hourlyCents), data_source: data.source };
@@ -334,7 +343,7 @@ export async function runTruthQuery(
       for (const l of lessons) {
         if (!l.completed) continue;
         const dow = new Date(l.date + "T12:00:00").getDay();
-        byDow.set(dow, (byDow.get(dow) ?? 0) + l.amountCents);
+        byDow.set(dow, (byDow.get(dow) ?? 0) + effectiveCents(l, studentsById));
       }
       if (byDow.size === 0) {
         return {
@@ -360,8 +369,10 @@ export async function runTruthQuery(
     case "percent_change_yoy": {
       const yearA = Number(params.year_a);
       const yearB = Number(params.year_b);
-      const totalA = data.lessons.filter((l) => l.completed && l.date >= `${yearA}-01-01` && l.date <= `${yearA}-12-31`).reduce((a, l) => a + l.amountCents, 0);
-      const totalB = data.lessons.filter((l) => l.completed && l.date >= `${yearB}-01-01` && l.date <= `${yearB}-12-31`).reduce((a, l) => a + l.amountCents, 0);
+      const inYearA = data.lessons.filter((l) => l.completed && l.date >= `${yearA}-01-01` && l.date <= `${yearA}-12-31`);
+      const inYearB = data.lessons.filter((l) => l.completed && l.date >= `${yearB}-01-01` && l.date <= `${yearB}-12-31`);
+      const totalA = inYearA.reduce((a, l) => a + effectiveCents(l, studentsById), 0);
+      const totalB = inYearB.reduce((a, l) => a + effectiveCents(l, studentsById), 0);
       const pct = totalA > 0 ? ((totalB - totalA) / totalA) * 100 : null;
       return {
         year_a: yearA,
@@ -379,7 +390,7 @@ export async function runTruthQuery(
         .filter((l) => l.completed)
         .map((l) => ({
           date: l.date,
-          amount: l.amountCents / 100,
+          amount: effectiveCents(l, studentsById) / 100,
           durationMinutes: l.durationMinutes,
           customer: studentsById.get(l.studentId) ? toName(studentsById.get(l.studentId)!) : undefined,
           studentId: l.studentId,

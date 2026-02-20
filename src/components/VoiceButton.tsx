@@ -10,6 +10,8 @@ import { Button, IconButton } from "@/components/ui/Button";
 import {
   getStudentsForDay,
   getLessonForStudentOnDate,
+  getEffectiveDurationMinutes,
+  getEffectiveRateCents,
 } from "@/utils/earnings";
 import { hasSupabase } from "@/lib/supabase";
 import { fetchLessons } from "@/store/supabaseSync";
@@ -69,6 +71,18 @@ function langToSpeechLocale(lang: string): string {
   return "en-US";
 }
 
+function applyClarificationOption(transcript: string, option: string): string {
+  const dateMatch = option.match(/\((\d{4}-\d{2}-\d{2})\)/);
+  const dateKey = dateMatch?.[1];
+  if (!dateKey) return transcript;
+  const weekdayMatch = option.match(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i);
+  if (!weekdayMatch) return `${transcript} ${dateKey}`;
+  const weekday = weekdayMatch[1];
+  const re = new RegExp(`\\b${weekday}\\b`, "i");
+  if (re.test(transcript)) return transcript.replace(re, dateKey);
+  return `${transcript} ${dateKey}`;
+}
+
 export default function VoiceButton({
   dateKey,
   dayOfWeek: _dayOfWeek,
@@ -78,11 +92,13 @@ export default function VoiceButton({
   dayOfWeek: number;
   onDateChange?: (date: Date) => void;
 }) {
-  const { data, updateLesson } = useStoreContext();
+  const { data, updateLesson, addLesson } = useStoreContext();
   const { lang } = useLanguage();
   const [phase, setPhase] = useState<Phase>("idle");
   const [transcript, setTranscript] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [clarificationOptions, setClarificationOptions] = useState<string[]>([]);
+  const [appliedClarification, setAppliedClarification] = useState<string | null>(null);
   const [unmatchedItems, setUnmatchedItems] = useState<{ text: string; reason: string }[]>([]);
   const [showPanel, setShowPanel] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
@@ -104,22 +120,63 @@ export default function VoiceButton({
       return students
         .map((s) => {
           const lesson = getLessonForStudentOnDate(dataRef.current.lessons, s.id, targetDateKey);
-          if (!lesson?.id) return null;
           return {
-            lesson_id: lesson.id,
+            lesson_id: lesson?.id ?? null,
             student_id: s.id,
             student_name: `${s.firstName} ${s.lastName}`,
-            date: lesson.date,
-            time: lesson.timeOfDay ?? s.timeOfDay ?? "",
-            duration_minutes: lesson.durationMinutes,
-            amount_cents: lesson.amountCents,
-            completed: lesson.completed,
+            date: targetDateKey,
+            time: lesson?.timeOfDay ?? s.timeOfDay ?? "",
+            duration_minutes: lesson?.durationMinutes ?? getEffectiveDurationMinutes(s, targetDateKey),
+            amount_cents: lesson?.amountCents ?? getEffectiveRateCents(s, targetDateKey),
+            completed: lesson?.completed ?? false,
           } satisfies DashboardScheduledLesson;
         })
         .filter((x): x is DashboardScheduledLesson => x != null);
     },
     []
   );
+
+  const runVoiceCommand = useCallback(async (text: string) => {
+    setTranscript(text);
+    setPhase("processing");
+    try {
+      const dashboardContext: DashboardContext = {
+        user_id: dataRef.current.user?.id ?? "local-user",
+        selected_date: dateKey,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        scheduled_lessons: getScheduledLessonsForDate(dateKey),
+      };
+
+      const result = await handleVoiceCommand(text, dashboardContext, {
+        students: dataRef.current.students,
+        lessons: dataRef.current.lessons,
+        getScheduledLessonsForDate,
+        updateLessonById: (lessonId, updates) => updateLesson(lessonId, updates),
+        addLesson: (lesson) => addLesson(lesson),
+        fetchLessonsForVerification: async (): Promise<Lesson[]> => {
+          if (hasSupabase() && dataRef.current.user?.id) {
+            return fetchLessons(dataRef.current.user.id);
+          }
+          await new Promise((r) => setTimeout(r, 0));
+          return dataRef.current.lessons;
+        },
+      });
+
+      if (result.plan?.target_date && result.plan.target_date !== dateKey && onDateChange) {
+        onDateChange(new Date(`${result.plan.target_date}T12:00:00`));
+      }
+
+      setFeedback(result.human_message);
+      setClarificationOptions(result.clarification_options ?? []);
+      setUnmatchedItems([]);
+      setPhase("result");
+    } catch (_err) {
+      setFeedback("I couldn't process that command safely. Please try again.");
+      setClarificationOptions([]);
+      setUnmatchedItems([]);
+      setPhase("error");
+    }
+  }, [dateKey, onDateChange, updateLesson, addLesson, getScheduledLessonsForDate]);
 
   /* ---- Start listening ---- */
   const startListening = useCallback(() => {
@@ -137,53 +194,15 @@ export default function VoiceButton({
     setPhase("listening");
     setTranscript("");
     setFeedback(null);
+    setClarificationOptions([]);
+    setAppliedClarification(null);
     setUnmatchedItems([]);
     setShowPanel(true);
 
     recognition.onresult = async (event: SpeechRecognitionEvent) => {
       const last = event.results[event.results.length - 1];
       const text = last[0].transcript;
-      setTranscript(text);
-      setPhase("processing");
-
-      try {
-        const dashboardContext: DashboardContext = {
-          user_id: dataRef.current.user?.id ?? "local-user",
-          selected_date: dateKey,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          scheduled_lessons: getScheduledLessonsForDate(dateKey),
-        };
-
-        const result = await handleVoiceCommand(text, dashboardContext, {
-          students: dataRef.current.students,
-          lessons: dataRef.current.lessons,
-          getScheduledLessonsForDate,
-          updateLessonById: (lessonId, updates) => updateLesson(lessonId, updates),
-          fetchLessonsForVerification: async (): Promise<Lesson[]> => {
-            if (hasSupabase() && dataRef.current.user?.id) {
-              return fetchLessons(dataRef.current.user.id);
-            }
-            await new Promise((r) => setTimeout(r, 0));
-            return dataRef.current.lessons;
-          },
-        });
-
-        if (result.plan?.target_date && result.plan.target_date !== dateKey && onDateChange) {
-          onDateChange(new Date(`${result.plan.target_date}T12:00:00`));
-        }
-
-        const optionLines =
-          result.clarification_options && result.clarification_options.length > 0
-            ? `\n${result.clarification_options.map((o) => `• ${o}`).join("\n")}`
-            : "";
-        setFeedback(`${result.human_message}${optionLines}`);
-        setUnmatchedItems([]);
-        setPhase("result");
-      } catch (_err) {
-        setFeedback("I couldn't process that command safely. Please try again.");
-        setUnmatchedItems([]);
-        setPhase("error");
-      }
+      await runVoiceCommand(text);
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -214,7 +233,7 @@ export default function VoiceButton({
     };
 
     recognition.start();
-  }, [lang, dateKey, onDateChange, updateLesson, getScheduledLessonsForDate]);
+  }, [lang, runVoiceCommand]);
 
   /* ---- Stop listening ---- */
   const stopListening = useCallback(() => {
@@ -228,6 +247,8 @@ export default function VoiceButton({
     setPhase("idle");
     setTranscript("");
     setFeedback(null);
+    setClarificationOptions([]);
+    setAppliedClarification(null);
     setUnmatchedItems([]);
   }, []);
 
@@ -384,6 +405,22 @@ export default function VoiceButton({
                   &quot;{transcript}&quot;
                 </p>
               )}
+              {appliedClarification && (
+                <div
+                  style={{
+                    margin: "0 0 12px",
+                    display: "inline-block",
+                    padding: "4px 10px",
+                    fontSize: 12,
+                    borderRadius: 999,
+                    background: "rgba(233, 226, 255, 0.9)",
+                    color: "var(--text)",
+                    border: "1px solid rgba(176, 160, 232, 0.5)",
+                  }}
+                >
+                  Applied: {appliedClarification}
+                </div>
+              )}
               {feedback && (
                 <div
                   style={{
@@ -393,6 +430,26 @@ export default function VoiceButton({
                   }}
                 >
                   {feedback}
+                </div>
+              )}
+              {clarificationOptions.length > 0 && (
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {clarificationOptions.map((opt) => (
+                    <Button
+                      key={opt}
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={async () => {
+                        const clarified = applyClarificationOption(transcript, opt);
+                        setAppliedClarification(opt);
+                        await runVoiceCommand(clarified);
+                      }}
+                      style={{ justifyContent: "flex-start" }}
+                    >
+                      {opt}
+                    </Button>
+                  ))}
                 </div>
               )}
               {unmatchedItems.length > 0 && (

@@ -105,7 +105,7 @@ function routeIntent(normalized: string): InsightIntent {
   if (/\bwhat day (?:of the week )?do i earn the most|(?:which |what )?day (?:of the week )?is best for earnings|day of the week.*earn the most|earn the most on which day|best day for earnings|which day do i earn the most\b/.test(normalized)) return "day_of_week_earnings_max";
   if ((/\bytd\b/.test(normalized) || /\byear to date\b/.test(normalized)) && (/\bearn me\b/.test(normalized) || /\b[a-z]+\s+[a-z]+\s+ytd\b/.test(normalized) || /\bytd from\b/.test(normalized) || /\byear to date earnings\b/.test(normalized))) return "earnings_ytd_for_student";
   if (/\battendance summary\b/.test(normalized)) return "student_attendance_summary";
-  if (/\btop 3 students by revenue|top 3 by revenue|revenue per student|revenue ranking|student revenue breakdown\b/.test(normalized)) return "revenue_per_student_in_period";
+  if (/\btop 3 students by revenue|top 3 by revenue|top 3 students|top three students|top students(?: by revenue)?|revenue per student|revenue ranking|student revenue breakdown|best students by revenue\b/.test(normalized)) return "revenue_per_student_in_period";
   if (/\bforecast monthly|projected monthly|forecast this month|monthly projection|will i earn this month\b/.test(normalized)) return "forecast_monthly";
   if (/\bforecast yearly|projected yearly|forecast this year|yearly projection|will i earn this year\b/.test(normalized)) return "forecast_yearly";
   if (/%|percent|percentage/.test(normalized) && /\b(20\d{2}).*(20\d{2})\b/.test(normalized)) return "percent_change_yoy";
