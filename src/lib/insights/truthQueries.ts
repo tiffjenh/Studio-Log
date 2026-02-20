@@ -74,6 +74,21 @@ SELECT COUNT(*) FILTER (WHERE completed = true)::int AS lesson_count
 FROM public.lessons
 WHERE user_id = $1 AND lesson_date BETWEEN $2 AND $3;
 `,
+  hours_total_in_period: `
+SELECT
+  COUNT(*) FILTER (WHERE completed = true)::int AS lesson_count,
+  COALESCE(SUM(duration_minutes) FILTER (WHERE completed = true), 0)::bigint AS total_minutes
+FROM public.lessons
+WHERE user_id = $1 AND lesson_date BETWEEN $2 AND $3;
+`,
+  avg_lessons_per_week_in_period: `
+SELECT DATE_TRUNC('week', lesson_date)::date AS week_start,
+       COUNT(*) FILTER (WHERE completed = true)::int AS lesson_count
+FROM public.lessons
+WHERE user_id = $1 AND lesson_date BETWEEN $2 AND $3
+GROUP BY 1
+ORDER BY 1 ASC;
+`,
   revenue_per_lesson_in_period: `
 SELECT
   COUNT(*) FILTER (WHERE completed = true)::int AS lesson_count,
@@ -135,6 +150,8 @@ FROM public.lessons
 WHERE user_id = $1 AND lesson_date BETWEEN $2 AND $3 AND completed = true
 GROUP BY 1 ORDER BY total_cents DESC LIMIT 1;
 `,
+  // NOTE: what_if_rate_change and tax_guidance are primarily computed in-memory because they
+  // require scenario parameters or are non-SQL guidance responses.
 };
 
 type TruthDataContext = {
@@ -336,6 +353,46 @@ export async function runTruthQuery(
         lesson_count: completedLessons.length,
         zero_cause:
           completedLessons.length === 0
+            ? lessons.length === 0
+              ? "no_rows_in_range"
+              : "no_completed_lessons_in_range"
+            : null,
+        data_source: data.source,
+      };
+    }
+    case "hours_total_in_period": {
+      const totalMins = completedLessons.reduce((acc, l) => acc + (l.durationMinutes ?? 0), 0);
+      const totalHours = Math.round((totalMins / 60) * 100) / 100;
+      return {
+        lesson_count: completedLessons.length,
+        total_minutes: totalMins,
+        total_hours: totalHours,
+        zero_cause:
+          completedLessons.length === 0
+            ? lessons.length === 0
+              ? "no_rows_in_range"
+              : "no_completed_lessons_in_range"
+            : null,
+        data_source: data.source,
+      };
+    }
+    case "avg_lessons_per_week_in_period": {
+      if (!start || !end) return { error: "missing_range", data_source: data.source };
+      // Reuse weekly bucketing logic to include weeks with zero lessons.
+      const weeks = weeklyRevenueSeries([], start, end);
+      const weekly_counts = weeks.map((w) => {
+        const count = completedLessons.filter((l) => l.date >= w.start_date && l.date <= w.end_date).length;
+        return { start_date: w.start_date, end_date: w.end_date, lesson_count: count };
+      });
+      const totalLessons = weekly_counts.reduce((s, p) => s + p.lesson_count, 0);
+      const avg = weekly_counts.length > 0 ? totalLessons / weekly_counts.length : 0;
+      return {
+        weekly_series: weekly_counts,
+        weeks_count: weekly_counts.length,
+        lesson_count: totalLessons,
+        avg_lessons_per_week: Math.round(avg * 100) / 100,
+        zero_cause:
+          totalLessons === 0
             ? lessons.length === 0
               ? "no_rows_in_range"
               : "no_completed_lessons_in_range"
@@ -584,6 +641,161 @@ export async function runTruthQuery(
         total_b_dollars: centsToDollars(totalB),
         dollar_change_dollars: centsToDollars(totalB - totalA),
         percent_change: pct == null ? null : Math.round(pct * 100) / 100,
+        data_source: data.source,
+      };
+    }
+    case "what_if_rate_change": {
+      const delta = typeof params.rate_delta_dollars_per_hour === "number"
+        ? params.rate_delta_dollars_per_hour
+        : typeof params.rate_delta_dollars_per_hour === "string"
+          ? Number(params.rate_delta_dollars_per_hour)
+          : null;
+      if (delta == null || !Number.isFinite(delta)) {
+        return { error: "missing_rate_delta", data_source: data.source };
+      }
+      const totalCents = completedLessons.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
+      const totalMins = completedLessons.reduce((acc, l) => acc + (l.durationMinutes ?? 0), 0);
+      const totalHours = totalMins / 60;
+      const deltaDollars = Math.round((totalHours * delta) * 100) / 100;
+      const projected = centsToDollars(totalCents) + deltaDollars;
+      return {
+        lesson_count: completedLessons.length,
+        total_hours: Math.round(totalHours * 100) / 100,
+        current_total_dollars: centsToDollars(totalCents),
+        rate_delta_dollars_per_hour: delta,
+        delta_dollars: deltaDollars,
+        projected_total_dollars: Math.round(projected * 100) / 100,
+        data_source: data.source,
+      };
+    }
+    case "what_if_add_students": {
+      const n =
+        typeof params.new_students === "number"
+          ? params.new_students
+          : typeof params.new_students === "string"
+            ? Number(params.new_students)
+            : null;
+      if (n == null || !Number.isFinite(n) || n <= 0) return { error: "missing_new_students", data_source: data.source };
+      if (!start || !end) return { error: "missing_range", data_source: data.source };
+      const mapped = completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) }));
+      const series = weeklyRevenueSeries(mapped, start, end);
+      const total = series.reduce((s, p) => s + p.total_dollars, 0);
+      const avgWeekly = series.length > 0 ? total / series.length : 0;
+      const activeStudents = new Set(mapped.map((l) => l.studentId));
+      const perStudent = activeStudents.size > 0 ? avgWeekly / activeStudents.size : 0;
+      const delta = perStudent * n;
+      return {
+        lesson_count: completedLessons.length,
+        weeks_count: series.length,
+        active_students: activeStudents.size,
+        new_students: n,
+        avg_weekly_dollars: Math.round(avgWeekly * 100) / 100,
+        avg_weekly_per_student_dollars: Math.round(perStudent * 100) / 100,
+        delta_weekly_dollars: Math.round(delta * 100) / 100,
+        projected_weekly_dollars: Math.round((avgWeekly + delta) * 100) / 100,
+        data_source: data.source,
+      };
+    }
+    case "what_if_take_time_off": {
+      const weeksOff =
+        typeof params.weeks_off === "number"
+          ? params.weeks_off
+          : typeof params.weeks_off === "string"
+            ? Number(params.weeks_off)
+            : null;
+      if (weeksOff == null || !Number.isFinite(weeksOff) || weeksOff <= 0) return { error: "missing_weeks_off", data_source: data.source };
+      if (!start || !end) return { error: "missing_range", data_source: data.source };
+      const mapped = completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) }));
+      const series = weeklyRevenueSeries(mapped, start, end);
+      const total = series.reduce((s, p) => s + p.total_dollars, 0);
+      const avgWeekly = series.length > 0 ? total / series.length : 0;
+      const lost = avgWeekly * weeksOff;
+      return {
+        lesson_count: completedLessons.length,
+        weeks_count: series.length,
+        weeks_off: weeksOff,
+        avg_weekly_dollars: Math.round(avgWeekly * 100) / 100,
+        expected_lost_dollars: Math.round(lost * 100) / 100,
+        data_source: data.source,
+      };
+    }
+    case "what_if_lose_top_students": {
+      const topN =
+        typeof params.top_n === "number"
+          ? params.top_n
+          : typeof params.top_n === "string"
+            ? Number(params.top_n)
+            : null;
+      if (topN == null || !Number.isFinite(topN) || topN <= 0) return { error: "missing_top_n", data_source: data.source };
+      const mapped = completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) }));
+      const totalCents = mapped.reduce((acc, l) => acc + (l.amountCents ?? 0), 0);
+      const { rows } = topStudentsByRevenue(mapped, studentsById, topN);
+      const lost = rows.reduce((s, r) => s + r.total_dollars, 0);
+      const projected = centsToDollars(totalCents) - lost;
+      return {
+        lesson_count: completedLessons.length,
+        top_n: topN,
+        lost_students: rows,
+        lost_total_dollars: Math.round(lost * 100) / 100,
+        current_total_dollars: centsToDollars(totalCents),
+        projected_total_dollars: Math.round(projected * 100) / 100,
+        data_source: data.source,
+      };
+    }
+    case "students_needed_for_target_income": {
+      const target =
+        typeof params.target_income_dollars === "number"
+          ? params.target_income_dollars
+          : typeof params.target_income_dollars === "string"
+            ? Number(params.target_income_dollars)
+            : null;
+      const rate =
+        typeof params.rate_dollars_per_hour === "number"
+          ? params.rate_dollars_per_hour
+          : typeof params.rate_dollars_per_hour === "string"
+            ? Number(params.rate_dollars_per_hour)
+            : null;
+      if (target == null || !Number.isFinite(target) || target <= 0) return { error: "missing_target_income", data_source: data.source };
+      if (rate == null || !Number.isFinite(rate) || rate <= 0) return { error: "missing_rate", data_source: data.source };
+      if (!start || !end) return { error: "missing_range", data_source: data.source };
+
+      const mapped = completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) }));
+      const series = weeklyRevenueSeries(mapped, start, end);
+      const activeStudents = new Set(mapped.map((l) => l.studentId));
+      const totalMins = mapped.reduce((s, l) => s + (l.durationMinutes ?? 0), 0);
+      const totalHours = totalMins / 60;
+      const weeks = series.length;
+      const hoursPerStudentPerWeek = weeks > 0 && activeStudents.size > 0 ? totalHours / weeks / activeStudents.size : 0;
+      if (hoursPerStudentPerWeek <= 0) return { error: "insufficient_history", data_source: data.source };
+      const incomePerStudentYear = hoursPerStudentPerWeek * rate * 52;
+      const needed = Math.ceil(target / incomePerStudentYear);
+      return {
+        lesson_count: completedLessons.length,
+        weeks_count: weeks,
+        active_students: activeStudents.size,
+        rate_dollars_per_hour: rate,
+        target_income_dollars: target,
+        typical_weekly_hours_per_student: Math.round(hoursPerStudentPerWeek * 100) / 100,
+        projected_income_per_student_year_dollars: Math.round(incomePerStudentYear * 100) / 100,
+        students_needed: needed,
+        data_source: data.source,
+      };
+    }
+    case "tax_guidance": {
+      const totalCents = completedLessons.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
+      const totalDollars = centsToDollars(totalCents);
+      // Guidance only: do not present revenue as "tax owed".
+      const lowPct = 0.25;
+      const highPct = 0.3;
+      const low = Math.round((totalDollars * lowPct) * 100) / 100;
+      const high = Math.round((totalDollars * highPct) * 100) / 100;
+      return {
+        lesson_count: completedLessons.length,
+        total_dollars: totalDollars,
+        suggested_set_aside_low_dollars: low,
+        suggested_set_aside_high_dollars: high,
+        note:
+          "This is guidance only (not a tax calculation). Actual taxes depend on filing status, state, deductions, and other income.",
         data_source: data.source,
       };
     }

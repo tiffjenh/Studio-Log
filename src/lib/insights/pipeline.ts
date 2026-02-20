@@ -79,8 +79,79 @@ function mapRouterIntentToPlanIntent(raw: string): QueryPlan["intent"] {
   if (x === "income_stability") return "income_stability";
   if (x === "avg_weekly_revenue") return "avg_weekly_revenue";
   if (x === "lessons_count") return "lessons_count_in_period";
-  if (x === "total_hours" || x === "avg_lessons_per_week" || x === "tax_estimate" || x === "on_track" || x.startsWith("what_if_")) return "general_fallback";
+  if (x === "total_hours") return "hours_total_in_period";
+  if (x === "avg_lessons_per_week") return "avg_lessons_per_week_in_period";
+  if (x === "tax_estimate") return "tax_guidance";
+  if (x === "on_track") return "general_fallback";
+  if (x === "what_if_add_students") return "what_if_add_students";
+  if (x === "what_if_take_time_off") return "what_if_take_time_off";
+  if (x === "what_if_lose_top_students") return "what_if_lose_top_students";
+  if (x === "students_needed_for_target_income") return "students_needed_for_target_income";
+  if (x === "what_if_rate_change" || x === "what_if_rate_increase") return "what_if_rate_change";
   return "general_fallback";
+}
+
+function sqlTruthKeyForIntent(intent: QueryPlan["intent"]): string {
+  switch (intent) {
+    case "student_highest_hourly_rate":
+      return "student_highest_hourly_rate";
+    case "student_lowest_hourly_rate":
+      return "student_lowest_hourly_rate";
+    case "students_below_average_rate":
+      return "students_below_average_rate";
+    case "earnings_in_period":
+      return "earnings_in_period";
+    case "lessons_count_in_period":
+      return "lessons_count_in_period";
+    case "hours_total_in_period":
+      return "hours_total_in_period";
+    case "avg_lessons_per_week_in_period":
+      return "avg_lessons_per_week_in_period";
+    case "revenue_per_lesson_in_period":
+      return "revenue_per_lesson_in_period";
+    case "earnings_ytd_for_student":
+      return "earnings_ytd_for_student";
+    case "student_missed_most_lessons_in_year":
+      return "student_missed_most_lessons_in_year";
+    case "student_attendance_summary":
+      return "student_attendance_summary";
+    case "revenue_per_student_in_period":
+      return "revenue_per_student_in_period";
+    case "avg_weekly_revenue":
+      return "avg_weekly_revenue";
+    case "cash_flow_trend":
+      return "cash_flow_trend";
+    case "income_stability":
+      return "income_stability";
+    case "what_if_rate_change":
+      return "what_if_rate_change";
+    case "what_if_add_students":
+      return "what_if_add_students";
+    case "what_if_take_time_off":
+      return "what_if_take_time_off";
+    case "what_if_lose_top_students":
+      return "what_if_lose_top_students";
+    case "students_needed_for_target_income":
+      return "students_needed_for_target_income";
+    case "tax_guidance":
+      return "tax_guidance";
+    case "forecast_monthly":
+      return "forecast_monthly";
+    case "forecast_yearly":
+      return "forecast_yearly";
+    case "percent_change_yoy":
+      return "percent_change_yoy";
+    case "average_hourly_rate_in_period":
+      return "average_hourly_rate_in_period";
+    case "day_of_week_earnings_max":
+      return "day_of_week_earnings_max";
+    case "general_fallback":
+      return "general_fallback";
+    case "clarification":
+      return "clarification";
+    default:
+      return "earnings_in_period";
+  }
 }
 
 async function classifyFallbackWithLlm(query: string): Promise<QueryPlan["intent"] | null> {
@@ -142,6 +213,8 @@ function extractMetadata(
     students_below_average_rate: { type: "filter", formula: "student_hourly_rate_dollars < avg_hourly_rate_dollars" },
     earnings_in_period: { type: "sum", formula: "sum(amount_dollars)" },
     lessons_count_in_period: { type: "count", formula: "count(completed_lessons)" },
+    hours_total_in_period: { type: "sum", formula: "sum(duration_minutes) / 60" },
+    avg_lessons_per_week_in_period: { type: "ratio", formula: "count(completed_lessons) / weeks_in_range" },
     revenue_per_lesson_in_period: { type: "ratio", formula: "sum(amount_dollars) / count(completed_lessons)" },
     earnings_ytd_for_student: { type: "sum", formula: "sum(amount_dollars where student=target)" },
     student_missed_most_lessons_in_year: { type: "argmax", formula: "max(missed_lessons_count)" },
@@ -150,6 +223,12 @@ function extractMetadata(
     avg_weekly_revenue: { type: "ratio", formula: "sum(amount_dollars) / week_count" },
     cash_flow_trend: { type: "timeseries", formula: "weekly sum(amount_dollars) + direction" },
     income_stability: { type: "dispersion", formula: "coefficient_of_variation(weekly revenue)" },
+    what_if_rate_change: { type: "simulation", formula: "sum(hours) * rate_delta + current_total" },
+    what_if_add_students: { type: "simulation", formula: "avg_weekly_per_student * new_students + current_avg_weekly" },
+    what_if_take_time_off: { type: "simulation", formula: "avg_weekly * weeks_off (lost)" },
+    what_if_lose_top_students: { type: "simulation", formula: "current_total - sum(top_n students revenue)" },
+    students_needed_for_target_income: { type: "solve", formula: "ceil(target_income / income_per_student_year)" },
+    tax_guidance: { type: "guidance", formula: "suggested set-aside range from earnings" },
     forecast_monthly: { type: "forecast", formula: "projected_monthly_dollars" },
     forecast_yearly: { type: "forecast", formula: "projected_yearly_dollars" },
     percent_change_yoy: { type: "percent_change", formula: "(current - previous) / previous" },
@@ -207,19 +286,7 @@ export async function askInsights(questionText: string, context: AskInsightsCont
         needs_clarification: false,
         clarifying_question: null,
         required_missing_params: [],
-        sql_truth_query_key:
-          llmIntent === "student_highest_hourly_rate" ? "student_highest_hourly_rate" :
-            llmIntent === "student_lowest_hourly_rate" ? "student_lowest_hourly_rate" :
-              llmIntent === "students_below_average_rate" ? "students_below_average_rate" :
-                llmIntent === "earnings_ytd_for_student" ? "earnings_ytd_for_student" :
-                  llmIntent === "revenue_per_student_in_period" ? "revenue_per_student_in_period" :
-                  llmIntent === "lessons_count_in_period" ? "lessons_count_in_period" :
-                    llmIntent === "revenue_per_lesson_in_period" ? "revenue_per_lesson_in_period" :
-                    llmIntent === "average_hourly_rate_in_period" ? "average_hourly_rate_in_period" :
-                      llmIntent === "forecast_monthly" ? "forecast_monthly" :
-                        llmIntent === "percent_change_yoy" ? "percent_change_yoy" :
-                          llmIntent === "day_of_week_earnings_max" ? "day_of_week_earnings_max" :
-                            "earnings_in_period",
+        sql_truth_query_key: sqlTruthKeyForIntent(llmIntent),
       };
     }
   }
@@ -278,6 +345,7 @@ export async function askInsights(questionText: string, context: AskInsightsCont
   const hasValidMetric =
     !out.error &&
     (typeof out.total_dollars === "number" ||
+      typeof out.total_hours === "number" ||
       typeof out.hourly_dollars === "number" ||
       typeof out.student_name === "string" ||
       typeof out.dow_label === "string" ||
@@ -285,8 +353,14 @@ export async function askInsights(questionText: string, context: AskInsightsCont
       out.percent_change != null ||
       out.projected_monthly_dollars != null ||
       out.projected_yearly_dollars != null ||
+      out.projected_total_dollars != null ||
+      out.projected_weekly_dollars != null ||
       out.attended_lessons != null ||
       out.avg_weekly_dollars != null ||
+      out.avg_lessons_per_week != null ||
+      out.expected_lost_dollars != null ||
+      out.students_needed != null ||
+      out.suggested_set_aside_low_dollars != null ||
       Array.isArray(out.weekly_series) ||
       out.stability_label != null);
   if (!hasValidMetric && (!verifier.passed || verifier.confidence === "low")) {

@@ -66,7 +66,7 @@ describe("Insights canned question harness", () => {
 
       const topMatch = question.match(/\btop\s+(\d+)\b/i);
       const n = topMatch ? Number(topMatch[1]) : null;
-      if (n != null && !res.needsClarification) {
+      if (n != null && !res.needsClarification && res.trace?.queryPlan.intent === "revenue_per_student_in_period") {
         const rows = ((res.computedResult?.outputs as { rows?: unknown[] } | undefined)?.rows ?? []);
         expect(rows.length, question).toBeLessThanOrEqual(n);
         if (rows.length < n) {

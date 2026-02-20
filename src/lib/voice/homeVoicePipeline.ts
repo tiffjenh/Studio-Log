@@ -574,6 +574,7 @@ function resolveNamesToStudents(
   debug?: VoiceDebug,
   overrides?: {
     forcedStudentIdByNameQuery?: Record<string, string>;
+    preferredStudentIds?: Set<string>;
   }
 ): { resolved: Student[]; ambiguous: { spoken: string; matches: Student[] }[]; missing: string[] } {
   const resolved: Student[] = [];
@@ -636,6 +637,35 @@ function resolveNamesToStudents(
       continue;
     }
     if (candidates.length >= 2 && candidates[0].score - candidates[1].score < 0.08) {
+      // Tiebreaker: if only one of the top candidates is scheduled for the relevant day,
+      // prefer it to avoid unnecessary "Which Leo?" prompts on the dashboard.
+      const preferred = overrides?.preferredStudentIds;
+      if (preferred) {
+        const top2 = candidates.slice(0, 2);
+        const preferredTop = top2.filter((c) => preferred.has(c.student.id));
+        if (preferredTop.length === 1) {
+          const chosen = preferredTop[0]!;
+          if (!used.has(chosen.student.id)) {
+            used.add(chosen.student.id);
+            resolved.push(chosen.student);
+          }
+          debug?.studentResolution?.push({
+            nameQuery: titleCaseName(rawName),
+            strategy,
+            candidates: top2.map((c) => ({
+              student_id: c.student.id,
+              display_name: `${c.student.firstName} ${c.student.lastName}`,
+              score: c.score,
+            })),
+            chosen: {
+              student_id: chosen.student.id,
+              display_name: `${chosen.student.firstName} ${chosen.student.lastName}`,
+              score: chosen.score,
+            },
+          });
+          continue;
+        }
+      }
       debug?.studentResolution?.push({
         nameQuery: titleCaseName(rawName),
         strategy,
@@ -814,9 +844,11 @@ function parseTranscriptToCommand(
       return { needs_clarification: "I couldn't parse that time. Please say a valid time like 3pm or 15:00." };
     }
     const duration = parseDurationMinutes(text) ?? undefined;
-    const names = explicitName
-      ? [explicitName]
-      : (knownNameMentions.length > 0 ? knownNameMentions : extractStudentMentions(text));
+    // Prefer explicit known full-name mentions (e.g. "Leo Chen") over the first-name capture.
+    const names =
+      knownNameMentions.length > 0
+        ? knownNameMentions
+        : (explicitName ? [explicitName] : extractStudentMentions(text));
     if (names.length === 0) return { needs_clarification: "Which student should I move?" };
     return {
       intent: "move_lesson",
@@ -979,6 +1011,10 @@ function createPlan(
         ? cmd.effective_date
         : context.selected_date;
 
+  const preferredStudentIdsForTargetDate = new Set(
+    adapter.getScheduledLessonsForDate(targetDate).map((r) => r.student_id)
+  );
+
   const plan: CommandPlan = {
     intent: cmd.intent,
     target_date: targetDate ?? null,
@@ -1100,7 +1136,10 @@ function createPlan(
       };
     }
 
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, options?.resolutionOverrides);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, {
+      ...options?.resolutionOverrides,
+      preferredStudentIds: preferredStudentIdsForTargetDate,
+    });
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return {
@@ -1176,7 +1215,10 @@ function createPlan(
         plan: null,
       };
     }
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, options?.resolutionOverrides);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, {
+      ...options?.resolutionOverrides,
+      preferredStudentIds: preferredStudentIdsForTargetDate,
+    });
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return {
@@ -1235,7 +1277,10 @@ function createPlan(
   }
 
   if (cmd.intent === "set_time") {
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, options?.resolutionOverrides);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, {
+      ...options?.resolutionOverrides,
+      preferredStudentIds: preferredStudentIdsForTargetDate,
+    });
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return {
@@ -1291,7 +1336,14 @@ function createPlan(
   }
 
   if (cmd.intent === "move_lesson") {
-    const resolved = resolveNamesToStudents([cmd.target.name], allStudents, debug, options?.resolutionOverrides);
+    const fromDateForDisambiguation = cmd.from_date ?? context.selected_date;
+    const preferredStudentIdsForFromDate = new Set(
+      adapter.getScheduledLessonsForDate(fromDateForDisambiguation).map((r) => r.student_id)
+    );
+    const resolved = resolveNamesToStudents([cmd.target.name], allStudents, debug, {
+      ...options?.resolutionOverrides,
+      preferredStudentIds: preferredStudentIdsForFromDate,
+    });
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return {
@@ -1368,7 +1420,10 @@ function createPlan(
   if (cmd.intent === "set_amount") {
     const target = cmd.date ?? context.selected_date;
     const amountCents = Math.round(cmd.amount_dollars * 100);
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, options?.resolutionOverrides);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, {
+      ...options?.resolutionOverrides,
+      preferredStudentIds: preferredStudentIdsForTargetDate,
+    });
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return {
@@ -1431,7 +1486,10 @@ function createPlan(
     }
     const target = cmd.effective_date ?? context.selected_date;
     const rateCentsPerHour = Math.round(cmd.rate_dollars_per_hour * 100);
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, options?.resolutionOverrides);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, {
+      ...options?.resolutionOverrides,
+      preferredStudentIds: preferredStudentIdsForTargetDate,
+    });
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return {

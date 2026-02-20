@@ -82,6 +82,29 @@ function inferMissingParams(
   studentName?: string
 ): string[] {
   if (routedIntent === "general_fallback") return ["intent"];
+  if (routedIntent === "what_if_rate_change" && !/\b(\$?\d+(?:\.\d+)?)\s*(?:\/\s*hour|per\s*hour|an?\s*hour|hour)\b/.test(normalized) && !/\bby\s+\$?\d+(?:\.\d+)?\b/.test(normalized)) {
+    return ["rate_delta"];
+  }
+  if (routedIntent === "what_if_add_students" && !/\badd\s+\d+\s+new\s+students?\b/.test(normalized)) {
+    return ["student_count"];
+  }
+  if (routedIntent === "what_if_take_time_off" && !/\b\d+\s+weeks?\s+off\b/.test(normalized)) {
+    return ["weeks_off"];
+  }
+  if (routedIntent === "what_if_lose_top_students" && !/\btop\s+\d+\s+students?\b/.test(normalized)) {
+    return ["top_n"];
+  }
+  if (routedIntent === "students_needed_for_target_income") {
+    const hasTarget = /\b\$\s*\d+|\b\d+\s*k\b/i.test(normalized);
+    const hasRate =
+      /\bat\s+\$?\s*\d+(?:\.\d+)?\s*(?:per\s*hour|hr|hour)\b/i.test(normalized) ||
+      /\b\$\s*\d+(?:\.\d+)?\s*(?:\/\s*hr|\/\s*hour|per\s*hour|hr|hour)\b/i.test(normalized) ||
+      /\b\d+(?:\.\d+)?\s*(?:\/\s*hr|\/\s*hour|per\s*hour)\b/i.test(normalized);
+    const missing: string[] = [];
+    if (!hasTarget) missing.push("target_income");
+    if (!hasRate) missing.push("rate");
+    return missing;
+  }
   if (
     (routedIntent === "earnings_ytd_for_student" ||
       routedIntent === "student_attendance_summary") &&
@@ -105,6 +128,8 @@ function deriveTruthKey(intent: InsightIntent): string {
     students_below_average_rate: "students_below_average_rate",
     earnings_in_period: "earnings_in_period",
     lessons_count_in_period: "lessons_count_in_period",
+    hours_total_in_period: "hours_total_in_period",
+    avg_lessons_per_week_in_period: "avg_lessons_per_week_in_period",
     revenue_per_lesson_in_period: "revenue_per_lesson_in_period",
     earnings_ytd_for_student: "earnings_ytd_for_student",
     student_missed_most_lessons_in_year: "student_missed_most_lessons_in_year",
@@ -113,6 +138,12 @@ function deriveTruthKey(intent: InsightIntent): string {
     avg_weekly_revenue: "avg_weekly_revenue",
     cash_flow_trend: "cash_flow_trend",
     income_stability: "income_stability",
+    what_if_rate_change: "what_if_rate_change",
+    what_if_add_students: "what_if_add_students",
+    what_if_take_time_off: "what_if_take_time_off",
+    what_if_lose_top_students: "what_if_lose_top_students",
+    students_needed_for_target_income: "students_needed_for_target_income",
+    tax_guidance: "tax_guidance",
     forecast_monthly: "forecast_monthly",
     forecast_yearly: "forecast_yearly",
     percent_change_yoy: "percent_change_yoy",
@@ -128,6 +159,14 @@ function routeIntent(normalized: string): InsightIntent {
   if (/^how many lessons did i teach last month$/.test(normalized)) return "lessons_count_in_period";
   if (/^what s my revenue per lesson$/.test(normalized) || /^what is my revenue per lesson$/.test(normalized)) return "revenue_per_lesson_in_period";
   if (/^what day of the week do i earn the most$/.test(normalized)) return "day_of_week_earnings_max";
+  if (/\b(estimated\s+tax|tax estimate|set aside for taxes|quarterly taxes|taxes?)\b/.test(normalized)) return "tax_guidance";
+  if (/\b(what if|if i)\b.*\b(raise|increase)\b.*\b(rate|rates)\b/.test(normalized)) return "what_if_rate_change";
+  if (/\b(what if|if i)\b.*\badd\s+\d+\s+new\s+students?\b/.test(normalized)) return "what_if_add_students";
+  if (/\b(what if|if i)\b.*\btake\s+\d+\s+weeks?\s+off\b/.test(normalized)) return "what_if_take_time_off";
+  if (/\b(what if|if i)\b.*\blose\b.*\btop\s+\d+\s+students?\b/.test(normalized)) return "what_if_lose_top_students";
+  if (/\bhow many students\b.*\breach\b.*\b\$\s*\d+|\bhow many students\b.*\breach\b.*\b\d+\s*k\b/i.test(normalized)) return "students_needed_for_target_income";
+  if (/\bhow many hours\b|\bhours worked\b|\bhours did i work\b|\btotal hours\b/.test(normalized)) return "hours_total_in_period";
+  if (/\baverage lessons per week\b|\bavg lessons per week\b|\baverage.*lessons.*per week\b/.test(normalized)) return "avg_lessons_per_week_in_period";
   if (/\b(stable|stability|volatile|volatility)\b/.test(normalized) && /\b(income|earnings|revenue|cash flow)\b/.test(normalized)) return "income_stability";
   if (/\bis my income (stable|volatile)\b/.test(normalized)) return "income_stability";
   if (/\bis my cash flow (stable|volatile)\b/.test(normalized)) return "income_stability";
@@ -139,7 +178,9 @@ function routeIntent(normalized: string): InsightIntent {
   if (/\bhow many lessons\b|\blesson count\b|\bcount lessons\b|\bnumber of lessons\b/.test(normalized)) return "lessons_count_in_period";
   if (/\brevenue per lesson\b|\baverage revenue per lesson\b|\bavg revenue per lesson\b/.test(normalized)) return "revenue_per_lesson_in_period";
   if (/\bhighest hourly rate|highest hourly student|pays the most per hour|highest paying student|highest paying per hour\b/.test(normalized)) return "student_highest_hourly_rate";
-  if (/\blowest hourly rate|lowest hourly student|least hourly rate student|who pays the least per hour|who is lowest per hour|pays the least\b/.test(normalized)) return "student_lowest_hourly_rate";
+  if (/\blowest hourly rate|lowest hourly student|least hourly rate student|who pays the least per hour|who is lowest per hour\b/.test(normalized)) return "student_lowest_hourly_rate";
+  if (/\bwho pays the most\b|\bwhich student pays the most\b|\btop paying student\b/.test(normalized)) return "revenue_per_student_in_period";
+  if (/\bwho pays the least\b|\bwhich student pays the least\b/.test(normalized)) return "revenue_per_student_in_period";
   if (/\bbelow my average rate|below my average hourly rate|below average hourly rate|below average hourly|students below average|students below my average|under average rate\b/.test(normalized)) return "students_below_average_rate";
   if (/\baverage hourly rate|avg hourly|hourly average\b/.test(normalized)) return "average_hourly_rate_in_period";
   if (/\baverage rate\b/.test(normalized) && !/\bbelow|under\b/.test(normalized)) return "average_hourly_rate_in_period";
@@ -170,7 +211,7 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
     const def = defaultRangeForIntent("day_of_week_earnings_max", todayISO);
     time_range = toTimeRange(def, "ytd");
   }
-  if (!time_range && (routedIntent === "earnings_in_period" || routedIntent === "average_hourly_rate_in_period" || routedIntent === "revenue_per_student_in_period" || routedIntent === "lessons_count_in_period" || routedIntent === "revenue_per_lesson_in_period" || routedIntent === "avg_weekly_revenue" || routedIntent === "cash_flow_trend" || routedIntent === "income_stability")) {
+  if (!time_range && (routedIntent === "earnings_in_period" || routedIntent === "average_hourly_rate_in_period" || routedIntent === "revenue_per_student_in_period" || routedIntent === "lessons_count_in_period" || routedIntent === "hours_total_in_period" || routedIntent === "avg_lessons_per_week_in_period" || routedIntent === "revenue_per_lesson_in_period" || routedIntent === "avg_weekly_revenue" || routedIntent === "cash_flow_trend" || routedIntent === "income_stability" || routedIntent === "what_if_rate_change" || routedIntent === "what_if_add_students" || routedIntent === "what_if_take_time_off" || routedIntent === "what_if_lose_top_students" || routedIntent === "students_needed_for_target_income" || routedIntent === "tax_guidance")) {
     const def = defaultRangeForIntent(routedIntent, todayISO);
     time_range = toTimeRange(def, def.label?.includes("YTD") ? "ytd" : "rolling_days");
   }
@@ -184,6 +225,16 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
       ? "Which year should I use for missed lessons?"
       : routedIntent === "earnings_ytd_for_student" || routedIntent === "student_attendance_summary"
         ? "Which student did you mean?"
+        : routedIntent === "what_if_rate_change"
+          ? "How much should I change the rate by (e.g. $10/hour)?"
+            : routedIntent === "what_if_add_students"
+              ? "How many new students should I model (e.g. “add 3 new students”) and should I assume they match your typical schedule?"
+              : routedIntent === "what_if_take_time_off"
+                ? "How many weeks off should I model (e.g. “take 2 weeks off”)?"
+                : routedIntent === "what_if_lose_top_students"
+                  ? "How many top students should I remove (e.g. “lose my top 2 students”) and what time range should I use?"
+                  : routedIntent === "students_needed_for_target_income"
+                    ? "What target income and hourly rate should I use (e.g. “reach $100k at $70/hr”)?"
         : "Did you mean earnings or attendance?"
     : null;
 
@@ -201,6 +252,35 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
     if (!slots.top_n && (/\bwhich student\b/.test(normalized) || /\bwho\b.*\bearned?\b.*\bmost\b/.test(normalized))) {
       slots.top_n = 1;
     }
+  }
+  if (routedIntent === "what_if_rate_change") {
+    const perHour = normalized.match(/\b(\$?\d+(?:\.\d+)?)\s*(?:\/\s*hour|per\s*hour|an?\s*hour|hour)\b/);
+    const by = normalized.match(/\bby\s+\$?\s*(\d+(?:\.\d+)?)\b/);
+    const val = perHour ? Number(perHour[1].replace("$", "")) : by ? Number(by[1]) : null;
+    if (val != null && Number.isFinite(val)) slots.rate_delta_dollars_per_hour = val;
+  }
+  if (routedIntent === "what_if_add_students") {
+    const m = normalized.match(/\badd\s+(\d+)\s+new\s+students?\b/);
+    if (m) slots.new_students = Number(m[1]);
+  }
+  if (routedIntent === "what_if_take_time_off") {
+    const m = normalized.match(/\btake\s+(\d+)\s+weeks?\s+off\b/);
+    if (m) slots.weeks_off = Number(m[1]);
+  }
+  if (routedIntent === "what_if_lose_top_students") {
+    const m = normalized.match(/\btop\s+(\d+)\s+students?\b/);
+    if (m) slots.top_n = Number(m[1]);
+  }
+  if (routedIntent === "students_needed_for_target_income") {
+    const target = normalized.match(/\breach\s+\$?\s*(\d+(?:,\d{3})*|\d+)\s*k\b/i);
+    const target2 = normalized.match(/\breach\s+\$?\s*(\d+(?:,\d{3})*)\b/i);
+    const raw = target ? target[1].replace(/,/g, "") : target2 ? target2[1].replace(/,/g, "") : null;
+    const val = raw ? Number(raw) : null;
+    if (val != null && Number.isFinite(val)) {
+      slots.target_income_dollars = target ? val * 1000 : val;
+    }
+    const rate = normalized.match(/\bat\s+\$?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*hr|\/\s*hour|per\s*hour|hr|hour)\b/i);
+    if (rate) slots.rate_dollars_per_hour = Number(rate[1]);
   }
 
   const plan: QueryPlan = {

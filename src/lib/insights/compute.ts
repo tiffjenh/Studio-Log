@@ -14,6 +14,7 @@ function confidenceFromOutputs(plan: QueryPlan, outputs: Record<string, unknown>
   const hasSignal =
     outputs.row != null ||
     outputs.total_dollars != null ||
+    outputs.total_hours != null ||
     outputs.rows != null ||
     outputs.student_name != null ||
     outputs.missed_count != null ||
@@ -23,10 +24,16 @@ function confidenceFromOutputs(plan: QueryPlan, outputs: Record<string, unknown>
     outputs.projected_yearly_dollars != null ||
     outputs.dow_label != null ||
     outputs.lesson_count != null ||
+    outputs.avg_lessons_per_week != null ||
     outputs.avg_dollars_per_lesson != null ||
     outputs.avg_weekly_dollars != null ||
     outputs.stability_label != null ||
-    outputs.weekly_series != null;
+    outputs.weekly_series != null ||
+    outputs.projected_total_dollars != null ||
+    outputs.projected_weekly_dollars != null ||
+    outputs.expected_lost_dollars != null ||
+    outputs.students_needed != null ||
+    outputs.suggested_set_aside_low_dollars != null;
   if (!hasSignal) return "low";
   if (plan.student_filter?.confidence != null && plan.student_filter.confidence < 0.8) return "low";
   return "high";

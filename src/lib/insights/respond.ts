@@ -2,6 +2,8 @@ import type { ComputedResult } from "./schema";
 import {
   formatEarningsInPeriod,
   formatLessonsCountInPeriod,
+  formatHoursTotalInPeriod,
+  formatAvgLessonsPerWeekInPeriod,
   formatRevenuePerLessonInPeriod,
   formatEarningsYtdStudent,
   formatHighestLowestHourly,
@@ -16,6 +18,12 @@ import {
   formatIncomeStability,
   formatPercentChangeYoy,
   formatForecast,
+  formatWhatIfRateChange,
+  formatWhatIfAddStudents,
+  formatWhatIfTakeTimeOff,
+  formatWhatIfLoseTopStudents,
+  formatStudentsNeededForTargetIncome,
+  formatTaxGuidance,
 } from "./formatAnswer";
 
 export function resultToAnswer(computed: ComputedResult): string {
@@ -34,6 +42,10 @@ export function resultToAnswer(computed: ComputedResult): string {
       return formatEarningsInPeriod(out);
     case "lessons_count_in_period":
       return formatLessonsCountInPeriod(out);
+    case "hours_total_in_period":
+      return formatHoursTotalInPeriod(out);
+    case "avg_lessons_per_week_in_period":
+      return formatAvgLessonsPerWeekInPeriod(out);
     case "revenue_per_lesson_in_period":
       return formatRevenuePerLessonInPeriod(out);
     case "earnings_ytd_for_student":
@@ -57,6 +69,18 @@ export function resultToAnswer(computed: ComputedResult): string {
       return formatCashFlowTrend(out);
     case "income_stability":
       return formatIncomeStability(out);
+    case "what_if_rate_change":
+      return formatWhatIfRateChange(out);
+    case "what_if_add_students":
+      return formatWhatIfAddStudents(out);
+    case "what_if_take_time_off":
+      return formatWhatIfTakeTimeOff(out);
+    case "what_if_lose_top_students":
+      return formatWhatIfLoseTopStudents(out);
+    case "students_needed_for_target_income":
+      return formatStudentsNeededForTargetIncome(out);
+    case "tax_guidance":
+      return formatTaxGuidance(out);
     case "forecast_monthly":
     case "forecast_yearly":
       return formatForecast(out);

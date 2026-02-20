@@ -132,6 +132,31 @@ describe("homeVoicePipeline disambiguation resume", () => {
     expect(moved?.date).toBe("2026-02-18");
     expect(unchanged?.date).toBe("2026-02-17");
   });
+
+  it("does not drop last names in move commands (full name stays unambiguous)", async () => {
+    const students = [
+      makeStudent("s-leo-garcia", "Leo", "Garcia"),
+      makeStudent("s-leo-chen", "Leo", "Chen"),
+    ];
+    const lessons = [
+      makeLesson("l-garcia", "s-leo-garcia", "2026-02-17", "3:00 PM"),
+      makeLesson("l-chen", "s-leo-chen", "2026-02-17", "5:00 PM"),
+    ];
+    const adapter = buildAdapter(students, lessons);
+    const context: DashboardContext = {
+      user_id: "u1",
+      selected_date: "2026-02-17",
+      timezone: "America/Los_Angeles",
+      scheduled_lessons: adapter.getScheduledLessonsForDate("2026-02-17"),
+    };
+
+    const res = await handleVoiceCommand("Move Leo Chen's lesson to tomorrow", context, adapter);
+    expect(res.status, res.human_message).toBe("success");
+    const moved = adapter.lessonsRef.find((l) => l.id === "l-chen");
+    const unchanged = adapter.lessonsRef.find((l) => l.id === "l-garcia");
+    expect(moved?.date).toBe("2026-02-18");
+    expect(unchanged?.date).toBe("2026-02-17");
+  });
 });
 
 describe("homeVoicePipeline natural parsing", () => {

@@ -121,7 +121,7 @@ describe("Insights pipeline", () => {
   });
 
   it("supports cash flow trend and returns multi-point trend output", async () => {
-    const res = await askInsights("What's my cash flow trend?", ctx);
+    const res = await askInsights("What's my cash flow trend in 2026?", ctx);
     expect(res.needsClarification).toBe(false);
     expect(res.trace?.queryPlan.intent).toBe("cash_flow_trend");
     const outputs = res.computedResult?.outputs as { weekly_series?: unknown[]; direction?: string } | undefined;
@@ -130,10 +130,76 @@ describe("Insights pipeline", () => {
   });
 
   it("supports stability questions without earnings/attendance clarification", async () => {
-    const res = await askInsights("Is my income stable or volatile?", ctx);
+    const res = await askInsights("Is my income stable or volatile in 2026?", ctx);
     expect(res.needsClarification).toBe(false);
     expect(res.trace?.queryPlan.intent).toBe("income_stability");
     expect(/stable|volatile|moderately|not enough weekly data/i.test(res.finalAnswerText)).toBe(true);
+  });
+
+  it("supports hours worked queries", async () => {
+    const res = await askInsights("How many hours did I work in 2025?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("hours_total_in_period");
+    const out = res.computedResult?.outputs as { total_hours?: number; lesson_count?: number } | undefined;
+    expect(out?.lesson_count).toBe(3);
+    expect(out?.total_hours).toBe(2.5);
+    expect(/hours/i.test(res.finalAnswerText)).toBe(true);
+  });
+
+  it("supports average lessons per week queries", async () => {
+    const res = await askInsights("Average lessons per week in 2026", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("avg_lessons_per_week_in_period");
+    const out = res.computedResult?.outputs as { avg_lessons_per_week?: number; weeks_count?: number } | undefined;
+    expect(typeof out?.avg_lessons_per_week).toBe("number");
+    expect((out?.weeks_count ?? 0)).toBeGreaterThan(0);
+    expect(/lessons\/week/i.test(res.finalAnswerText)).toBe(true);
+  });
+
+  it("supports what-if rate change questions", async () => {
+    const res = await askInsights("If I raise rates by $10/hour, what happens to my income in 2026?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("what_if_rate_change");
+    expect(res.finalAnswerText).toContain("$10/hr");
+    expect(res.finalAnswerText.toLowerCase()).toContain("projected");
+  });
+
+  it("tax questions return guidance, not a revenue total", async () => {
+    const res = await askInsights("Estimated tax on my income in 2026?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("tax_guidance");
+    expect(res.finalAnswerText).toMatch(/tax set-aside guidance/i);
+    expect(res.finalAnswerText).toMatch(/25–30%|25-30%/);
+  });
+
+  it("supports what-if add students dropdown question", async () => {
+    const res = await askInsights("If I add 3 new students, what's my new income in 2026?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("what_if_add_students");
+    expect(res.finalAnswerText.toLowerCase()).toContain("adding");
+    expect(res.finalAnswerText.toLowerCase()).toContain("/week");
+  });
+
+  it("supports what-if time off dropdown question", async () => {
+    const res = await askInsights("If I take 2 weeks off, how does that affect my yearly earnings in 2026?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("what_if_take_time_off");
+    expect(res.finalAnswerText.toLowerCase()).toContain("weeks off");
+  });
+
+  it("supports what-if lose top students dropdown question", async () => {
+    const res = await askInsights("What if I lose my top 2 students in 2026?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("what_if_lose_top_students");
+    expect(res.finalAnswerText.toLowerCase()).toContain("lose");
+    expect(res.finalAnswerText.toLowerCase()).toContain("projected");
+  });
+
+  it("supports students-needed-for-target dropdown question", async () => {
+    const res = await askInsights("How many students do I need to reach $100k at $70/hr in 2026?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("students_needed_for_target_income");
+    expect(res.finalAnswerText.toLowerCase()).toContain("need");
   });
 
   it("returns exactly top N students when available", async () => {

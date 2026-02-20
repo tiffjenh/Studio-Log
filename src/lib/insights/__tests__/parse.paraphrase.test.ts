@@ -18,6 +18,22 @@ describe("parseToQueryPlan paraphrase robustness", () => {
     expectedTopN?: number;
   }> = [
     {
+      expectedIntent: "hours_total_in_period",
+      phrases: [
+        "How many hours did I work in 2024?",
+        "Total hours worked in 2025",
+        "How many hours worked last month?",
+      ],
+    },
+    {
+      expectedIntent: "avg_lessons_per_week_in_period",
+      phrases: [
+        "Average lessons per week",
+        "Avg lessons per week last month",
+        "What is my average lessons per week in 2026?",
+      ],
+    },
+    {
       expectedIntent: "cash_flow_trend",
       phrases: [
         "What's my cash flow trend?",
@@ -42,12 +58,58 @@ describe("parseToQueryPlan paraphrase robustness", () => {
       ],
     },
     {
+      expectedIntent: "what_if_rate_change",
+      phrases: [
+        "If I raise rates by $10/hour, what happens to my income?",
+        "What if I increase my rate by 5 per hour?",
+      ],
+    },
+    {
+      expectedIntent: "what_if_add_students",
+      phrases: [
+        "If I add 3 new students, what's my new income?",
+      ],
+    },
+    {
+      expectedIntent: "what_if_take_time_off",
+      phrases: [
+        "If I take 2 weeks off, how does that affect my yearly earnings?",
+      ],
+    },
+    {
+      expectedIntent: "what_if_lose_top_students",
+      phrases: [
+        "What if I lose my top 2 students?",
+      ],
+    },
+    {
+      expectedIntent: "students_needed_for_target_income",
+      phrases: [
+        "How many students do I need to reach $100k at $70/hr?",
+      ],
+    },
+    {
+      expectedIntent: "tax_guidance",
+      phrases: [
+        "Estimated tax on my income this year?",
+        "How much should I set aside for taxes?",
+        "What do I need to set aside for quarterly taxes?",
+      ],
+    },
+    {
       expectedIntent: "revenue_per_student_in_period",
       phrases: [
         "Which student did I earn the most from in 2025?",
         "Who earned me the most in 2025?",
       ],
       expectedTopN: 1,
+    },
+    {
+      expectedIntent: "revenue_per_student_in_period",
+      phrases: [
+        "Who pays the most?",
+        "Who pays the least?",
+      ],
     },
     {
       expectedIntent: "revenue_per_student_in_period",

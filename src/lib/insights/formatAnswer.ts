@@ -92,6 +92,25 @@ export function formatLessonsCountInPeriod(out: { lesson_count?: number }): stri
   return `${n} completed lesson${n === 1 ? "" : "s"}.`;
 }
 
+export function formatHoursTotalInPeriod(out: { total_hours?: number; lesson_count?: number }): string {
+  const lessonCount = (out.lesson_count as number | undefined) ?? 0;
+  if (lessonCount <= 0) return "No completed lessons found for that period.";
+  const hours = (out.total_hours as number | undefined) ?? 0;
+  return `${hours.toLocaleString("en-US", { maximumFractionDigits: 2 })} hours across ${lessonCount} completed lesson${lessonCount === 1 ? "" : "s"}.`;
+}
+
+export function formatAvgLessonsPerWeekInPeriod(out: {
+  avg_lessons_per_week?: number;
+  weeks_count?: number;
+  lesson_count?: number;
+}): string {
+  const weeks = (out.weeks_count as number | undefined) ?? 0;
+  const lessons = (out.lesson_count as number | undefined) ?? 0;
+  if (weeks <= 0 || lessons <= 0) return "No completed lessons found for that period.";
+  const avg = (out.avg_lessons_per_week as number | undefined) ?? 0;
+  return `${avg.toLocaleString("en-US", { maximumFractionDigits: 2 })} lessons/week on average (${lessons} lessons over ${weeks} week${weeks === 1 ? "" : "s"}).`;
+}
+
 export function formatRevenuePerLessonInPeriod(out: {
   avg_dollars_per_lesson?: number;
   lesson_count?: number;
@@ -143,8 +162,112 @@ export function formatCashFlowTrend(out: {
   if (series.length === 0) return "No completed lessons found for that period.";
   const direction = out.direction ?? "flat";
   const directionLabel = direction === "up" ? "upward" : direction === "down" ? "downward" : "flat";
-  const preview = series.slice(-5).map((p) => `${p.start_date}: ${fmt(p.total_dollars)}`).join(" · ");
-  return `Cash flow trend is **${directionLabel}**.\n${preview}`;
+  const bullets = series
+    .slice(-5)
+    .map((p) => `• ${p.start_date} — ${fmt(p.total_dollars)}`)
+    .join("\n");
+  return `**Cash flow trend:** ${directionLabel}\n${bullets}`;
+}
+
+export function formatWhatIfRateChange(out: {
+  rate_delta_dollars_per_hour?: number;
+  total_hours?: number;
+  current_total_dollars?: number;
+  projected_total_dollars?: number;
+  delta_dollars?: number;
+  lesson_count?: number;
+}): string {
+  const delta = (out.rate_delta_dollars_per_hour as number | undefined) ?? 0;
+  const hours = (out.total_hours as number | undefined) ?? 0;
+  const current = (out.current_total_dollars as number | undefined) ?? 0;
+  const projected = (out.projected_total_dollars as number | undefined) ?? 0;
+  const deltaDollars = (out.delta_dollars as number | undefined) ?? 0;
+  const lessons = (out.lesson_count as number | undefined) ?? 0;
+  if (!delta || hours <= 0 || lessons <= 0) return "Not enough completed lesson history to simulate that rate change.";
+  return `If you change rates by **$${delta}/hr**, you’d add about **${fmt(deltaDollars)}** over ${hours.toFixed(1)} hours.\nCurrent: ${fmt(current)}\nProjected: ${fmt(projected)}`;
+}
+
+export function formatWhatIfAddStudents(out: {
+  new_students?: number;
+  avg_weekly_dollars?: number;
+  avg_weekly_per_student_dollars?: number;
+  delta_weekly_dollars?: number;
+  projected_weekly_dollars?: number;
+  weeks_count?: number;
+  active_students?: number;
+}): string {
+  const n = (out.new_students as number | undefined) ?? 0;
+  const avg = (out.avg_weekly_dollars as number | undefined) ?? 0;
+  const per = (out.avg_weekly_per_student_dollars as number | undefined) ?? 0;
+  const delta = (out.delta_weekly_dollars as number | undefined) ?? 0;
+  const projected = (out.projected_weekly_dollars as number | undefined) ?? 0;
+  const weeks = (out.weeks_count as number | undefined) ?? 0;
+  const active = (out.active_students as number | undefined) ?? 0;
+  if (!n || weeks <= 0 || active <= 0) return "Not enough history to model adding students yet.";
+  return `Based on ${weeks} weeks of history, you average ${fmt(avg)}/week (~${fmt(per)}/week per active student).\nAdding **${n}** similar student${n === 1 ? "" : "s"} could add about **${fmt(delta)}/week**.\nProjected: ${fmt(projected)}/week.`;
+}
+
+export function formatWhatIfTakeTimeOff(out: {
+  weeks_off?: number;
+  avg_weekly_dollars?: number;
+  expected_lost_dollars?: number;
+  weeks_count?: number;
+}): string {
+  const weeksOff = (out.weeks_off as number | undefined) ?? 0;
+  const avg = (out.avg_weekly_dollars as number | undefined) ?? 0;
+  const lost = (out.expected_lost_dollars as number | undefined) ?? 0;
+  const weeks = (out.weeks_count as number | undefined) ?? 0;
+  if (!weeksOff || weeks <= 0) return "Not enough history to estimate time-off impact yet.";
+  return `You average about ${fmt(avg)}/week.\nTaking **${weeksOff}** week${weeksOff === 1 ? "" : "s"} off would reduce yearly earnings by roughly **${fmt(lost)}** (assuming similar schedule).`;
+}
+
+export function formatWhatIfLoseTopStudents(out: {
+  top_n?: number;
+  lost_students?: Array<{ student_name: string; total_dollars: number }>;
+  lost_total_dollars?: number;
+  current_total_dollars?: number;
+  projected_total_dollars?: number;
+}): string {
+  const n = (out.top_n as number | undefined) ?? 0;
+  const rows = (out.lost_students as Array<{ student_name: string; total_dollars: number }>) ?? [];
+  const lost = (out.lost_total_dollars as number | undefined) ?? 0;
+  const current = (out.current_total_dollars as number | undefined) ?? 0;
+  const projected = (out.projected_total_dollars as number | undefined) ?? 0;
+  if (!n || rows.length === 0) return "Not enough data to identify top students for that period.";
+  const bullets = rows.map((r) => `• **${r.student_name}** — ${fmt(r.total_dollars)}`).join("\n");
+  return `If you lose your top **${n}** student${n === 1 ? "" : "s"} in this period:\n${bullets}\n\nLost: **${fmt(lost)}**\nCurrent: ${fmt(current)}\nProjected: ${fmt(projected)}`;
+}
+
+export function formatStudentsNeededForTargetIncome(out: {
+  target_income_dollars?: number;
+  rate_dollars_per_hour?: number;
+  typical_weekly_hours_per_student?: number;
+  projected_income_per_student_year_dollars?: number;
+  students_needed?: number;
+}): string {
+  const target = (out.target_income_dollars as number | undefined) ?? 0;
+  const rate = (out.rate_dollars_per_hour as number | undefined) ?? 0;
+  const hours = (out.typical_weekly_hours_per_student as number | undefined) ?? 0;
+  const perYear = (out.projected_income_per_student_year_dollars as number | undefined) ?? 0;
+  const needed = (out.students_needed as number | undefined) ?? 0;
+  if (!target || !rate || !hours || !perYear || !needed) return "Not enough history to estimate students needed yet.";
+  return `At **$${rate}/hr**, your typical student averages about **${hours.toFixed(2)} hrs/week**.\nThat’s about **${fmt(perYear)} per student/year**.\nTo reach **${fmt(target)}**, you’d need about **${needed}** students (at a similar schedule).`;
+}
+
+export function formatTaxGuidance(out: {
+  total_dollars?: number;
+  suggested_set_aside_low_dollars?: number;
+  suggested_set_aside_high_dollars?: number;
+  note?: string;
+  lesson_count?: number;
+}): string {
+  const total = (out.total_dollars as number | undefined) ?? 0;
+  const low = (out.suggested_set_aside_low_dollars as number | undefined) ?? 0;
+  const high = (out.suggested_set_aside_high_dollars as number | undefined) ?? 0;
+  const note = (out.note as string | undefined) ?? "";
+  const lessons = (out.lesson_count as number | undefined) ?? 0;
+  if (lessons <= 0) return "No completed lessons found for that period.";
+  return `**Tax set-aside guidance**\nA common safe range is **25–30%** of income.\nOn ${fmt(total)} earnings, that’s **${fmt(low)}–${fmt(high)}** to set aside.\n${note}`.trim();
 }
 
 export function formatIncomeStability(out: {

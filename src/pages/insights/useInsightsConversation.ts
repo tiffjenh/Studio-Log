@@ -13,6 +13,8 @@ import type { AskInsightsResult, InsightsMetadata } from "@/lib/insights";
 import type { InsightIntent } from "@/lib/insights/schema";
 import type { ForecastIntent } from "@/lib/forecasts/types";
 import type { Lesson, Student } from "@/types";
+import type { PendingInsightsClarification } from "@/lib/insights/clarification";
+import { resolveInsightsClarification } from "@/lib/insights/clarification";
 
 
 function mapInsightIntentToForecast(intent: InsightIntent): ForecastIntent {
@@ -47,20 +49,22 @@ export function useInsightsConversation(args: UseInsightsConversationArgs) {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingClarification, setPendingClarification] = useState<PendingInsightsClarification | null>(null);
 
   const clear = useCallback(() => {
     setMessages([]);
     setError(null);
+    setPendingClarification(null);
   }, []);
 
   const sendMessage = useCallback(
     async (queryRaw: string) => {
       const query = queryRaw.trim();
-      const q = query || "Show my earnings summary";
+      const qUser = query || "Show my earnings summary";
       setIsLoading(true);
       setError(null);
 
-      setMessages((prev) => [...prev, { role: "user", content: q }]);
+      setMessages((prev) => [...prev, { role: "user", content: qUser }]);
 
       try {
         const debugInsights = import.meta.env.DEV || (typeof window !== "undefined" && (window as unknown as { DEBUG_INSIGHTS?: boolean }).DEBUG_INSIGHTS);
@@ -74,7 +78,8 @@ export function useInsightsConversation(args: UseInsightsConversationArgs) {
           }
           : undefined;
 
-        const insightsResult = await askInsights(q, {
+        const effectiveQuery = pendingClarification ? resolveInsightsClarification(pendingClarification, qUser) : qUser;
+        const insightsResult = await askInsights(effectiveQuery, {
           user_id: userId,
           lessons,
           roster,
@@ -84,6 +89,13 @@ export function useInsightsConversation(args: UseInsightsConversationArgs) {
           locale,
           priorContext,
         });
+        if (insightsResult.needsClarification) {
+          const missing = insightsResult.trace?.queryPlan?.required_missing_params ?? [];
+          // Store the query that actually needs clarifying, so we can resume without losing intent.
+          setPendingClarification({ originalQuestion: effectiveQuery, requiredMissingParams: missing });
+        } else {
+          setPendingClarification(null);
+        }
         if (debugInsights && insightsResult.trace) {
           console.log("[Insights] trace", insightsResult.trace);
         }
@@ -93,7 +105,7 @@ export function useInsightsConversation(args: UseInsightsConversationArgs) {
           displayText = insightsResult.clarifyingQuestion;
         }
 
-        const responseLang = detectQueryLanguage(q);
+        const responseLang = detectQueryLanguage(qUser);
         if (responseLang === "es" || responseLang === "zh") {
           displayText = await translateForInsights(displayText, responseLang);
         }

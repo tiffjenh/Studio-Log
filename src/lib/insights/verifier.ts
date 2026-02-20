@@ -9,6 +9,7 @@ export type VerifierResult = {
 function hasValidResult(out: Record<string, unknown>): boolean {
   if (out.error) return false;
   if (typeof out.total_dollars === "number") return true;
+  if (typeof out.total_hours === "number") return true;
   if (typeof out.hourly_dollars === "number") return true;
   if (typeof out.student_name === "string" && (out.missed_count != null || out.total_cents != null)) return true;
   if (typeof out.dow_label === "string" && typeof out.total_dollars === "number") return true;
@@ -17,6 +18,12 @@ function hasValidResult(out: Record<string, unknown>): boolean {
   if (out.projected_monthly_dollars != null || out.projected_yearly_dollars != null) return true;
   if (out.attended_lessons != null || out.attendance_rate_percent != null) return true;
   if (out.avg_weekly_dollars != null) return true;
+  if (out.avg_lessons_per_week != null) return true;
+  if (out.projected_total_dollars != null || out.delta_dollars != null) return true;
+  if (out.projected_weekly_dollars != null || out.delta_weekly_dollars != null) return true;
+  if (out.expected_lost_dollars != null) return true;
+  if (out.students_needed != null || out.projected_income_per_student_year_dollars != null) return true;
+  if (out.suggested_set_aside_low_dollars != null || out.suggested_set_aside_high_dollars != null) return true;
   if (Array.isArray(out.weekly_series)) return true;
   if (typeof out.stability_label === "string") return true;
   return false;
