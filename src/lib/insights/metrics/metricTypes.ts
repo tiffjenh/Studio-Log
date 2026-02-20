@@ -47,6 +47,6 @@ export type MetricResult =
 
 export type IntentMetricSpec = {
   metric: MetricKey;
-  required_params: ("start_date" | "end_date" | "student" | "year")[];
+  required_params: ("start_date" | "end_date" | "student" | "year" | "year_a" | "year_b")[];
   default_date_range?: "ytd" | "last_30_days" | "last_year" | "this_month";
 };
