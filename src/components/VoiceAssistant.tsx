@@ -4,6 +4,7 @@
  */
 
 import type { ResolvedVoiceCommand } from "@/lib/voice/types";
+import { Button } from "@/components/ui/Button";
 
 export interface VoiceConfirmationCardProps {
   summary: string;
@@ -38,32 +39,25 @@ export function VoiceConfirmationCard({
         Confirm to apply this change.
       </p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button
+        <Button
           type="button"
+          variant="primary"
+          size="sm"
           onClick={onConfirm}
           disabled={isLoading}
-          className="btn btn-primary pill"
-          style={{ padding: "10px 18px", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-sans)" }}
+          loading={isLoading}
         >
-          {isLoading ? "Applying…" : "Confirm"}
-        </button>
-        <button
+          Confirm
+        </Button>
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           onClick={onCancel}
           disabled={isLoading}
-          className="pill"
-          style={{
-            padding: "10px 18px",
-            fontSize: 14,
-            fontWeight: 600,
-            fontFamily: "var(--font-sans)",
-            border: "1px solid var(--border)",
-            background: "var(--card)",
-            color: "var(--text)",
-          }}
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { Button, IconButton } from "@/components/ui/Button";
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/Icons";
 
 const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -133,36 +135,17 @@ export default function DatePicker({ value, onChange, placeholder = "MM/DD/YYYY"
           color: "var(--text)",
         }}
       />
-      <button
+      <IconButton
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="pill pill--active"
-        style={{
-          width: 48,
-          minWidth: 48,
-          maxWidth: 48,
-          height: 48,
-          minHeight: 48,
-          maxHeight: 48,
-          padding: 0,
-          border: "none",
-          borderRadius: "50%",
-          background: "var(--accent-gradient)",
-          color: "white",
-          fontSize: 18,
-          fontFamily: "var(--font-sans)",
-          cursor: "pointer",
-          boxShadow: "var(--shadow-soft)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
+        variant="secondary"
+        size="md"
+        style={{ flexShrink: 0 }}
         aria-label="Open calendar"
         title="Pick date"
       >
-        📅
-      </button>
+        <CalendarIcon />
+      </IconButton>
 
       {open && (
         <div
@@ -180,57 +163,27 @@ export default function DatePicker({ value, onChange, placeholder = "MM/DD/YYYY"
           }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <button
+            <IconButton
               type="button"
               onClick={() => setViewDate((d) => addDays(new Date(d.getFullYear(), d.getMonth(), 1), -1))}
-              style={{
-                width: 36,
-                height: 36,
-                minWidth: 36,
-                maxWidth: 36,
-                minHeight: 36,
-                maxHeight: 36,
-                borderRadius: "50%",
-                border: "1px solid var(--border)",
-                background: "var(--card)",
-                cursor: "pointer",
-                fontSize: 18,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--text)",
-              }}
+              variant="secondary"
+              size="sm"
               aria-label="Previous month"
             >
-              ‹
-            </button>
+              <ChevronLeftIcon />
+            </IconButton>
             <span style={{ fontWeight: 600, fontSize: 16, fontFamily: "var(--font-sans)" }}>
               {viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
             </span>
-            <button
+            <IconButton
               type="button"
               onClick={() => setViewDate((d) => addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 1))}
-              style={{
-                width: 36,
-                height: 36,
-                minWidth: 36,
-                maxWidth: 36,
-                minHeight: 36,
-                maxHeight: 36,
-                borderRadius: "50%",
-                border: "1px solid var(--border)",
-                background: "var(--card)",
-                cursor: "pointer",
-                fontSize: 18,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--text)",
-              }}
+              variant="secondary"
+              size="sm"
               aria-label="Next month"
             >
-              ›
-            </button>
+              <ChevronRightIcon />
+            </IconButton>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 8, textAlign: "center" }}>
@@ -243,60 +196,53 @@ export default function DatePicker({ value, onChange, placeholder = "MM/DD/YYYY"
               const key = toDateKey(date);
               const isSelected = value === key;
               return (
-                <button
+                <Button
                   key={key}
                   type="button"
+                  variant={isSelected ? "primary" : "ghost"}
+                  size="sm"
+                  iconOnly
                   onClick={() => {
                     onChange(key);
                     setOpen(false);
                   }}
                   style={{
-                    width: 36,
-                    minWidth: 36,
-                    height: 36,
-                    minHeight: 36,
-                    maxHeight: 36,
-                    padding: 0,
                     borderRadius: "50%",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    fontFamily: "var(--font-sans)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: isSelected ? "var(--primary)" : "transparent",
+                    minWidth: 36,
+                    minHeight: 36,
                     color: isSelected ? "white" : isCurrentMonth ? "var(--text)" : "var(--text-muted)",
                     opacity: isCurrentMonth ? 1 : 0.6,
                   }}
                 >
                   {date.getDate()}
-                </button>
+                </Button>
               );
             })}
           </div>
 
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 onChange("");
                 setOpen(false);
               }}
-              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--primary)", fontFamily: "var(--font-sans)" }}
             >
               Clear
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 onChange(todayKey);
                 setOpen(false);
               }}
-              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--primary)", fontFamily: "var(--font-sans)" }}
             >
               Today
-            </button>
+            </Button>
           </div>
         </div>
       )}

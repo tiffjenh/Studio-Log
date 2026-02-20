@@ -5,8 +5,9 @@ import { useLanguage } from "@/context/LanguageContext";
 import { formatCurrency, getStudentsForDay, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, getStudentIdsWithLessonOnDate, toDateKey, dedupeLessonsById, getWeekBounds, getSuppressedGeneratedSlotIds, computeLessonAmountCents, isStudentActive } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Lesson, Student } from "@/types";
+import { Button, IconButton } from "@/components/ui/Button";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/Icons";
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 function addDays(d: Date, n: number): Date {
@@ -115,84 +116,52 @@ export default function Calendar() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, minHeight: 44 }}>
         <Link to="/" style={{ color: "var(--text)", textDecoration: "none", fontSize: 15, display: "inline-flex", alignItems: "center" }}>← {t("common.back")}</Link>
         <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0, lineHeight: 1 }}>{t("calendar.title")}</h1>
-        <Link
+        <Button
           to="/add-student"
           title={t("students.addStudent")}
-          style={{
-            width: 40,
-            height: 40,
-            minWidth: 40,
-            maxWidth: 40,
-            minHeight: 40,
-            maxHeight: 40,
-            borderRadius: "50%",
-            background: "var(--avatar-gradient)",
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 22,
-            fontWeight: 300,
-            lineHeight: 1,
-            textDecoration: "none",
-            flexShrink: 0,
-            padding: 0,
-          }}
+          variant="primary"
+          size="sm"
+          iconOnly
+          aria-label={t("students.addStudent")}
         >
           +
-        </Link>
+        </Button>
       </div>
       <div style={{ marginBottom: 16, position: "relative" }} ref={monthPickerRef}>
-        <button
+        <Button
           type="button"
+          variant="primary"
+          size="md"
           onClick={() => { setMonthPickerOpen((o) => !o); setMonthPickerView(selectedDate); }}
-          className="pill pill--active"
           style={{
             marginBottom: 12,
-            minHeight: 48,
-            padding: "12px 20px",
-            border: "none",
-            borderRadius: "var(--radius-pill)",
-            background: "var(--avatar-gradient)",
-            color: "white",
-            fontSize: 16,
-            fontWeight: 600,
-            fontFamily: "var(--font-sans)",
-            cursor: "pointer",
-            boxShadow: "var(--shadow-soft)",
           }}
         >
           {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-        </button>
+        </Button>
 
         {monthPickerOpen && (
           <div className="float-card" style={{ position: "absolute", left: 16, right: 16, maxWidth: 360, zIndex: 50, marginBottom: 16, padding: 16, boxShadow: "var(--shadow-elevated)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <button
+              <IconButton
                 type="button"
                 onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth(), 1), -1))}
-                style={{
-                  width: 36, height: 36, minWidth: 36, maxWidth: 36, minHeight: 36, maxHeight: 36, borderRadius: "50%",
-                  border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18,
-                  display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)",
-                }}
+                variant="secondary"
+                size="sm"
                 aria-label="Previous month"
               >
-                ‹
-              </button>
+                <ChevronLeftIcon />
+              </IconButton>
               <span style={{ fontWeight: 600, fontSize: 16, fontFamily: "var(--font-sans)" }}>{monthPickerView.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
-              <button
+              <IconButton
                 type="button"
                 onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 1))}
-                style={{
-                  width: 36, height: 36, minWidth: 36, maxWidth: 36, minHeight: 36, maxHeight: 36, borderRadius: "50%",
-                  border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18,
-                  display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text)",
-                }}
+                variant="secondary"
+                size="sm"
                 aria-label="Next month"
               >
-                ›
-              </button>
+                <ChevronRightIcon />
+              </IconButton>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, textAlign: "center", marginBottom: 8 }}>
               {DAYS_SHORT.map((label) => (
@@ -213,19 +182,23 @@ export default function Calendar() {
                   const key = toDateKey(date);
                   const isSelected = key === dateKey;
                   return (
-                    <button
+                    <Button
                       key={key}
                       type="button"
+                      variant={isSelected ? "primary" : "ghost"}
+                      size="sm"
+                      iconOnly
                       onClick={() => { setSelectedDate(date); setMonthPickerOpen(false); }}
                       style={{
-                        width: 36, minWidth: 36, height: 36, minHeight: 36, maxHeight: 36, padding: 0, borderRadius: "50%", border: "none", cursor: "pointer", fontSize: 14, fontFamily: "var(--font-sans)", display: "flex", alignItems: "center", justifyContent: "center",
-                        background: isSelected ? "var(--primary)" : "transparent",
+                        minWidth: 36,
+                        minHeight: 36,
+                        borderRadius: "50%",
                         color: isSelected ? "white" : isCurrentMonth ? "var(--text)" : "var(--text-muted)",
                         opacity: isCurrentMonth ? 1 : 0.6,
                       }}
                     >
                       {date.getDate()}
-                    </button>
+                    </Button>
                   );
                 });
               })()}
@@ -234,40 +207,54 @@ export default function Calendar() {
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button
+          <IconButton
             type="button"
             onClick={() => setViewCenter((prev) => addDays(prev, -5))}
-            style={{ flexShrink: 0, width: 40, height: 40, minWidth: 40, minHeight: 40, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}
+            variant="secondary"
+            size="sm"
+            style={{ flexShrink: 0 }}
           >
-            ‹
-          </button>
+            <ChevronLeftIcon />
+          </IconButton>
           <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
             {stripDates.map((d) => {
               const isSelected = toDateKey(d) === dateKey;
+              const chipTypography = {
+                fontFamily: "var(--font-sans)",
+                fontSize: 12,
+                fontWeight: 500,
+                color: isSelected ? "rgba(255,255,255,0.95)" : "var(--text-muted)",
+                lineHeight: 1.1,
+              };
+              const monthDayLabel = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
               return (
-                <button
+                <Button
                   key={d.toISOString()}
                   type="button"
+                  variant={isSelected ? "primary" : "secondary"}
+                  size="sm"
+                  iconOnly
                   onClick={() => setSelectedDate(d)}
                   style={{
-                    width: 56, minWidth: 56, height: 56, minHeight: 56, padding: 0, borderRadius: "50%", border: "1px solid var(--border)",
-                    background: isSelected ? "var(--avatar-gradient)" : "var(--card)", color: isSelected ? "white" : "var(--text)", cursor: "pointer",
-                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-sans)",
+                    width: 74, minWidth: 74, height: 56, minHeight: 56, borderRadius: 999,
+                    color: chipTypography.color,
+                    display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-sans)",
                   }}
                 >
-                  <div style={{ fontSize: 11, fontWeight: 600, color: isSelected ? "rgba(255,255,255,0.9)" : "var(--text-muted)" }}>{DAYS[d.getDay()]}</div>
-                  <div style={{ fontSize: 16, fontWeight: 600 }}>{d.getDate()}</div>
-                </button>
+                  <div style={chipTypography}>{monthDayLabel}</div>
+                </Button>
               );
             })}
           </div>
-          <button
+          <IconButton
             type="button"
             onClick={() => setViewCenter((prev) => addDays(prev, 5))}
-            style={{ flexShrink: 0, width: 40, height: 40, minWidth: 40, minHeight: 40, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 18 }}
+            variant="secondary"
+            size="sm"
+            style={{ flexShrink: 0 }}
           >
-            ›
-          </button>
+            <ChevronRightIcon />
+          </IconButton>
         </div>
       </div>
       <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Schedule</h3>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useStoreContext } from "@/context/StoreContext";
+import { Button } from "@/components/ui/Button";
 
 export default function ImportBanner() {
   const { importableLocalData, importLocalData, clearImportableData } = useStoreContext();
@@ -42,30 +43,25 @@ export default function ImportBanner() {
       </p>
       {error ? <p style={{ margin: 0, color: "#dc2626", fontSize: 14 }}>{error}</p> : null}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button
+        <Button
           type="button"
           onClick={handleImport}
           disabled={loading}
-          className="btn btn-primary"
-          style={{ padding: "8px 16px" }}
+          variant="primary"
+          size="sm"
+          loading={loading}
         >
-          {loading ? "Importing…" : "Import"}
-        </button>
-        <button
+          Import
+        </Button>
+        <Button
           type="button"
           onClick={clearImportableData}
           disabled={loading}
-          style={{
-            padding: "8px 16px",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            background: "var(--card)",
-            color: "var(--text)",
-            cursor: "pointer",
-          }}
+          variant="secondary"
+          size="sm"
         >
           Don&apos;t import
-        </button>
+        </Button>
       </div>
     </div>
   );

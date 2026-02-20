@@ -10,6 +10,8 @@ import { downloadCsv, getMatrixTemplateCsv } from "@/utils/importTemplates";
 import { filterCurrencies, getCurrencyByCode, getStoredCurrencyCode, setStoredCurrencyCode } from "@/utils/currencies";
 import { getLessonForStudentOnDate } from "@/utils/earnings";
 import type { Lesson, Student } from "@/types";
+import { Button, IconButton } from "@/components/ui/Button";
+import { ChevronLeftIcon, DownloadIcon } from "@/components/ui/Icons";
 
 export default function Settings() {
   const { data, setUser, updateUserProfile, addLessonsBulk, updateLesson, clearAllLessons, reload } = useStoreContext();
@@ -350,14 +352,16 @@ export default function Settings() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
         <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0 }}>{t("settings.title")}</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={openCurrencyModal}
-            style={{ fontSize: 18, fontWeight: 700, color: "var(--text-muted)", fontFamily: "var(--font-sans)", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}
+            style={{ minWidth: 40, paddingLeft: 8, paddingRight: 8 }}
             aria-label={t("settings.defaultCurrency")}
           >
             {currencySymbol}
-          </button>
+          </Button>
           <LanguageSwitcher />
         </div>
       </div>
@@ -367,7 +371,7 @@ export default function Settings() {
           <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 360, width: "90%", maxHeight: "80vh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, fontFamily: "var(--font-sans)" }}>{t("settings.defaultCurrency")}</h3>
-              <button type="button" onClick={() => setCurrencyModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-muted)" }} aria-label="Close">×</button>
+              <IconButton type="button" variant="ghost" size="sm" onClick={() => setCurrencyModalOpen(false)} aria-label="Close">×</IconButton>
             </div>
             <input
               type="text"
@@ -379,14 +383,18 @@ export default function Settings() {
             />
             <div style={{ overflowY: "auto", maxHeight: 280 }}>
               {filterCurrencies(currencySearch).map((c) => (
-                <button
+                <Button
                   key={c.code}
                   type="button"
+                  variant="tab"
+                  active={defaultCurrencyCode === c.code}
+                  size="sm"
+                  fullWidth
                   onClick={() => selectCurrency(c.code)}
-                  style={{ width: "100%", padding: "12px 14px", border: "none", background: defaultCurrencyCode === c.code ? "rgba(201, 123, 148, 0.15)" : "transparent", textAlign: "left", cursor: "pointer", fontSize: 14, fontFamily: "var(--font-sans)" }}
+                  style={{ width: "100%", textAlign: "left", justifyContent: "flex-start", boxShadow: "none" }}
                 >
                   {c.symbol} {c.code} – {c.name}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -405,9 +413,9 @@ export default function Settings() {
           ) : (
             <span style={{ flex: 2 }}>{user.name}</span>
           )}
-          <button type="button" onClick={() => (editing === "name" ? handleSave("name") : setEditing("name"))} style={{ marginLeft: 8, color: "var(--text)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
+          <Button type="button" variant="secondary" size="sm" onClick={() => (editing === "name" ? handleSave("name") : setEditing("name"))} style={{ marginLeft: 8 }}>
             {editing === "name" ? t("common.save") : t("common.edit")}
-          </button>
+          </Button>
         </div>
         <div style={rowStyle}>
           <span style={{ flex: 1 }}>{t("settings.email")}</span>
@@ -416,9 +424,9 @@ export default function Settings() {
           ) : (
             <span style={{ flex: 2 }}>{user.email}</span>
           )}
-          <button type="button" onClick={() => { if (editing === "email") handleSave("email"); else { setEmailChangeMessage(null); setEditing("email"); } }} style={{ marginLeft: 8, color: "var(--text)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>
+          <Button type="button" variant="secondary" size="sm" onClick={() => { if (editing === "email") handleSave("email"); else { setEmailChangeMessage(null); setEditing("email"); } }} style={{ marginLeft: 8 }}>
             {editing === "email" ? t("common.save") : t("common.edit")}
-          </button>
+          </Button>
         </div>
         {saveError ? <p style={{ color: "#dc2626", marginTop: 8, marginBottom: 0 }}>{saveError}</p> : null}
         {emailJustConfirmed && (
@@ -452,37 +460,40 @@ export default function Settings() {
               />
               {passwordError && <span style={{ fontSize: 13, color: "#dc2626" }}>{passwordError}</span>}
               <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" onClick={handleChangePassword} style={{ padding: "8px 14px", color: "white", fontWeight: 600, background: "var(--accent-gradient)", border: "none", borderRadius: 8, cursor: "pointer" }}>{t("common.save")}</button>
-                <button type="button" onClick={() => { setEditing(null); setNewPassword(""); setConfirmPassword(""); setPasswordError(""); }} style={{ padding: "8px 14px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)", cursor: "pointer" }}>{t("common.cancel")}</button>
+                <Button type="button" variant="secondary" size="sm" onClick={handleChangePassword}>{t("common.save")}</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => { setEditing(null); setNewPassword(""); setConfirmPassword(""); setPasswordError(""); }}>{t("common.cancel")}</Button>
               </div>
             </div>
           ) : (
             <>
               <span style={{ flex: 2 }}>••••••••</span>
-              <button type="button" onClick={() => { setPasswordError(""); setEditing("password"); }} style={{ marginLeft: 8, color: "var(--text)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>{t("common.edit")}</button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => { setPasswordError(""); setEditing("password"); }} style={{ marginLeft: 8 }}>{t("common.edit")}</Button>
             </>
           )}
         </div>
       </div>
       <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <button type="button" className="pill" style={{ width: "auto", padding: "10px 20px", marginBottom: 8, borderRadius: "var(--radius-pill)", background: "transparent", border: "2px solid #fff", color: "var(--text)", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }} onClick={handleLogOut}>{t("settings.logOut")}</button>
+        <Button type="button" variant="secondary" size="md" onClick={handleLogOut} style={{ marginBottom: 8 }}>{t("settings.logOut")}</Button>
         <div>
-          <button type="button" onClick={() => setImportDataOpen((o) => !o)} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text-muted)", textDecoration: "underline" }}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setImportDataOpen((o) => !o)}>
             {t("settings.importData")}
-          </button>
+          </Button>
         </div>
       </div>
       {importDataOpen && (
       <>
       <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => setImportMatrixOpen((o) => !o)}
-          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", background: "none", border: "none", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}
+          fullWidth
+          style={{ width: "100%", textAlign: "left", justifyContent: "flex-start", boxShadow: "none" }}
         >
           <span style={{ fontSize: 14 }}>{importMatrixOpen ? "▼" : "▶"}</span>
           {t("settings.importLessonsMatrix")}
-        </button>
+        </Button>
         {importMatrixOpen && (
           <div style={{ padding: "0 20px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--font-sans)", fontSize: 13 }}>
             <p style={{ margin: "12px 0", fontSize: 13, color: "var(--text-muted)" }}>
@@ -496,32 +507,33 @@ export default function Settings() {
                 onChange={handleMatrixImport}
                 style={{ display: "none" }}
               />
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => matrixFileInputRef.current?.click()}
                 disabled={importing || clearingLessons}
-                style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#111", background: "transparent", border: "1px solid #374151", borderRadius: 8, cursor: importing || clearingLessons ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)" }}
+                loading={importing}
               >
-                {importing ? t("common.loading") : t("settings.importMatrix")}
-              </button>
-              <button
+                {t("settings.importMatrix")}
+              </Button>
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => downloadCsv("lessons-matrix-template.csv", getMatrixTemplateCsv())}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#111", background: "transparent", border: "1px solid #374151", borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-sans)" }}
+                leftIcon={<DownloadIcon size={10} />}
               >
-                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
                 Template
-              </button>
+              </Button>
             </div>
             {importProgressBar}
             {importResultBanner}
             <p style={{ margin: "16px 0 8px", fontSize: 13, color: "var(--text-muted)" }}>To fix wrong dates (e.g. everything in 2024): clear all lessons, then re-import your matrix CSV with full dates (1/15/2024, 1/15/2025). If it still shows only 2024, do a <strong>hard refresh</strong> (Ctrl+Shift+R or Cmd+Shift+R) or open the app in a private/incognito window so the latest code loads, then clear and re-import again.</p>
-            <button
+            <Button
               type="button"
+              variant="danger"
+              size="sm"
               disabled={clearingLessons}
               onClick={async () => {
                 if (!window.confirm("Are you sure?")) return;
@@ -537,14 +549,39 @@ export default function Settings() {
                   setClearingLessons(false);
                 }
               }}
-              style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "#991b1b", background: "transparent", border: "1px solid #fecaca", borderRadius: 8, cursor: clearingLessons ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)", opacity: clearingLessons ? 0.7 : 1 }}
+              loading={clearingLessons}
             >
-              {clearingLessons ? "Clearing…" : "Clear all lessons"}
-            </button>
+              Clear all lessons
+            </Button>
           </div>
         )}
       </div>
       </>
+      )}
+
+      {/* Dev-only: Button Showcase for visual consistency check */}
+      {import.meta.env.DEV && (
+        <div className="float-card" style={{ marginTop: 32, padding: 24 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Button Showcase</h2>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+            <Button variant="primary" size="sm">Primary sm</Button>
+            <Button variant="primary" size="md">Primary md</Button>
+            <Button variant="primary" size="lg">Primary lg</Button>
+            <Button variant="secondary" size="sm">Secondary sm</Button>
+            <Button variant="secondary" size="md">Secondary md</Button>
+            <Button variant="ghost" size="sm">Ghost sm</Button>
+            <Button variant="danger" size="sm">Danger</Button>
+            <Button variant="tab" size="sm" active>Tab active</Button>
+            <Button variant="tab" size="sm">Tab inactive</Button>
+            <Button variant="primary" size="md" disabled>Disabled</Button>
+            <Button variant="primary" size="md" loading>Loading</Button>
+          </div>
+          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+            Icon buttons: <Button variant="primary" size="md" iconOnly aria-label="Example">+</Button>
+            <Button variant="secondary" size="md" iconOnly aria-label="Back" style={{ marginLeft: 8 }}><ChevronLeftIcon /></Button>
+            <Button variant="ghost" size="md" iconOnly aria-label="Download" style={{ marginLeft: 8 }}><DownloadIcon /></Button>
+          </div>
+        </div>
       )}
     </>
   );

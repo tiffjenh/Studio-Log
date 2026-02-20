@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
+import { Button } from "@/components/ui/Button";
 
 export default function CreateAccount() {
   const { setUser } = useStoreContext();
@@ -38,10 +39,7 @@ export default function CreateAccount() {
         <input type="tel" placeholder="Phone Number (optional)" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} />
         <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
         <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} />
-        <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 8, marginBottom: 16 }}>Sign Up</button>
-        <div style={{ textAlign: "center" }}>
-          <Link to="/login" style={{ color: "var(--primary)", fontSize: 16 }}>Already have an account? Log in</Link>
-        </div>
+        <Button type="submit" variant="primary" fullWidth style={{ marginTop: 8, marginBottom: 16 }}>Sign Up</Button>
       </form>
     </div>
   );

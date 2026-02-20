@@ -6,6 +6,7 @@ import { formatCurrency, getEffectiveRateCents, getEffectiveDurationMinutes } fr
 import DatePicker, { parseToDateKey } from "@/components/DatePicker";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Lesson } from "@/types";
+import { Button, IconButton } from "@/components/ui/Button";
 
 const DURATIONS = [
   { label: "30 min", minutes: 30 },
@@ -154,23 +155,24 @@ export default function EditLesson() {
           </div>
           <div style={{ flex: 1 }}>
             <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Reschedule time</label>
-            <button type="button" onClick={openTimePicker} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
+            <Button type="button" variant="secondary" size="md" onClick={openTimePicker} fullWidth style={{ textAlign: "left", justifyContent: "flex-start" }}>
               {lessonTime || "5:00 PM"}
-            </button>
+            </Button>
           </div>
         </div>
         <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Duration</label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }}>
           {DURATIONS.map((opt) => (
-            <button
+            <Button
               key={opt.minutes}
               type="button"
+              variant="tab"
+              size="sm"
+              active={durationMinutes === opt.minutes}
               onClick={() => setDurationMinutes(opt.minutes)}
-              className={durationMinutes === opt.minutes ? "pill pill--active" : "pill"}
-              style={{ padding: "10px 16px" }}
             >
               {opt.label}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="float-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
@@ -185,24 +187,28 @@ export default function EditLesson() {
           style={{ width: "100%", minHeight: 80, padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 24, fontSize: 16 }}
         />
         {saveError && <p style={{ color: "var(--error, #c00)", marginBottom: 16 }}>{saveError}</p>}
-        <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={saving}>
-          {saving ? (t("common.loading") ?? "Saving…") : t("common.save")}
-        </button>
-        <button
+        <Button type="submit" variant="secondary" size="sm" fullWidth disabled={saving} loading={saving}>
+          {t("common.save")}
+        </Button>
+        <Button
           type="button"
+          variant="danger"
+          size="md"
           onClick={handleDelete}
           disabled={saving || deleting}
-          style={{ marginTop: 16, width: "100%", padding: "12px 16px", border: "1px solid var(--error, #c00)", color: "var(--error, #c00)", background: "transparent", borderRadius: 12, cursor: "pointer", fontSize: 15 }}
+          loading={deleting}
+          fullWidth
+          style={{ marginTop: 16 }}
         >
-          {deleting ? (t("common.loading") ?? "Deleting…") : t("editLesson.deleteLesson")}
-        </button>
+          {t("editLesson.deleteLesson")}
+        </Button>
       </form>
 
       {timePickerOpen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setTimePickerOpen(false)}>
           <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", fontFamily: "var(--font-sans)" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-              <button type="button" onClick={() => setTimePickerOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>&times;</button>
+              <IconButton type="button" variant="ghost" size="sm" onClick={() => setTimePickerOpen(false)} aria-label="Close">&times;</IconButton>
             </div>
             <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>Select time</p>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
@@ -216,13 +222,13 @@ export default function EditLesson() {
                 </select>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <button type="button" onClick={() => setTimePickerAmPm("AM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: timePickerAmPm === "AM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, fontFamily: "var(--font-sans)" }}>AM</button>
-                <button type="button" onClick={() => setTimePickerAmPm("PM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: timePickerAmPm === "PM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, fontFamily: "var(--font-sans)" }}>PM</button>
+                <Button type="button" variant="tab" size="sm" active={timePickerAmPm === "AM"} onClick={() => setTimePickerAmPm("AM")}>AM</Button>
+                <Button type="button" variant="tab" size="sm" active={timePickerAmPm === "PM"} onClick={() => setTimePickerAmPm("PM")}>PM</Button>
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button type="button" onClick={() => setTimePickerOpen(false)} style={{ padding: "10px 20px", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontWeight: 600, fontFamily: "var(--font-sans)" }}>Cancel</button>
-              <button type="button" onClick={applyTime} style={{ padding: "10px 24px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}>OK</button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setTimePickerOpen(false)}>Cancel</Button>
+              <Button type="button" variant="primary" size="sm" onClick={applyTime}>OK</Button>
             </div>
           </div>
         </div>

@@ -1,0 +1,2414 @@
+[
+  {
+    "id": "cat-revenue-forecasting-0",
+    "question": "Am I on track for $80k this year?",
+    "language": "en",
+    "detected_intent": "on_track",
+    "sql_truth_query_key": "on_track_projection",
+    "truth_result": {
+      "on_track": false,
+      "projected_yearly_dollars": 1040.36,
+      "target_dollars": 80000,
+      "gap_dollars": 78959.64
+    },
+    "llm_answer": "Not quite. Projected yearly is $1,040.36. You'd need about $78,959.64 more to reach $80,000.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-revenue-forecasting-1",
+    "question": "What was my total revenue last month?",
+    "language": "en",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": {
+      "total_earnings_dollars": 320
+    },
+    "llm_answer": "Your total revenue in that period was $320.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-revenue-forecasting-2",
+    "question": "What is my projected earnings this year?",
+    "language": "en",
+    "detected_intent": "forecast",
+    "sql_truth_query_key": "forecast_projection",
+    "truth_result": {
+      "projected_monthly_dollars": 86.93,
+      "projected_yearly_dollars": 1040.36,
+      "avg_weekly_dollars": 21.06,
+      "trend": "down"
+    },
+    "llm_answer": "Projected monthly: $86.93. Yearly: $1,040.36.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-revenue-forecasting-3",
+    "question": "How much will I earn this month?",
+    "language": "en",
+    "detected_intent": "forecast",
+    "sql_truth_query_key": "forecast_projection",
+    "truth_result": {
+      "projected_monthly_dollars": 86.93,
+      "projected_yearly_dollars": 1040.36,
+      "avg_weekly_dollars": 21.06,
+      "trend": "down"
+    },
+    "llm_answer": "Projected monthly: $86.93. Yearly: $1,040.36.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-revenue-forecasting-4",
+    "question": "Show my earnings summary",
+    "language": "en",
+    "detected_intent": "earnings_total",
+    "sql_truth_query_key": "total_earnings_ytd",
+    "truth_result": {
+      "total_earnings_dollars": 415,
+      "year": 2026
+    },
+    "llm_answer": "You have 19 earnings entries, totaling $2,440.",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "irrelevant_default_template",
+      "numeric_mismatch:total_earnings_dollars"
+    ]
+  },
+  {
+    "id": "cat-pricing-rate-optimization-0",
+    "question": "Who pays the most per hour?",
+    "language": "en",
+    "detected_intent": "most_per_hour",
+    "sql_truth_query_key": "highest_hourly_student",
+    "truth_result": {
+      "student_name": "Leo Chen",
+      "rate_dollars": 120
+    },
+    "llm_answer": "Leo Chen pays the most per hour: $120/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-pricing-rate-optimization-1",
+    "question": "What is my average hourly rate?",
+    "language": "en",
+    "detected_intent": "avg_hourly_rate",
+    "sql_truth_query_key": "avg_hourly_rate",
+    "truth_result": {
+      "avg_hourly_rate_dollars": 110.67
+    },
+    "llm_answer": "Your average hourly rate is $110.67/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-pricing-rate-optimization-2",
+    "question": "Who is below my average rate?",
+    "language": "en",
+    "detected_intent": "students_below_avg_rate",
+    "sql_truth_query_key": "students_below_avg_rate",
+    "truth_result": {
+      "avg_rate_dollars": 110.67,
+      "below_avg": [
+        {
+          "student_name": "Alice Wu",
+          "hourly_rate_dollars": 95
+        }
+      ],
+      "below_count": 1
+    },
+    "llm_answer": "1 student below your average rate of $110.67/hr: Alice Wu ($95/hr).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-pricing-rate-optimization-3",
+    "question": "If I raise rates by $10/hour, what happens to my income?",
+    "language": "en",
+    "detected_intent": "what_if_rate_change",
+    "sql_truth_query_key": "simulate_rate_increase",
+    "truth_result": {
+      "added_earnings_dollars": 37.5,
+      "baseline_hours": 3.75
+    },
+    "llm_answer": "At $111.67/hour (instead of ~$101.67/hr), you'd make about $162.48 more per year (projected ~$1,202.84/year).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-student-level-insights-0",
+    "question": "Who pays the most?",
+    "language": "en",
+    "detected_intent": "top_student_by_earnings",
+    "sql_truth_query_key": "top_student_by_earnings",
+    "truth_result": {
+      "top_student_name": "Leo Chen",
+      "total_earnings_dollars": 180
+    },
+    "llm_answer": "Leo Chen pays the most: $180 total.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-student-level-insights-1",
+    "question": "Which student earned me the most?",
+    "language": "en",
+    "detected_intent": "top_student_by_earnings",
+    "sql_truth_query_key": "top_student_by_earnings",
+    "truth_result": {
+      "top_student_name": "Leo Chen",
+      "total_earnings_dollars": 180
+    },
+    "llm_answer": "Leo Chen pays the most: $180 total.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-student-level-insights-2",
+    "question": "Who pays the least?",
+    "language": "en",
+    "detected_intent": "lowest_student_by_hourly_rate",
+    "sql_truth_query_key": "lowest_hourly_student",
+    "truth_result": {
+      "student_name": "Alice Wu",
+      "rate_dollars": 85
+    },
+    "llm_answer": "Alice Wu has the lowest rate: $85/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-student-level-insights-3",
+    "question": "Revenue per student breakdown",
+    "language": "en",
+    "detected_intent": "revenue_per_student_breakdown",
+    "sql_truth_query_key": "earnings_by_student_breakdown",
+    "truth_result": {
+      "breakdown": [
+        {
+          "student_name": "Leo Chen",
+          "total_earnings_dollars": 895
+        },
+        {
+          "student_name": "Noah Nguyen",
+          "total_earnings_dollars": 840
+        },
+        {
+          "student_name": "Alice Wu",
+          "total_earnings_dollars": 365
+        },
+        {
+          "student_name": "Ava Park",
+          "total_earnings_dollars": 340
+        }
+      ]
+    },
+    "llm_answer": "Revenue by student: Leo Chen: $895; Noah Nguyen: $840; Alice Wu: $365; Ava Park: $340.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-student-level-insights-4",
+    "question": "Top 3 students by revenue?",
+    "language": "en",
+    "detected_intent": "revenue_concentration",
+    "sql_truth_query_key": "revenue_concentration_top3",
+    "truth_result": {
+      "top3_percent": 86.07
+    },
+    "llm_answer": "You have 19 earnings entries, totaling $2,440.",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "irrelevant_default_template"
+    ]
+  },
+  {
+    "id": "cat-cash-flow-stability-0",
+    "question": "Is my income stable or volatile?",
+    "language": "en",
+    "detected_intent": "cash_flow",
+    "sql_truth_query_key": "cash_flow_summary",
+    "truth_result": {
+      "avg_weekly_dollars": 21.03,
+      "trend": "unknown"
+    },
+    "llm_answer": "You earn on average $21.06 per week. Your income trend looks down.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-cash-flow-stability-1",
+    "question": "What's my cash flow trend?",
+    "language": "en",
+    "detected_intent": "cash_flow",
+    "sql_truth_query_key": "cash_flow_summary",
+    "truth_result": {
+      "avg_weekly_dollars": 21.03,
+      "trend": "unknown"
+    },
+    "llm_answer": "You earn on average $21.06 per week. Your income trend looks down.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-cash-flow-stability-2",
+    "question": "How much do I earn on average per week?",
+    "language": "en",
+    "detected_intent": "cash_flow",
+    "sql_truth_query_key": "cash_flow_summary",
+    "truth_result": {
+      "avg_weekly_dollars": 21.03,
+      "trend": "unknown"
+    },
+    "llm_answer": "You earn on average $21.06 per week. Your income trend looks down.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-operational-metrics-0",
+    "question": "How many lessons did I teach last month?",
+    "language": "en",
+    "detected_intent": "lessons_count",
+    "sql_truth_query_key": "total_lessons",
+    "truth_result": {
+      "lessons_count": 2
+    },
+    "llm_answer": "You taught 2 lessons (last_month).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-operational-metrics-1",
+    "question": "What's my revenue per lesson?",
+    "language": "en",
+    "detected_intent": "revenue_per_lesson",
+    "sql_truth_query_key": "revenue_per_lesson",
+    "truth_result": {
+      "revenue_per_lesson_dollars": 138.33
+    },
+    "llm_answer": "Your average revenue per lesson is $138.33.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-operational-metrics-2",
+    "question": "What day of the week do I earn the most?",
+    "language": "en",
+    "detected_intent": "best_day_of_week",
+    "sql_truth_query_key": "best_day_of_week",
+    "truth_result": {
+      "day_name": "Saturday",
+      "total_earnings_dollars": 520
+    },
+    "llm_answer": "Saturday earns you the most: $520 total.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-operational-metrics-3",
+    "question": "Average lessons per week",
+    "language": "en",
+    "detected_intent": "avg_lessons_per_week",
+    "sql_truth_query_key": "avg_lessons_per_week",
+    "truth_result": {
+      "avg_lessons_per_week": 0.38,
+      "weeks": 8
+    },
+    "llm_answer": "You average 0.38 lessons per week (Jan 1 – today 2026).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-tax-financial-planning-0",
+    "question": "How much should I set aside for taxes?",
+    "language": "en",
+    "detected_intent": "tax_estimate",
+    "sql_truth_query_key": "estimated_tax_set_aside",
+    "truth_result": {
+      "estimated_tax_yearly_dollars": 208.07,
+      "monthly_set_aside_dollars": 17.34,
+      "tax_rate_percent": 20
+    },
+    "llm_answer": "Estimated yearly taxes: $208.07. Set aside about $17.34/month.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-tax-financial-planning-1",
+    "question": "Estimated tax on my income this year?",
+    "language": "en",
+    "detected_intent": "tax_estimate",
+    "sql_truth_query_key": "estimated_tax_set_aside",
+    "truth_result": {
+      "estimated_tax_yearly_dollars": 208.07,
+      "monthly_set_aside_dollars": 17.34,
+      "tax_rate_percent": 20
+    },
+    "llm_answer": "Estimated yearly taxes: $208.07. Set aside about $17.34/month.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-tax-financial-planning-2",
+    "question": "What do I need to set aside for quarterly taxes?",
+    "language": "en",
+    "detected_intent": "tax_estimate",
+    "sql_truth_query_key": "estimated_tax_set_aside",
+    "truth_result": {
+      "estimated_tax_yearly_dollars": 208.07,
+      "monthly_set_aside_dollars": 17.34,
+      "tax_rate_percent": 20
+    },
+    "llm_answer": "Estimated yearly taxes: $208.07. Set aside about $17.34/month.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-what-if-modeling-0",
+    "question": "If I add 3 new students, what's my new income?",
+    "language": "en",
+    "detected_intent": "what_if_add_students",
+    "sql_truth_query_key": "simulate_add_students",
+    "truth_result": {
+      "added_earnings_dollars": 0
+    },
+    "llm_answer": "Adding 3 new weekly student(s) would add about $15,860/year. Projected yearly would be ~$16,900.36.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-what-if-modeling-1",
+    "question": "If I take 2 weeks off, how does that affect my yearly earnings?",
+    "language": "en",
+    "detected_intent": "what_if_rate_change",
+    "sql_truth_query_key": "simulate_rate_increase",
+    "truth_result": {
+      "added_earnings_dollars": 0,
+      "baseline_hours": 3.75
+    },
+    "llm_answer": "Taking 2 weeks off would cost about $42.12 in income. Projected yearly would be ~$998.24.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-what-if-modeling-2",
+    "question": "What if I lose my top 2 students?",
+    "language": "en",
+    "detected_intent": "what_if_lose_students",
+    "sql_truth_query_key": "simulate_lose_students",
+    "truth_result": {
+      "lost_earnings_dollars": 895,
+      "students": [
+        "Leo Chen"
+      ]
+    },
+    "llm_answer": "I need an hourly rate to compute how many students you’d need. Please specify, e.g. “at $70/hour”.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "cat-what-if-modeling-3",
+    "question": "How many students do I need to reach $100k at $70/hr?",
+    "language": "en",
+    "detected_intent": "what_if_rate_change",
+    "sql_truth_query_key": "simulate_rate_increase",
+    "truth_result": {
+      "added_earnings_dollars": 262.5,
+      "baseline_hours": 3.75
+    },
+    "llm_answer": "At $70/hour (instead of ~$101.67/hr), you'd make about $-286.34 more per year (projected ~$754.02/year).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q001",
+    "question": "How much did I earn this month?",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": {
+      "total_earnings_dollars": 225
+    },
+    "llm_answer": "Your total revenue in that period was $225.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q002",
+    "question": "What are my total earnings for this month so far?",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": {
+      "total_earnings_dollars": 225
+    },
+    "llm_answer": "Your total revenue in that period was $225.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q003",
+    "question": "Show me my revenue for February 2026.",
+    "language": "en",
+    "expected_intent": "earnings_in_month",
+    "detected_intent": "earnings_in_month",
+    "sql_truth_query_key": "earnings_by_month",
+    "truth_result": {
+      "total_earnings_dollars": 225,
+      "year": 2026,
+      "month": 2,
+      "start": "2026-02-01",
+      "end": "2026-02-28"
+    },
+    "llm_answer": "Your earnings in February 2026 were $225.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q004",
+    "question": "How much have I made year to date?",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "total_earnings_ytd",
+    "truth_result": {
+      "total_earnings_dollars": 415,
+      "year": 2026
+    },
+    "llm_answer": "Your total revenue in that period was $415.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q005",
+    "question": "What were my total earnings in 2025?",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": {
+      "total_earnings_dollars": 925
+    },
+    "llm_answer": "Your total revenue in that period was $925.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q006",
+    "question": "Which student earned me the most this year?",
+    "language": "en",
+    "expected_intent": "top_student_by_earnings",
+    "detected_intent": "top_student_by_earnings",
+    "sql_truth_query_key": "top_student_by_earnings",
+    "truth_result": {
+      "top_student_name": "Leo Chen",
+      "total_earnings_dollars": 180
+    },
+    "llm_answer": "Leo Chen pays the most: $180 total.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q007",
+    "question": "Who is my highest paying student?",
+    "language": "en",
+    "expected_intent": "most_per_hour",
+    "detected_intent": "most_per_hour",
+    "sql_truth_query_key": "highest_hourly_student",
+    "truth_result": {
+      "student_name": "Leo Chen",
+      "rate_dollars": 120
+    },
+    "llm_answer": "Leo Chen pays the most per hour: $120/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q008",
+    "question": "Which student pays the lowest hourly rate?",
+    "language": "en",
+    "expected_intent": "lowest_student_by_hourly_rate",
+    "detected_intent": "lowest_student_by_hourly_rate",
+    "sql_truth_query_key": "lowest_hourly_student",
+    "truth_result": {
+      "student_name": "Alice Wu",
+      "rate_dollars": 85
+    },
+    "llm_answer": "Alice Wu has the lowest rate: $85/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q009",
+    "question": "Who brings in the least revenue?",
+    "language": "en",
+    "expected_intent": "lowest_student_by_revenue",
+    "detected_intent": "lowest_student_by_revenue",
+    "sql_truth_query_key": "lowest_student_by_revenue",
+    "truth_result": {
+      "student_name": "Alice Wu",
+      "total_earnings_dollars": 95
+    },
+    "llm_answer": "Alice Wu brings in the least revenue: $95 total.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q010",
+    "question": "What was my best month ever?",
+    "language": "en",
+    "expected_intent": "best_month",
+    "detected_intent": "best_month",
+    "sql_truth_query_key": "best_month",
+    "truth_result": {
+      "month_key": "2026-03",
+      "total_earnings_dollars": 340
+    },
+    "llm_answer": "Your best month was March 2026 with $340 in earnings.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q011",
+    "question": "Which month did I make the most money?",
+    "language": "en",
+    "expected_intent": "best_month",
+    "detected_intent": "best_month",
+    "sql_truth_query_key": "best_month",
+    "truth_result": {
+      "month_key": "2026-03",
+      "total_earnings_dollars": 340
+    },
+    "llm_answer": "Your best month was March 2026 with $340 in earnings.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q012",
+    "question": "What was my worst earning month?",
+    "language": "en",
+    "expected_intent": "worst_month",
+    "detected_intent": "worst_month",
+    "sql_truth_query_key": "worst_month",
+    "truth_result": {
+      "month_key": "2024-03",
+      "total_earnings_dollars": 80
+    },
+    "llm_answer": "Your worst month was March 2024 with $80 in earnings.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q013",
+    "question": "Am I on track to hit $100,000 this year?",
+    "language": "en",
+    "expected_intent": "on_track",
+    "detected_intent": "on_track",
+    "sql_truth_query_key": "on_track_projection",
+    "truth_result": {
+      "on_track": false,
+      "projected_yearly_dollars": 1040.36,
+      "target_dollars": 100000,
+      "gap_dollars": 98959.64
+    },
+    "llm_answer": "Not quite. Projected yearly is $1,040.36. You'd need about $98,959.64 more to reach $100,000.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q014",
+    "question": "Based on my current pace, what will I make this year?",
+    "language": "en",
+    "expected_intent": "forecast",
+    "detected_intent": "forecast",
+    "sql_truth_query_key": "forecast_projection",
+    "truth_result": {
+      "projected_monthly_dollars": 86.93,
+      "projected_yearly_dollars": 1040.36,
+      "avg_weekly_dollars": 21.06,
+      "trend": "down"
+    },
+    "llm_answer": "Projected monthly: $86.93. Yearly: $1,040.36.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q015",
+    "question": "If I raise my rates by $10 per hour, how much more would I make annually?",
+    "language": "en",
+    "expected_intent": "what_if_rate_change",
+    "detected_intent": "what_if_rate_change",
+    "sql_truth_query_key": "simulate_rate_increase",
+    "truth_result": {
+      "added_earnings_dollars": 240,
+      "baseline_hours": 24
+    },
+    "llm_answer": "At $111.67/hour (instead of ~$101.67/hr), you'd make about $162.48 more per year (projected ~$1,202.84/year).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q016",
+    "question": "How many total hours did I teach last month?",
+    "language": "en",
+    "expected_intent": "total_hours",
+    "detected_intent": "total_hours",
+    "sql_truth_query_key": "total_hours",
+    "truth_result": {
+      "total_hours": 2.75
+    },
+    "llm_answer": "You taught 2.75 total hours (last_month).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q017",
+    "question": "What’s my average revenue per lesson?",
+    "language": "en",
+    "expected_intent": "revenue_per_lesson",
+    "detected_intent": "revenue_per_lesson",
+    "sql_truth_query_key": "revenue_per_lesson",
+    "truth_result": {
+      "revenue_per_lesson_dollars": 138.33
+    },
+    "llm_answer": "Your average revenue per lesson is $138.33.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q018",
+    "question": "How much revenue do I generate per hour worked?",
+    "language": "en",
+    "expected_intent": "revenue_per_hour",
+    "detected_intent": "revenue_per_hour",
+    "sql_truth_query_key": "earnings_per_hour",
+    "truth_result": {
+      "revenue_per_hour_dollars": 110.67
+    },
+    "llm_answer": "You generate $110.67 per hour worked.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q019",
+    "question": "How much should I set aside for taxes this year?",
+    "language": "en",
+    "expected_intent": "tax_estimate",
+    "detected_intent": "tax_estimate",
+    "sql_truth_query_key": "estimated_tax_set_aside",
+    "truth_result": {
+      "estimated_tax_yearly_dollars": 208.07,
+      "monthly_set_aside_dollars": 17.34,
+      "tax_rate_percent": 20
+    },
+    "llm_answer": "Estimated yearly taxes: $208.07. Set aside about $17.34/month.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q020",
+    "question": "What’s my estimated quarterly tax payment?",
+    "language": "en",
+    "expected_intent": "tax_estimate",
+    "detected_intent": "tax_estimate",
+    "sql_truth_query_key": "estimated_tax_set_aside",
+    "truth_result": {
+      "estimated_tax_yearly_dollars": 208.07,
+      "monthly_set_aside_dollars": 17.34,
+      "tax_rate_percent": 20
+    },
+    "llm_answer": "Estimated yearly taxes: $208.07. Set aside about $17.34/month.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q021",
+    "question": "If I add 3 new weekly students at $70/hr, what would my yearly income be?",
+    "language": "en",
+    "expected_intent": "what_if_add_students",
+    "detected_intent": "what_if_add_students",
+    "sql_truth_query_key": "simulate_add_students",
+    "truth_result": {
+      "added_earnings_dollars": 10920
+    },
+    "llm_answer": "Adding 3 new weekly student(s) would add about $15,860/year. Projected yearly would be ~$16,900.36.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q022",
+    "question": "What happens if I lose my top 2 students?",
+    "language": "en",
+    "expected_intent": "what_if_lose_students",
+    "detected_intent": "what_if_lose_students",
+    "sql_truth_query_key": "simulate_lose_students",
+    "truth_result": {
+      "lost_earnings_dollars": 1735,
+      "students": [
+        "Leo Chen",
+        "Noah Nguyen"
+      ]
+    },
+    "llm_answer": "I need an hourly rate to compute how many students you’d need. Please specify, e.g. “at $70/hour”.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q023",
+    "question": "How much more did I make in 2025 than 2024?",
+    "language": "en",
+    "expected_intent": "percent_change_yoy",
+    "detected_intent": "percent_change_yoy",
+    "sql_truth_query_key": "yoy_growth_percent",
+    "truth_result": {
+      "year_a": 2024,
+      "year_b": 2025,
+      "total_a_dollars": 630,
+      "total_b_dollars": 925,
+      "percent_change": 46.83,
+      "dollar_change_dollars": 295
+    },
+    "llm_answer": "You made $295 more in 2025 than 2024.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q024",
+    "question": "What percent did my income grow from 2024 to 2025?",
+    "language": "en",
+    "expected_intent": "percent_change_yoy",
+    "detected_intent": "percent_change_yoy",
+    "sql_truth_query_key": "yoy_growth_percent",
+    "truth_result": {
+      "year_a": 2024,
+      "year_b": 2025,
+      "total_a_dollars": 630,
+      "total_b_dollars": 925,
+      "percent_change": 46.83,
+      "dollar_change_dollars": 295
+    },
+    "llm_answer": "You made 46.8% more in 2025 than 2024.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q025",
+    "question": "What are my earnings in January?",
+    "language": "en",
+    "expected_intent": "clarification",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "clarification",
+    "truth_result": null,
+    "llm_answer": "Which year do you mean for that month?",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q026",
+    "question": "How much did Leo Chen earn me?",
+    "language": "en",
+    "expected_intent": "clarification",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "clarification",
+    "truth_result": null,
+    "llm_answer": "Which timeframe should I use for that student: this month, last month, year-to-date, or a specific year?",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q027",
+    "question": "How much have I made?",
+    "language": "en",
+    "expected_intent": "clarification",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "clarification",
+    "truth_result": null,
+    "llm_answer": "Which period do you mean: this month, last month, year-to-date, or a specific year?",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q031",
+    "question": "how much i make feb 2026",
+    "language": "en",
+    "expected_intent": "earnings_in_month",
+    "detected_intent": "earnings_in_month",
+    "sql_truth_query_key": "earnings_by_month",
+    "truth_result": {
+      "total_earnings_dollars": 225,
+      "year": 2026,
+      "month": 2,
+      "start": "2026-02-01",
+      "end": "2026-02-28"
+    },
+    "llm_answer": "Your earnings in February 2026 were $225.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q032",
+    "question": "who my best student",
+    "language": "en",
+    "expected_intent": "top_student_by_earnings",
+    "detected_intent": "top_student_by_earnings",
+    "sql_truth_query_key": "top_student_by_earnings",
+    "truth_result": {
+      "top_student_name": "Leo Chen",
+      "total_earnings_dollars": 180
+    },
+    "llm_answer": "Leo Chen pays the most: $180 total.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q033",
+    "question": "top earning month ever",
+    "language": "en",
+    "expected_intent": "best_month",
+    "detected_intent": "best_month",
+    "sql_truth_query_key": "best_month",
+    "truth_result": {
+      "month_key": "2026-03",
+      "total_earnings_dollars": 340
+    },
+    "llm_answer": "Your best month was March 2026 with $340 in earnings.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q034",
+    "question": "average hourly rate overall",
+    "language": "en",
+    "expected_intent": "avg_hourly_rate",
+    "detected_intent": "avg_hourly_rate",
+    "sql_truth_query_key": "avg_hourly_rate",
+    "truth_result": {
+      "avg_hourly_rate_dollars": 110.67
+    },
+    "llm_answer": "Your average hourly rate is $110.67/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q035",
+    "question": "¿Cuánto gané este mes?",
+    "language": "es",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": {
+      "total_earnings_dollars": 225
+    },
+    "llm_answer": "Your total revenue in that period was $225.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q036",
+    "question": "¿Quién es mi estudiante que paga más por hora?",
+    "language": "es",
+    "expected_intent": "most_per_hour",
+    "detected_intent": "top_student_by_earnings",
+    "sql_truth_query_key": "highest_hourly_student",
+    "truth_result": {
+      "student_name": "Leo Chen",
+      "rate_dollars": 120
+    },
+    "llm_answer": "Leo Chen pays the most: $180 total.",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "intent_mismatch:top_student_by_earnings"
+    ]
+  },
+  {
+    "id": "q037",
+    "question": "¿Cuánto he ganado este año hasta ahora?",
+    "language": "es",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "total_earnings_ytd",
+    "truth_result": {
+      "total_earnings_dollars": 415,
+      "year": 2026
+    },
+    "llm_answer": "Your total revenue in that period was $415.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q038",
+    "question": "Si aumento mis tarifas $10 por hora, ¿cuánto ganaría al año?",
+    "language": "es",
+    "expected_intent": "what_if_rate_change",
+    "detected_intent": "what_if_rate_change",
+    "sql_truth_query_key": "simulate_rate_increase",
+    "truth_result": {
+      "added_earnings_dollars": 240,
+      "baseline_hours": 24
+    },
+    "llm_answer": "You’re already on track. Current income in period: $415.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q039",
+    "question": "¿Cuál fue mi mejor mes?",
+    "language": "es",
+    "expected_intent": "best_month",
+    "detected_intent": "best_month",
+    "sql_truth_query_key": "best_month",
+    "truth_result": {
+      "month_key": "2026-03",
+      "total_earnings_dollars": 340
+    },
+    "llm_answer": "Your best month was March 2026 with $340 in earnings.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q040",
+    "question": "我这个月赚了多少钱？",
+    "language": "zh",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": {
+      "total_earnings_dollars": 225
+    },
+    "llm_answer": "Your total revenue in that period was $225.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q041",
+    "question": "今年到目前为止我赚了多少？",
+    "language": "zh",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "total_earnings_ytd",
+    "truth_result": {
+      "total_earnings_dollars": 415,
+      "year": 2026
+    },
+    "llm_answer": "Your total revenue in that period was $415.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q042",
+    "question": "哪个学生给我带来最多收入？",
+    "language": "zh",
+    "expected_intent": "top_student_by_earnings",
+    "detected_intent": "top_student_by_earnings",
+    "sql_truth_query_key": "top_student_by_earnings",
+    "truth_result": {
+      "top_student_name": "Leo Chen",
+      "total_earnings_dollars": 180
+    },
+    "llm_answer": "Leo Chen pays the most: $180 total.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q043",
+    "question": "如果我每小时涨价10美元，会多赚多少？",
+    "language": "zh",
+    "expected_intent": "what_if_rate_change",
+    "detected_intent": "what_if_rate_change",
+    "sql_truth_query_key": "simulate_rate_increase",
+    "truth_result": {
+      "added_earnings_dollars": 240,
+      "baseline_hours": 24
+    },
+    "llm_answer": "At $111.67/hour (instead of ~$101.67/hr), you'd make about $162.48 more per year (projected ~$1,202.84/year).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q044",
+    "question": "我去年赚了多少？",
+    "language": "zh",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": {
+      "total_earnings_dollars": 925
+    },
+    "llm_answer": "Your total revenue in that period was $925.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q045",
+    "question": "What percentage of my revenue comes from my top 3 students?",
+    "language": "en",
+    "expected_intent": "revenue_concentration",
+    "detected_intent": "percent_change_yoy",
+    "sql_truth_query_key": "revenue_concentration_top3",
+    "truth_result": {
+      "top3_percent": 86.07
+    },
+    "llm_answer": "You made 4.3% less in 2026 than 2025.",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "intent_mismatch:percent_change_yoy"
+    ]
+  },
+  {
+    "id": "q046",
+    "question": "Which day of the week earns me the most money?",
+    "language": "en",
+    "expected_intent": "best_day_of_week",
+    "detected_intent": "best_day_of_week",
+    "sql_truth_query_key": "best_day_of_week",
+    "truth_result": {
+      "day_name": "Saturday",
+      "total_earnings_dollars": 520
+    },
+    "llm_answer": "Saturday earns you the most: $520 total.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q047",
+    "question": "Is my income stable or volatile?",
+    "language": "en",
+    "expected_intent": "cash_flow",
+    "detected_intent": "cash_flow",
+    "sql_truth_query_key": "cash_flow_summary",
+    "truth_result": {
+      "avg_weekly_dollars": 21.03,
+      "trend": "unknown"
+    },
+    "llm_answer": "You earn on average $21.06 per week. Your income trend looks down.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q048",
+    "question": "What’s my average monthly income this year?",
+    "language": "en",
+    "expected_intent": "avg_monthly_earnings",
+    "detected_intent": "avg_monthly_earnings",
+    "sql_truth_query_key": "avg_monthly_earnings",
+    "truth_result": {
+      "avg_monthly_earnings_dollars": 152.5
+    },
+    "llm_answer": "Your average monthly income is $207.5.",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "numeric_mismatch:avg_monthly_earnings_dollars"
+    ]
+  },
+  {
+    "id": "q049",
+    "question": "How much revenue did Noah Nguyen generate in 2026?",
+    "language": "en",
+    "expected_intent": "student_earnings_for_year",
+    "detected_intent": "student_earnings_for_year",
+    "sql_truth_query_key": "earnings_by_student_year",
+    "truth_result": {
+      "student_name": "Noah Nguyen",
+      "total_earnings_dollars": 290,
+      "year": 2026
+    },
+    "llm_answer": "Noah Nguyen generated $290 in 2026.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q050",
+    "question": "If I stop working Fridays, how much revenue would I lose?",
+    "language": "en",
+    "expected_intent": "what_if_lose_students",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "simulate_lose_students",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q051",
+    "question": "Total revenue in Jan 2026?",
+    "language": "en",
+    "expected_intent": "earnings_in_month",
+    "detected_intent": "earnings_in_month",
+    "sql_truth_query_key": "earnings_by_month",
+    "truth_result": {
+      "total_earnings_dollars": 320,
+      "year": 2026,
+      "month": 1,
+      "start": "2026-01-01",
+      "end": "2026-01-31"
+    },
+    "llm_answer": "Your earnings in January 2026 were $320.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q052",
+    "question": "How much did I bill in March 2026?",
+    "language": "en",
+    "expected_intent": "earnings_in_month",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_month",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q053",
+    "question": "Earnings for 2024 please.",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": {
+      "total_earnings_dollars": 630
+    },
+    "llm_answer": "Your total revenue in that period was $630.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q054",
+    "question": "Give me YTD revenue.",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "total_earnings_ytd",
+    "truth_result": {
+      "total_earnings_dollars": 415,
+      "year": 2026
+    },
+    "llm_answer": "Your total revenue in that period was $415.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q055",
+    "question": "Revenue this month versus last month",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q056",
+    "question": "Who paid me the most this month?",
+    "language": "en",
+    "expected_intent": "top_student_by_earnings",
+    "detected_intent": "top_student_by_earnings",
+    "sql_truth_query_key": "top_student_by_earnings",
+    "truth_result": {
+      "top_student_name": "Ava Park",
+      "total_earnings_dollars": 130
+    },
+    "llm_answer": "Ava Park pays the most: $130 total.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q057",
+    "question": "Who had the lowest rate?",
+    "language": "en",
+    "expected_intent": "lowest_student_by_hourly_rate",
+    "detected_intent": "lowest_student_by_hourly_rate",
+    "sql_truth_query_key": "lowest_hourly_student",
+    "truth_result": {
+      "student_name": "Alice Wu",
+      "rate_dollars": 85
+    },
+    "llm_answer": "Alice Wu has the lowest rate: $85/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q058",
+    "question": "Who charges the highest hourly fee?",
+    "language": "en",
+    "expected_intent": "most_per_hour",
+    "detected_intent": "most_per_hour",
+    "sql_truth_query_key": "highest_hourly_student",
+    "truth_result": {
+      "student_name": "Leo Chen",
+      "rate_dollars": 120
+    },
+    "llm_answer": "Leo Chen pays the most per hour: $120/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q059",
+    "question": "List revenue by student.",
+    "language": "en",
+    "expected_intent": "revenue_per_student_breakdown",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_student_breakdown",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q060",
+    "question": "Show the student earnings breakdown.",
+    "language": "en",
+    "expected_intent": "revenue_per_student_breakdown",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_student_breakdown",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q061",
+    "question": "What month was my peak income?",
+    "language": "en",
+    "expected_intent": "best_month",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "best_month",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q062",
+    "question": "When was my lowest month?",
+    "language": "en",
+    "expected_intent": "worst_month",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "worst_month",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q063",
+    "question": "Can you estimate my yearly taxes?",
+    "language": "en",
+    "expected_intent": "tax_estimate",
+    "detected_intent": "tax_estimate",
+    "sql_truth_query_key": "estimated_tax_set_aside",
+    "truth_result": {
+      "estimated_tax_yearly_dollars": 208.07,
+      "monthly_set_aside_dollars": 17.34,
+      "tax_rate_percent": 20
+    },
+    "llm_answer": "Estimated yearly taxes: $208.07. Set aside about $17.34/month.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q064",
+    "question": "How much tax should I set aside monthly?",
+    "language": "en",
+    "expected_intent": "tax_estimate",
+    "detected_intent": "tax_estimate",
+    "sql_truth_query_key": "estimated_tax_set_aside",
+    "truth_result": {
+      "estimated_tax_yearly_dollars": 208.07,
+      "monthly_set_aside_dollars": 17.34,
+      "tax_rate_percent": 20
+    },
+    "llm_answer": "Estimated yearly taxes: $208.07. Set aside about $17.34/month.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q065",
+    "question": "Will I hit 80k this year?",
+    "language": "en",
+    "expected_intent": "on_track",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "on_track_projection",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q066",
+    "question": "Projected yearly income at current pace?",
+    "language": "en",
+    "expected_intent": "forecast",
+    "detected_intent": "forecast",
+    "sql_truth_query_key": "forecast_projection",
+    "truth_result": {
+      "projected_monthly_dollars": 86.93,
+      "projected_yearly_dollars": 1040.36,
+      "avg_weekly_dollars": 21.06,
+      "trend": "down"
+    },
+    "llm_answer": "Projected monthly: $86.93. Yearly: $1,040.36.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q067",
+    "question": "If rates go up by $5/hr what changes?",
+    "language": "en",
+    "expected_intent": "what_if_rate_change",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "simulate_rate_increase",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q068",
+    "question": "Add two students at 60/hour and show yearly impact",
+    "language": "en",
+    "expected_intent": "what_if_add_students",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "simulate_add_students",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q069",
+    "question": "How many lessons do I average per week?",
+    "language": "en",
+    "expected_intent": "avg_lessons_per_week",
+    "detected_intent": "lessons_count",
+    "sql_truth_query_key": "avg_lessons_per_week",
+    "truth_result": {
+      "avg_lessons_per_week": 0.38,
+      "weeks": 8
+    },
+    "llm_answer": "You taught 3 lessons (Jan 1 – today 2026).",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "intent_mismatch:lessons_count"
+    ]
+  },
+  {
+    "id": "q070",
+    "question": "How many lessons did I have this year?",
+    "language": "en",
+    "expected_intent": "lessons_count",
+    "detected_intent": "lessons_count",
+    "sql_truth_query_key": "total_lessons",
+    "truth_result": {
+      "lessons_count": 3
+    },
+    "llm_answer": "You taught 3 lessons (2026 YTD).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q071",
+    "question": "Total teaching hours this year",
+    "language": "en",
+    "expected_intent": "total_hours",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "total_hours",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q072",
+    "question": "What's my earnings per hour this year?",
+    "language": "en",
+    "expected_intent": "revenue_per_hour",
+    "detected_intent": "revenue_per_hour",
+    "sql_truth_query_key": "earnings_per_hour",
+    "truth_result": {
+      "revenue_per_hour_dollars": 110.67
+    },
+    "llm_answer": "You generate $110.67 per hour worked.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q073",
+    "question": "Compare 2026 against 2025 by percent",
+    "language": "en",
+    "expected_intent": "percent_change_yoy",
+    "detected_intent": "percent_change_yoy",
+    "sql_truth_query_key": "yoy_growth_percent",
+    "truth_result": {
+      "year_a": 2025,
+      "year_b": 2026,
+      "total_a_dollars": 925,
+      "total_b_dollars": 885,
+      "percent_change": -4.32,
+      "dollar_change_dollars": -40
+    },
+    "llm_answer": "You made 4.3% less in 2026 than 2025.",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "percent_missing_or_mismatch"
+    ]
+  },
+  {
+    "id": "q074",
+    "question": "How much less did I make in 2024 than 2025?",
+    "language": "en",
+    "expected_intent": "percent_change_yoy",
+    "detected_intent": "percent_change_yoy",
+    "sql_truth_query_key": "yoy_growth_percent",
+    "truth_result": {
+      "year_a": 2024,
+      "year_b": 2025,
+      "total_a_dollars": 630,
+      "total_b_dollars": 925,
+      "percent_change": 46.83,
+      "dollar_change_dollars": 295
+    },
+    "llm_answer": "You made $295 more in 2025 than 2024.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q075",
+    "question": "Who is my weakest revenue student this year?",
+    "language": "en",
+    "expected_intent": "lowest_student_by_revenue",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "lowest_student_by_revenue",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q076",
+    "question": "Student with the highest hourly rate?",
+    "language": "en",
+    "expected_intent": "most_per_hour",
+    "detected_intent": "most_per_hour",
+    "sql_truth_query_key": "highest_hourly_student",
+    "truth_result": {
+      "student_name": "Leo Chen",
+      "rate_dollars": 120
+    },
+    "llm_answer": "Leo Chen pays the most per hour: $120/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q077",
+    "question": "Student with the lowest hourly rate?",
+    "language": "en",
+    "expected_intent": "lowest_student_by_hourly_rate",
+    "detected_intent": "lowest_student_by_hourly_rate",
+    "sql_truth_query_key": "lowest_hourly_student",
+    "truth_result": {
+      "student_name": "Alice Wu",
+      "rate_dollars": 85
+    },
+    "llm_answer": "Alice Wu has the lowest rate: $85/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q078",
+    "question": "Average hourly rate this year",
+    "language": "en",
+    "expected_intent": "avg_hourly_rate",
+    "detected_intent": "avg_hourly_rate",
+    "sql_truth_query_key": "avg_hourly_rate",
+    "truth_result": {
+      "avg_hourly_rate_dollars": 110.67
+    },
+    "llm_answer": "Your average hourly rate is $110.67/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q079",
+    "question": "Average monthly earnings in 2026",
+    "language": "en",
+    "expected_intent": "avg_monthly_earnings",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "avg_monthly_earnings",
+    "truth_result": {
+      "avg_monthly_earnings_dollars": 295
+    },
+    "llm_answer": "Your total revenue in that period was $885.",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "intent_mismatch:earnings_by_range",
+      "numeric_mismatch:avg_monthly_earnings_dollars"
+    ]
+  },
+  {
+    "id": "q080",
+    "question": "What day earns me most revenue?",
+    "language": "en",
+    "expected_intent": "best_day_of_week",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "best_day_of_week",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q081",
+    "question": "What was my revenue in 2026?",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": {
+      "total_earnings_dollars": 885
+    },
+    "llm_answer": "Your total revenue in that period was $885.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q082",
+    "question": "Monthly forecast based on current trend",
+    "language": "en",
+    "expected_intent": "forecast",
+    "detected_intent": "cash_flow",
+    "sql_truth_query_key": "forecast_projection",
+    "truth_result": {
+      "projected_monthly_dollars": 86.93,
+      "projected_yearly_dollars": 1040.36,
+      "avg_weekly_dollars": 21.06,
+      "trend": "down"
+    },
+    "llm_answer": "You earn on average $21.06 per week. Your income trend looks down.",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "intent_mismatch:cash_flow",
+      "numeric_mismatch:projected_yearly_dollars"
+    ]
+  },
+  {
+    "id": "q083",
+    "question": "Can I reach 120k this year?",
+    "language": "en",
+    "expected_intent": "on_track",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "on_track_projection",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q084",
+    "question": "What are my Q taxes if tax rate is 22%?",
+    "language": "en",
+    "expected_intent": "tax_estimate",
+    "detected_intent": "tax_estimate",
+    "sql_truth_query_key": "estimated_tax_set_aside",
+    "truth_result": {
+      "estimated_tax_yearly_dollars": 228.88,
+      "monthly_set_aside_dollars": 19.07,
+      "tax_rate_percent": 22
+    },
+    "llm_answer": "Estimated yearly taxes: $208.07. Set aside about $17.34/month.",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "numeric_mismatch:estimated_tax_yearly_dollars"
+    ]
+  },
+  {
+    "id": "q085",
+    "question": "If I add 5 students at 80/hr what happens yearly?",
+    "language": "en",
+    "expected_intent": "what_if_add_students",
+    "detected_intent": "what_if_add_students",
+    "sql_truth_query_key": "simulate_add_students",
+    "truth_result": {
+      "added_earnings_dollars": 20800
+    },
+    "llm_answer": "Adding 5 new weekly student(s) would add about $26,433.33/year. Projected yearly would be ~$27,473.69.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q086",
+    "question": "If rates increase $15/hour, annual impact?",
+    "language": "en",
+    "expected_intent": "what_if_rate_change",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "simulate_rate_increase",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q087",
+    "question": "If I lose top 1 student how much drops?",
+    "language": "en",
+    "expected_intent": "what_if_lose_students",
+    "detected_intent": "what_if_lose_students",
+    "sql_truth_query_key": "simulate_lose_students",
+    "truth_result": {
+      "lost_earnings_dollars": 895,
+      "students": [
+        "Leo Chen"
+      ]
+    },
+    "llm_answer": "I need an hourly rate to compute how many students you’d need. Please specify, e.g. “at $70/hour”.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q088",
+    "question": "Revenue concentration of top students",
+    "language": "en",
+    "expected_intent": "revenue_concentration",
+    "detected_intent": "revenue_concentration",
+    "sql_truth_query_key": "revenue_concentration_top3",
+    "truth_result": {
+      "top3_percent": 86.07
+    },
+    "llm_answer": "You have 19 earnings entries, totaling $2,440.",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "irrelevant_default_template"
+    ]
+  },
+  {
+    "id": "q089",
+    "question": "How many lessons this month?",
+    "language": "en",
+    "expected_intent": "lessons_count",
+    "detected_intent": "lessons_count",
+    "sql_truth_query_key": "total_lessons",
+    "truth_result": {
+      "lessons_count": 2
+    },
+    "llm_answer": "You taught 2 lessons (this_month).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q090",
+    "question": "How many hours this month?",
+    "language": "en",
+    "expected_intent": "total_hours",
+    "detected_intent": "total_hours",
+    "sql_truth_query_key": "total_hours",
+    "truth_result": {
+      "total_hours": 2.25
+    },
+    "llm_answer": "You taught 2.25 total hours (this_month).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q091",
+    "question": "What's my trend lately?",
+    "language": "en",
+    "expected_intent": "cash_flow",
+    "detected_intent": "cash_flow",
+    "sql_truth_query_key": "cash_flow_summary",
+    "truth_result": {
+      "avg_weekly_dollars": 21.03,
+      "trend": "unknown"
+    },
+    "llm_answer": "You earn on average $21.06 per week. Your income trend looks down.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q092",
+    "question": "Income volatility check",
+    "language": "en",
+    "expected_intent": "cash_flow",
+    "detected_intent": "cash_flow",
+    "sql_truth_query_key": "cash_flow_summary",
+    "truth_result": {
+      "avg_weekly_dollars": 21.03,
+      "trend": "unknown"
+    },
+    "llm_answer": "You earn on average $21.06 per week. Your income trend looks down.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q093",
+    "question": "how much this month",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q094",
+    "question": "ytd earnings",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "total_earnings_ytd",
+    "truth_result": {
+      "total_earnings_dollars": 415,
+      "year": 2026
+    },
+    "llm_answer": "Your total revenue in that period was $415.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q095",
+    "question": "best month",
+    "language": "en",
+    "expected_intent": "best_month",
+    "detected_intent": "best_month",
+    "sql_truth_query_key": "best_month",
+    "truth_result": {
+      "month_key": "2026-03",
+      "total_earnings_dollars": 340
+    },
+    "llm_answer": "Your best month was March 2026 with $340 in earnings.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q096",
+    "question": "worst month",
+    "language": "en",
+    "expected_intent": "worst_month",
+    "detected_intent": "worst_month",
+    "sql_truth_query_key": "worst_month",
+    "truth_result": {
+      "month_key": "2024-03",
+      "total_earnings_dollars": 80
+    },
+    "llm_answer": "Your worst month was March 2024 with $80 in earnings.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q097",
+    "question": "top student this year",
+    "language": "en",
+    "expected_intent": "top_student_by_earnings",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "top_student_by_earnings",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q098",
+    "question": "lowest revenue student this year",
+    "language": "en",
+    "expected_intent": "lowest_student_by_revenue",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "lowest_student_by_revenue",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q099",
+    "question": "earnings january",
+    "language": "en",
+    "expected_intent": "clarification",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "clarification",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q100",
+    "question": "student earnings",
+    "language": "en",
+    "expected_intent": "clarification",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "clarification",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q116",
+    "question": "Ingresos de febrero 2026",
+    "language": "es",
+    "expected_intent": "earnings_in_month",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_month",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q117",
+    "question": "Ganancias YTD",
+    "language": "es",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "total_earnings_ytd",
+    "truth_result": {
+      "total_earnings_dollars": 415,
+      "year": 2026
+    },
+    "llm_answer": "Your total revenue in that period was $415.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q118",
+    "question": "¿Cuál estudiante paga menos por hora?",
+    "language": "es",
+    "expected_intent": "lowest_student_by_hourly_rate",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "lowest_hourly_student",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q119",
+    "question": "Mi promedio por hora",
+    "language": "es",
+    "expected_intent": "avg_hourly_rate",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "avg_hourly_rate",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q120",
+    "question": "¿Estoy en camino a 90k?",
+    "language": "es",
+    "expected_intent": "on_track",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "on_track_projection",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q121",
+    "question": "¿Cuántas clases por semana en promedio?",
+    "language": "es",
+    "expected_intent": "avg_lessons_per_week",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "avg_lessons_per_week",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q122",
+    "question": "¿Cuánto gané en 2025?",
+    "language": "es",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q123",
+    "question": "¿Qué pasa si pierdo mis 2 mejores estudiantes?",
+    "language": "es",
+    "expected_intent": "what_if_lose_students",
+    "detected_intent": "what_if_lose_students",
+    "sql_truth_query_key": "simulate_lose_students",
+    "truth_result": {
+      "lost_earnings_dollars": 1735,
+      "students": [
+        "Leo Chen",
+        "Noah Nguyen"
+      ]
+    },
+    "llm_answer": "I didn't understand that scenario. Try: \"If I raise rates by $10/hour\" or \"How many students to reach $100,000?\"",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q124",
+    "question": "¿Cuál fue mi peor mes?",
+    "language": "es",
+    "expected_intent": "worst_month",
+    "detected_intent": "worst_month",
+    "sql_truth_query_key": "worst_month",
+    "truth_result": {
+      "month_key": "2024-03",
+      "total_earnings_dollars": 80
+    },
+    "llm_answer": "Your worst month was March 2024 with $80 in earnings.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q125",
+    "question": "¿Cuánto ganó Leo Chen?",
+    "language": "es",
+    "expected_intent": "clarification",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "clarification",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q126",
+    "question": "2026年2月收入",
+    "language": "zh",
+    "expected_intent": "earnings_in_month",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_month",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q127",
+    "question": "今年平均每周上几节课？",
+    "language": "zh",
+    "expected_intent": "avg_lessons_per_week",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "avg_lessons_per_week",
+    "truth_result": null,
+    "llm_answer": "Could you clarify what metric you want (earnings, student, rate, lessons, or forecast) and the timeframe?",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q128",
+    "question": "每小时平均收入是多少？",
+    "language": "zh",
+    "expected_intent": "avg_hourly_rate",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "avg_hourly_rate",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q129",
+    "question": "如果我涨价每小时5美元会怎样？",
+    "language": "zh",
+    "expected_intent": "what_if_rate_change",
+    "detected_intent": "what_if_rate_change",
+    "sql_truth_query_key": "simulate_rate_increase",
+    "truth_result": {
+      "added_earnings_dollars": 120,
+      "baseline_hours": 24
+    },
+    "llm_answer": "You’re already on track. Current income in period: $415.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q130",
+    "question": "我在2025年赚了多少？",
+    "language": "zh",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q028",
+    "question": "What about last month?",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q029",
+    "question": "And this year?",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "total_earnings_ytd",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q030",
+    "question": "What about the previous year?",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q101",
+    "question": "How much did I make last month?",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q102",
+    "question": "What about this month?",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "earnings_by_range",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q103",
+    "question": "And year to date?",
+    "language": "en",
+    "expected_intent": "earnings_by_range",
+    "detected_intent": "earnings_by_range",
+    "sql_truth_query_key": "total_earnings_ytd",
+    "truth_result": {
+      "total_earnings_dollars": 415,
+      "year": 2026
+    },
+    "llm_answer": "Your total revenue in that period was $415.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q104",
+    "question": "Who paid me most in 2026?",
+    "language": "en",
+    "expected_intent": "top_student_by_earnings",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "top_student_by_earnings",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q105",
+    "question": "What about 2025?",
+    "language": "en",
+    "expected_intent": "top_student_by_earnings",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "top_student_by_earnings",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q106",
+    "question": "and this year",
+    "language": "en",
+    "expected_intent": "top_student_by_earnings",
+    "detected_intent": "clarification",
+    "sql_truth_query_key": "top_student_by_earnings",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:clarification"
+    ]
+  },
+  {
+    "id": "q107",
+    "question": "How much did Leo Chen earn me YTD?",
+    "language": "en",
+    "expected_intent": "student_ytd",
+    "detected_intent": "student_ytd",
+    "sql_truth_query_key": "earnings_by_student_ytd",
+    "truth_result": {
+      "student_name": "Leo Chen",
+      "total_earnings_dollars": 370,
+      "year": 2026
+    },
+    "llm_answer": "Leo Chen earned you $370 so far this year (YTD).",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q108",
+    "question": "what about Noah Nguyen?",
+    "language": "en",
+    "expected_intent": "student_ytd",
+    "detected_intent": "student_ytd",
+    "sql_truth_query_key": "earnings_by_student_ytd",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification"
+    ]
+  },
+  {
+    "id": "q109",
+    "question": "and Alice Wu?",
+    "language": "en",
+    "expected_intent": "student_ytd",
+    "detected_intent": "student_ytd",
+    "sql_truth_query_key": "earnings_by_student_ytd",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification"
+    ]
+  },
+  {
+    "id": "q110",
+    "question": "What % more did I make in 2026 than 2025?",
+    "language": "en",
+    "expected_intent": "percent_change_yoy",
+    "detected_intent": "percent_change_yoy",
+    "sql_truth_query_key": "yoy_growth_percent",
+    "truth_result": {
+      "year_a": 2025,
+      "year_b": 2026,
+      "total_a_dollars": 925,
+      "total_b_dollars": 885,
+      "percent_change": -4.32,
+      "dollar_change_dollars": -40
+    },
+    "llm_answer": "You made 4.3% less in 2026 than 2025.",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "percent_missing_or_mismatch"
+    ]
+  },
+  {
+    "id": "q111",
+    "question": "what about 2025 vs 2024",
+    "language": "en",
+    "expected_intent": "percent_change_yoy",
+    "detected_intent": "percent_change_yoy",
+    "sql_truth_query_key": "yoy_growth_percent",
+    "truth_result": {
+      "year_a": 2024,
+      "year_b": 2025,
+      "total_a_dollars": 630,
+      "total_b_dollars": 925,
+      "percent_change": 46.83,
+      "dollar_change_dollars": 295
+    },
+    "llm_answer": "You made $295 more in 2025 than 2024.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q112",
+    "question": "and 2024 vs 2023",
+    "language": "en",
+    "expected_intent": "percent_change_yoy",
+    "detected_intent": "percent_change_yoy",
+    "sql_truth_query_key": "yoy_growth_percent",
+    "truth_result": {
+      "year_a": 2023,
+      "year_b": 2024,
+      "total_a_dollars": 0,
+      "total_b_dollars": 630,
+      "percent_change": null,
+      "dollar_change_dollars": 630
+    },
+    "llm_answer": "No earnings in 2023, so percent change isn't defined. You earned $630 in 2024.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q113",
+    "question": "What's my hourly rate average?",
+    "language": "en",
+    "expected_intent": "avg_hourly_rate",
+    "detected_intent": "avg_hourly_rate",
+    "sql_truth_query_key": "avg_hourly_rate",
+    "truth_result": {
+      "avg_hourly_rate_dollars": 110.67
+    },
+    "llm_answer": "Your average hourly rate is $110.67/hour.",
+    "verdict": "PASS",
+    "fail_reasons": []
+  },
+  {
+    "id": "q114",
+    "question": "what about Noah",
+    "language": "en",
+    "expected_intent": "student_hourly_rate",
+    "detected_intent": "avg_hourly_rate",
+    "sql_truth_query_key": "student_hourly_rate",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:avg_hourly_rate"
+    ]
+  },
+  {
+    "id": "q115",
+    "question": "and lowest student?",
+    "language": "en",
+    "expected_intent": "lowest_hourly_student",
+    "detected_intent": "avg_hourly_rate",
+    "sql_truth_query_key": "lowest_hourly_student",
+    "truth_result": null,
+    "llm_answer": "What would you like to know? (e.g. earnings comparison, top student, forecast)",
+    "verdict": "FAIL",
+    "fail_reasons": [
+      "unexpected_clarification",
+      "intent_mismatch:avg_hourly_rate"
+    ]
+  }
+]

@@ -5,6 +5,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
 import { signInSupabase, signUpSupabase, resendConfirmationSupabase } from "@/store/supabaseSync";
 import LogoIcon from "@/components/LogoIcon";
+import { Button } from "@/components/ui/Button";
 
 export default function Landing() {
   const { setUser } = useStoreContext();
@@ -133,22 +134,24 @@ export default function Landing() {
           </div>
 
           {/* Tabs: Log in | Sign up */}
-          <div className="landing__tabs">
-          <button
-            type="button"
-            className={`landing__tab ${mode === "login" ? "landing__tab--active" : ""}`}
-            onClick={() => { setMode("login"); setError(""); setResendMessage("idle"); }}
-          >
-            {t("landing.logIn")}
-          </button>
-          <button
-            type="button"
-            className={`landing__tab ${mode === "signup" ? "landing__tab--active" : ""}`}
-            onClick={() => { setMode("signup"); setError(""); setResendMessage("idle"); }}
-          >
-            {t("landing.signUp")}
-          </button>
-        </div>
+          <div className="landing__tabs" style={{ display: "flex", gap: 8, marginBottom: 20, background: "rgba(255, 255, 255, 0.45)", borderRadius: 999, padding: 6 }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => { setMode("login"); setError(""); setResendMessage("idle"); }}
+              style={{ flex: 1, boxShadow: mode === "login" ? "var(--shadow-subtle)" : "none", opacity: mode === "login" ? 1 : 0.75 }}
+            >
+              {t("landing.logIn")}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => { setMode("signup"); setError(""); setResendMessage("idle"); }}
+              style={{ flex: 1, boxShadow: mode === "signup" ? "var(--shadow-subtle)" : "none", opacity: mode === "signup" ? 1 : 0.75 }}
+            >
+              {t("landing.signUp")}
+            </Button>
+          </div>
 
         {mode === "login" ? (
           <form onSubmit={handleLogin} className="landing__form">
@@ -169,9 +172,9 @@ export default function Landing() {
                 className="landing__input"
                 style={passwordInputStyle}
               />
-              <button type="button" onClick={() => setShowLoginPassword((s) => !s)} style={eyeBtnStyle} aria-label={showLoginPassword ? "Hide password" : "Show password"} title={showLoginPassword ? "Hide password" : "Show password"}>
+              <Button type="button" variant="ghost" iconOnly size="sm" onClick={() => setShowLoginPassword((s) => !s)} style={eyeBtnStyle} aria-label={showLoginPassword ? "Hide password" : "Show password"} title={showLoginPassword ? "Hide password" : "Show password"}>
                 <EyeIcon show={!showLoginPassword} />
-              </button>
+              </Button>
             </div>
             {error && !isEmailNotConfirmed(error) && (
               <p className="landing__error" style={{ marginBottom: 12 }}>{error}</p>
@@ -181,30 +184,28 @@ export default function Landing() {
                 <p style={{ margin: "0 0 10px", fontSize: 14, color: "var(--text-muted)" }}>
                   Your email hasn't been confirmed yet. Check your inbox and spam folder, or resend the authentication email below.
                 </p>
-                <button
+                <Button
                   type="button"
-                  onClick={handleResendConfirmation}
+                  variant="primary"
+                  fullWidth
                   disabled={resendMessage === "sending" || resendMessage === "sent"}
-                  className="btn btn-primary"
-                  style={{ fontSize: 14, padding: "10px 20px", borderRadius: 10, fontWeight: 600, width: "100%", cursor: resendMessage === "sending" ? "wait" : "pointer", opacity: resendMessage === "sent" ? 0.6 : 1 }}
+                  loading={resendMessage === "sending"}
+                  onClick={handleResendConfirmation}
                 >
                   {resendMessage === "sending" ? "Sending..." : resendMessage === "sent" ? "Email sent - check your inbox" : "Resend Authentication Email"}
-                </button>
+                </Button>
                 {resendMessage === "error" && (
                   <p style={{ marginTop: 8, marginBottom: 0, fontSize: 13, color: "var(--text-muted)" }}>Something went wrong. Try again in a minute.</p>
                 )}
               </div>
             )}
-            <button type="submit" className="btn btn-primary landing__submit">
+            <Button type="submit" variant="primary" size="lg" fullWidth style={{ marginTop: 6, marginBottom: 14 }}>
               {t("landing.logInButton")}
-            </button>
+            </Button>
             <div className="landing__links">
               <Link to="/forgot-password" className="landing__link landing__link--muted">
                 {t("landing.forgotPassword")}
               </Link>
-              <button type="button" className="landing__link landing__link--muted" onClick={() => setMode("signup")}>
-                {t("landing.noAccount")}
-              </button>
             </div>
           </form>
         ) : (
@@ -237,19 +238,15 @@ export default function Landing() {
                 className="landing__input"
                 style={passwordInputStyle}
               />
-              <button type="button" onClick={() => setShowSignupPassword((s) => !s)} style={eyeBtnStyle} aria-label={showSignupPassword ? "Hide password" : "Show password"} title={showSignupPassword ? "Hide password" : "Show password"}>
+              <Button type="button" variant="ghost" iconOnly size="sm" onClick={() => setShowSignupPassword((s) => !s)} style={eyeBtnStyle} aria-label={showSignupPassword ? "Hide password" : "Show password"} title={showSignupPassword ? "Hide password" : "Show password"}>
                 <EyeIcon show={!showSignupPassword} />
-              </button>
+              </Button>
             </div>
             {error ? <p className="landing__error">{error}</p> : null}
-            <button type="submit" className="btn btn-primary landing__submit">
+            <Button type="submit" variant="primary" size="lg" fullWidth style={{ marginTop: 6, marginBottom: 14 }}>
               {t("landing.signUpButton")}
-            </button>
-            <div className="landing__links">
-              <button type="button" className="landing__link" onClick={() => setMode("login")}>
-                {t("landing.haveAccount")}
-              </button>
-            </div>
+            </Button>
+            <div className="landing__links" />
           </form>
         )}
         </div>

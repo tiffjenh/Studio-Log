@@ -263,6 +263,27 @@ input, select, textarea {
   border: 1px solid var(--border);
 }
 
+/* Unified button system: focus ring for accessibility */
+.ui-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Icon-only buttons: larger glyphs (+, ‹, ›) and ensure SVG icons display */
+.ui-button--icon-only {
+  font-size: 28px !important;
+}
+.ui-button__icon {
+  font-size: inherit !important;
+  line-height: 1;
+}
+.ui-button__icon svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+  flex-shrink: 0;
+}
+
 /* Toggle switch (mock style) */
 .toggle-wrap {
   display: inline-flex;

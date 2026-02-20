@@ -518,6 +518,46 @@ export function computeGeneralAnalytics(
   const calculations: string[] = [];
   const projectedYearly = baseMetrics?.projected_yearly ?? null;
 
+  // Total revenue last month
+  if (/\btotal\s+revenue\s+last\s+month|revenue\s+last\s+month|what\s+was\s+my\s+(?:total\s+)?revenue\s+last\s+month/i.test(q)) {
+    if (!earnings.length) {
+      return { directAnswer: "No earnings data yet.", calculations: [], assumptions: [], confidence: "low" };
+    }
+    const n = now();
+    const lastMonthStart = new Date(n.getFullYear(), n.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(n.getFullYear(), n.getMonth(), 0);
+    const start = lastMonthStart.toISOString().slice(0, 10);
+    const end = lastMonthEnd.toISOString().slice(0, 10);
+    const total = sumInRange(earnings, start, end);
+    const monthLabel = lastMonthStart.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    return {
+      directAnswer: `Your total revenue in ${monthLabel} was ${fmtDollars(roundTo2(total))}.`,
+      calculations: [`${start} – ${end}: ${fmtDollars(roundTo2(total))}`],
+      assumptions: [],
+      confidence: "high",
+    };
+  }
+
+  // Earnings in a specific month (e.g. "What were my earnings in Jan 2026?")
+  const earningsInMonthMatch = query.match(/\b(?:what\s+were\s+my\s+earnings\s+in|earnings\s+in)\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s*(\d{4})/i);
+  if (earningsInMonthMatch) {
+    const monthNames: Record<string, number> = { jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12 };
+    const monthStr = (earningsInMonthMatch[1] ?? "").toLowerCase().slice(0, 3);
+    const year = parseInt(earningsInMonthMatch[2] ?? String(now().getFullYear()), 10);
+    const monthNum = monthNames[monthStr] ?? 1;
+    const start = `${year}-${String(monthNum).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, monthNum, 0).getDate();
+    const end = `${year}-${String(monthNum).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    const total = sumInRange(earnings, start, end);
+    const label = new Date(year, monthNum - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    return {
+      directAnswer: `Your earnings in ${label} were ${fmtDollars(roundTo2(total))}.`,
+      calculations: [`${start} – ${end}: ${fmtDollars(roundTo2(total))}`],
+      assumptions: [],
+      confidence: "high",
+    };
+  }
+
   // On track to hit $X this year?
   if (/\bon\s+track|hit\s+\$|reach\s+\$|目标|达标|estoy\s+en\s+camino/i.test(q) && extractDollarAmounts(query).length > 0) {
     const target = extractDollarAmounts(query)[0]!;
@@ -592,13 +632,22 @@ export function computeGeneralAnalytics(
     };
   }
 
-  // Which student pays the most (using customer if present)
-  if (/\bstudent\s+(?:who\s+)?pays\s+the\s+most|who\s+pays\s+the\s+most|top\s+student|estudiante\s+que\s+más|学生.*最多/i.test(q)) {
+  // Which student pays the most (by total revenue); skip if asking per hour → use highest-rate branch below
+  if (!/\bper\s+hour|hourly\s+rate|por\s+hora/i.test(q) && /\bstudent\s+(?:who\s+)?pays\s+the\s+most|who\s+pays\s+the\s+most|who\s+paid\s+(?:me\s+)?the\s+most|earned\s+me\s+the\s+most|which\s+student\s+earned\s+me\s+the\s+most|top\s+student|estudiante\s+que\s+más|学生.*最多/i.test(q)) {
     if (!earnings.length) {
       return { directAnswer: "No earnings data yet.", calculations: [], assumptions: [], confidence: "low" };
     }
+    const lastMonth = /\blast\s+month|mes\s+pasado|上月/i.test(q);
+    const subset = lastMonth
+      ? earnings.filter((r) => {
+          const n = now();
+          const start = new Date(n.getFullYear(), n.getMonth() - 1, 1).toISOString().slice(0, 10);
+          const end = new Date(n.getFullYear(), n.getMonth(), 0).toISOString().slice(0, 10);
+          return r.date >= start && r.date <= end;
+        })
+      : earnings;
     const byCustomer = new Map<string, number>();
-    for (const r of earnings) {
+    for (const r of subset) {
       const key = (r.customer ?? "Unknown").trim() || "Unknown";
       byCustomer.set(key, (byCustomer.get(key) ?? 0) + r.amount);
     }
@@ -607,8 +656,9 @@ export function computeGeneralAnalytics(
     if (sorted.length === 1 && (name === "Unknown" || !name)) {
       return { directAnswer: "Earnings aren’t broken down by student in this data. Add student/customer info to see who pays the most.", calculations: [], assumptions: [], confidence: "low" };
     }
+    const periodLabel = lastMonth ? " last month" : "";
     return {
-      directAnswer: `${name} pays the most: ${fmtDollars(roundTo2(total!))} total.`,
+      directAnswer: `${name} ${lastMonth ? "paid you" : "pays"} the most${periodLabel}: ${fmtDollars(roundTo2(total!))} total.`,
       calculations: sorted.slice(0, 5).map(([n, v]) => `${n}: ${fmtDollars(roundTo2(v!))}`),
       assumptions: [],
       confidence: "high",
@@ -638,8 +688,28 @@ export function computeGeneralAnalytics(
     };
   }
 
-  // Lowest / highest hourly rate (requires students)
-  if (students && students.length > 0 && (/\blowest\s+rate|lowest\s+hourly|which\s+student\s+.*\s+lowest|谁.*最低|tarifa\s+más\s+baja/i.test(q) || /\bhighest\s+rate|most\s+per\s+hour|which\s+student\s+.*\s+most\s+per|谁.*最高|paga\s+más\s+por\s+hora/i.test(q))) {
+  // How much did [Student name] earn me YTD?
+  const ytdStudentMatch = q.match(/(?:how much did|how much has)\s+(.+?)\s+earn(?:ed)?\s+me\s+(?:ytd|year\s+to\s+date)/i);
+  if (ytdStudentMatch && earnings.length > 0) {
+    const namePart = ytdStudentMatch[1]!.trim();
+    const customers = [...new Set(earnings.map((r) => (r.customer ?? "").trim()).filter(Boolean))];
+    const match = customers.find((c) => namePart.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(namePart.toLowerCase()));
+    if (match) {
+      const y = now().getFullYear();
+      const ytd = earnings
+        .filter((r) => r.date.startsWith(String(y)) && ((r.customer ?? "").trim() === match))
+        .reduce((s, r) => s + r.amount, 0);
+      return {
+        directAnswer: `${match} earned you ${fmtDollars(roundTo2(ytd))} so far this year (YTD).`,
+        calculations: [`${y} YTD for ${match}: ${fmtDollars(roundTo2(ytd))}`],
+        assumptions: [],
+        confidence: "high",
+      };
+    }
+  }
+
+  // Lowest / highest hourly rate (requires students). "Who pays the least?" → lowest rate.
+  if (students && students.length > 0 && (/\blowest\s+rate|lowest\s+hourly|which\s+student\s+.*\s+lowest|who\s+pays\s+the\s+least|\bpays\s+the\s+least\b|谁.*最低|tarifa\s+más\s+baja/i.test(q) || /\bhighest\s+rate|most\s+per\s+hour|which\s+student\s+.*\s+most\s+per|谁.*最高|paga\s+más\s+por\s+hora/i.test(q))) {
     const byRate = [...students].map((s) => ({ name: s.name, rate: s.rateCents / 100 }));
     byRate.sort((a, b) => a.rate - b.rate);
     const isLowest = /\blowest|最低|más\s+baja/i.test(q);
@@ -780,6 +850,28 @@ export function computeGeneralAnalytics(
       confidence: "high",
     };
   }
+  // Revenue per student breakdown (list of students with totals, sorted)
+  if (/\brevenue\s+per\s+student\s+breakdown|per\s+student\s+breakdown|breakdown\s+(?:by\s+)?student/i.test(q)) {
+    if (!earnings.length) {
+      return { directAnswer: "No earnings data yet.", calculations: [], assumptions: [], confidence: "low" };
+    }
+    const byCustomer = new Map<string, number>();
+    for (const r of earnings) {
+      const key = (r.customer ?? "Unknown").trim() || "Unknown";
+      byCustomer.set(key, (byCustomer.get(key) ?? 0) + r.amount);
+    }
+    const sorted = [...byCustomer.entries()].sort((a, b) => b[1]! - a[1]!).filter(([n]) => n !== "Unknown" && n);
+    if (sorted.length === 0) {
+      return { directAnswer: "Earnings aren't broken down by student. Add student info for a per-student breakdown.", calculations: [], assumptions: [], confidence: "low" };
+    }
+    const lines = sorted.map(([n, v]) => `${n}: ${fmtDollars(roundTo2(v!))}`);
+    return {
+      directAnswer: `Revenue by student: ${lines.slice(0, 5).join("; ")}${sorted.length > 5 ? ` (and ${sorted.length - 5} more)` : ""}.`,
+      calculations: lines,
+      assumptions: [],
+      confidence: "high",
+    };
+  }
   if (/\brevenue\s+per\s+student|avg\s+revenue\s+per\s+student|每个学生.*收入/i.test(q)) {
     if (!earnings.length) {
       return { directAnswer: "No earnings data yet.", calculations: [], assumptions: [], confidence: "low" };
@@ -824,7 +916,7 @@ export function computeGeneralAnalytics(
   }
 
   // Best day of week (by earnings)
-  if (/\bbest\s+day\s+of\s+week|day\s+of\s+week\s+earns?|which\s+day\s+earns?|哪天.*最多|mejor\s+día/i.test(q)) {
+  if (/\bbest\s+day\s+of\s+week|day\s+of\s+week\s+earns?|which\s+day\s+earns?|what\s+day\s+of\s+(?:the\s+)?week\s+.*earn|what\s+day\s+.*earn\s+(?:the\s+)?most|哪天.*最多|mejor\s+día/i.test(q)) {
     if (!earnings.length) {
       return { directAnswer: "No earnings data yet.", calculations: [], assumptions: [], confidence: "low" };
     }

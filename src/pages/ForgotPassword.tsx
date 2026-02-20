@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "@/context/LanguageContext";
+import { Button } from "@/components/ui/Button";
 
 export default function ForgotPassword() {
   const { t } = useLanguage();
@@ -30,7 +31,7 @@ export default function ForgotPassword() {
               onChange={(e) => setEmail(e.target.value)}
               style={{ width: "100%", padding: 14, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16 }}
             />
-            <button type="submit" className="btn btn-primary" style={{ width: "100%" }}>{t("landing.sendResetLink")}</button>
+            <Button type="submit" variant="primary" fullWidth>{t("landing.sendResetLink")}</Button>
           </form>
         )}
         <div style={{ marginTop: 20 }}>

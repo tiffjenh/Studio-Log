@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Button, IconButton } from "@/components/ui/Button";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import LogoIcon from "@/components/LogoIcon";
@@ -25,6 +26,7 @@ import {
 import StudentAvatar from "@/components/StudentAvatar";
 import VoiceButton from "@/components/VoiceButton";
 import type { Lesson, Student } from "@/types";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/Icons";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -198,27 +200,27 @@ export default function Dashboard() {
           {isToday ? t("dashboard.todaysLessons") : t("dashboard.lessons")}
         </h3>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 1, marginLeft: "auto", minWidth: 0 }}>
-          <button
+          <IconButton
             type="button"
             onClick={() => setSelectedDate((d) => addDays(d, -1))}
-            className="pill"
-            style={{ minWidth: 32, minHeight: 32, padding: "6px 8px", fontSize: 14 }}
+            variant="secondary"
+            size="sm"
             aria-label="Previous day"
           >
-            ‹
-          </button>
+            <ChevronLeftIcon />
+          </IconButton>
           <span style={{ minWidth: 88, textAlign: "center", fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>
             {DAY_NAMES[dayOfWeek]}, {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           </span>
-          <button
+          <IconButton
             type="button"
             onClick={() => setSelectedDate((d) => addDays(d, 1))}
-            className="pill"
-            style={{ minWidth: 32, minHeight: 32, padding: "6px 8px", fontSize: 14 }}
+            variant="secondary"
+            size="sm"
             aria-label="Next day"
           >
-            ›
-          </button>
+            <ChevronRightIcon />
+          </IconButton>
         </span>
       </div>
       {todaysStudents.length === 0 ? (
@@ -239,7 +241,7 @@ export default function Dashboard() {
         })
       )}
       <div style={{ marginTop: 28, textAlign: "center" }}>
-        <Link to="/calendar" className="btn btn-primary pill" style={{ textDecoration: "none", borderRadius: "var(--radius-pill)" }}>{t("dashboard.viewCalendar")}</Link>
+        <Button to="/calendar" variant="primary" size="lg">{t("dashboard.viewCalendar")}</Button>
       </div>
       <VoiceButton dateKey={dateKey} dayOfWeek={dayOfWeek} onDateChange={setSelectedDate} />
     </>

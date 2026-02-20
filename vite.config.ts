@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5174,
-    strictPort: true,
+    strictPort: false, // use next available port if 5174 is in use
     headers: { "Cache-Control": "no-store" },
   },
   resolve: {

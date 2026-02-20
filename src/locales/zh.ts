@@ -9,7 +9,7 @@ export default {
   },
   landing: {
     title: "Studio Log",
-    tagline: "記錄課程與收入",
+    tagline: "track students, clients and earnings",
     logIn: "登入",
     signUp: "註冊",
     logInButton: "登入",
@@ -22,8 +22,6 @@ export default {
     forgotPasswordHint: "輸入您的電子郵件，我們將寄送重設密碼連結給您。",
     sendResetLink: "寄送重設連結",
     backToLogin: "返回登入",
-    noAccount: "沒有帳號？註冊",
-    haveAccount: "已有帳號？登入",
   },
   common: {
     save: "儲存",

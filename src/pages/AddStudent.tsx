@@ -6,6 +6,8 @@ import { parseStudentCSV, rowToStudentWithError } from "@/utils/csvImport";
 import { downloadCsv, getStudentTemplateCsv } from "@/utils/importTemplates";
 import { getCurrencyByCode, getStoredCurrencyCode } from "@/utils/currencies";
 import type { DaySchedule, Student } from "@/types";
+import { Button, IconButton } from "@/components/ui/Button";
+import { DownloadIcon } from "@/components/ui/Icons";
 
 const DURATIONS = [30, 45, 60, 90, 120];
 const DURATION_LABELS: Record<number, string> = { 30: "30 min", 45: "45 min", 60: "1 hr", 90: "1.5 hr", 120: "2 hr" };
@@ -234,21 +236,19 @@ export default function AddStudent() {
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, ...fontStyle }}>{t("addStudent.title")}</h1>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} />
-          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} className="pill" style={{ minHeight: 40, background: "#ffffff", ...fontStyle }} title={t("students.importStudents")}>
-            {importing ? "..." : t("students.importStudents")}
-          </button>
-          <button
+          <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} variant="secondary" size="sm" loading={importing} title={t("students.importStudents")}>
+            {t("students.importStudents")}
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => downloadCsv("students-template.csv", getStudentTemplateCsv())}
-            style={{ minHeight: 40, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: "1px solid var(--border)", background: "transparent", cursor: "pointer", fontSize: 14, ...fontStyle }}
+            leftIcon={<DownloadIcon size={7} />}
+            style={{ gap: 6, minHeight: 40, height: 40 }}
           >
-            <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
             Template
-          </button>
+          </Button>
         </div>
       </div>
       {importing && importProgress && (
@@ -289,48 +289,46 @@ export default function AddStudent() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <span style={{ fontWeight: 700, fontSize: 15, ...fontStyle }}>{DAYS_FULL[entry.dayOfWeek]} Lesson</span>
               {scheduleEntries.length > 1 && (
-                <button type="button" onClick={() => removeScheduleEntry(entry.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#dc2626", padding: "4px 8px", fontWeight: 600, ...fontStyle }}>Delete Day</button>
+                <Button type="button" variant="danger" size="sm" onClick={() => removeScheduleEntry(entry.id)}>Delete Day</Button>
               )}
             </div>
             <label style={labelStyle}>{t("addStudent.dayOfWeek")}</label>
             <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
               {DAY_SHORT.map((label, i) => (
-                <button key={i} type="button" onClick={() => updateEntry(entry.id, "dayOfWeek", i)} className={entry.dayOfWeek === i ? "pill pill--active" : "pill"} style={{ flex: "1 1 0", minWidth: 0, padding: "8px 2px", fontSize: 13, textAlign: "center", ...fontStyle }}>
+                <Button key={i} type="button" variant="tab" size="sm" active={entry.dayOfWeek === i} onClick={() => updateEntry(entry.id, "dayOfWeek", i)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>
                   {label}
-                </button>
+                </Button>
               ))}
             </div>
             <label style={labelStyle}>{t("addStudent.lessonDuration")}</label>
             <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
               {DURATIONS.map((m) => (
-                <button key={m} type="button" onClick={() => updateEntry(entry.id, "durationMinutes", m)} className={entry.durationMinutes === m ? "pill pill--active" : "pill"} style={{ flex: "1 1 0", minWidth: 0, padding: "8px 2px", fontSize: 13, textAlign: "center", ...fontStyle }}>
+                <Button key={m} type="button" variant="tab" size="sm" active={entry.durationMinutes === m} onClick={() => updateEntry(entry.id, "durationMinutes", m)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>
                   {DURATION_LABELS[m]}
-                </button>
+                </Button>
               ))}
             </div>
             <label style={labelStyle}>{t("common.rate")}</label>
-            <button type="button" onClick={() => openRateModal(entry.id)} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+            <Button type="button" variant="secondary" size="md" onClick={() => openRateModal(entry.id)} fullWidth style={{ marginBottom: 16, textAlign: "left", justifyContent: "flex-start" }}>
               {entry.rateDollars ? `${currencySymbol}${entry.rateDollars}` : `${currencySymbol}0`}
-            </button>
+            </Button>
             <label style={labelStyle}>{t("common.time")}</label>
-            <button type="button" onClick={() => openTimePicker(entry.id)} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 0, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+            <Button type="button" variant="secondary" size="md" onClick={() => openTimePicker(entry.id)} fullWidth style={{ textAlign: "left", justifyContent: "flex-start" }}>
               {entry.timeOfDay || "5:00 PM"}
-            </button>
+            </Button>
           </div>
         ))}
-        <button type="button" onClick={addScheduleEntry} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--text-muted)", marginBottom: 20, ...fontStyle }}>
-          + Day
-        </button>
+        <Button type="button" variant="primary" size="sm" onClick={addScheduleEntry} leftIcon={<span>+</span>} style={{ marginBottom: 20 }}>Day</Button>
 
         {error ? <p style={{ color: "#dc2626", marginBottom: 16, ...fontStyle }}>{error}</p> : null}
-        <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 24, ...fontStyle }}>{t("common.save")}</button>
+        <Button type="submit" variant="secondary" size="sm" fullWidth style={{ marginTop: 24 }}>{t("common.save")}</Button>
       </form>
 
       {rateModalOpen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setRateModalOpen(false)}>
           <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-              <button type="button" onClick={() => setRateModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>&times;</button>
+              <IconButton type="button" variant="ghost" size="sm" onClick={() => setRateModalOpen(false)} aria-label="Close">&times;</IconButton>
             </div>
             <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text-muted)" }}>{scheduleEntries.length > 1 ? `${DAY_SHORT[scheduleEntries.find((e) => e.id === rateModalDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}{t("common.rate")}</p>
             <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 16, color: "var(--text)" }}>
@@ -338,13 +336,13 @@ export default function AddStudent() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                <button key={n} type="button" onClick={() => setRateKeypadValue((v) => v + n)} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>{n}</button>
+                <Button key={n} type="button" variant="secondary" size="sm" onClick={() => setRateKeypadValue((v) => v + n)}>{n}</Button>
               ))}
-              <button type="button" onClick={() => setRateKeypadValue((v) => (v.includes(".") ? v : v + "."))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, cursor: "pointer", ...fontStyle }}>.</button>
-              <button type="button" onClick={() => setRateKeypadValue((v) => v + "0")} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>0</button>
-              <button type="button" onClick={() => setRateKeypadValue((v) => v.slice(0, -1))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "rgba(180, 160, 180, 0.12)", fontSize: 18, cursor: "pointer", ...fontStyle }}>&larr;</button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setRateKeypadValue((v) => (v.includes(".") ? v : v + "."))}>.</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setRateKeypadValue((v) => v + "0")}>0</Button>
+              <Button type="button" variant="tab" size="sm" onClick={() => setRateKeypadValue((v) => v.slice(0, -1))}>&larr;</Button>
             </div>
-            <button type="button" onClick={applyRate} className="btn btn-primary" style={{ width: "100%", ...fontStyle }}>{t("common.setRate")}</button>
+            <Button type="button" variant="primary" size="md" onClick={applyRate} fullWidth>{t("common.setRate")}</Button>
           </div>
         </div>
       )}
@@ -353,7 +351,7 @@ export default function AddStudent() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setTimePickerOpen(false)}>
           <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-              <button type="button" onClick={() => setTimePickerOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>&times;</button>
+              <IconButton type="button" variant="ghost" size="sm" onClick={() => setTimePickerOpen(false)} aria-label="Close">&times;</IconButton>
             </div>
             <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>{scheduleEntries.length > 1 ? `${DAY_SHORT[scheduleEntries.find((e) => e.id === timePickerDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}{t("common.selectTime")}</p>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
@@ -367,13 +365,13 @@ export default function AddStudent() {
                 </select>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <button type="button" onClick={() => setTimePickerAmPm("AM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: timePickerAmPm === "AM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, ...fontStyle }}>AM</button>
-                <button type="button" onClick={() => setTimePickerAmPm("PM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: timePickerAmPm === "PM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, ...fontStyle }}>PM</button>
+                <Button type="button" variant="tab" size="sm" active={timePickerAmPm === "AM"} onClick={() => setTimePickerAmPm("AM")}>AM</Button>
+                <Button type="button" variant="tab" size="sm" active={timePickerAmPm === "PM"} onClick={() => setTimePickerAmPm("PM")}>PM</Button>
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button type="button" onClick={() => setTimePickerOpen(false)} style={{ padding: "10px 20px", background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", ...fontStyle }}>{t("common.cancel")}</button>
-              <button type="button" onClick={applyTime} className="btn btn-primary" style={{ padding: "10px 20px", ...fontStyle }}>{t("common.ok")}</button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setTimePickerOpen(false)}>{t("common.cancel")}</Button>
+              <Button type="button" variant="primary" size="sm" onClick={applyTime}>{t("common.ok")}</Button>
             </div>
           </div>
         </div>

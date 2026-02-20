@@ -53,3 +53,44 @@ npm run preview
 ```
 
 Output is in `dist/`. Deploy that folder to any static host (Vercel, Netlify, GitHub Pages, etc.).
+
+## Voice Commands Supported
+
+Homepage/dashboard voice uses a strict command pipeline: parse -> validate -> execute by `lesson_id` -> DB read-back verify.
+
+### Supported intents
+- **Attendance (single/multi/all):**
+  - "Chloe came today"
+  - "Chloe and Leo came today"
+  - "All students attended today"
+  - "Unmark Chloe and Leo"
+- **Lesson edits on a date (single occurrence):**
+  - "Make Chloe 45 minutes today"
+  - "Change Leo's lesson time to 3pm"
+  - "Move Leo from Friday Feb 18 to Sunday Feb 20 at 5pm for 1 hour"
+- **Lesson amount/rate for one date:**
+  - "Set Chloe rate to 60 per hour"
+
+### Safety and clarification behavior
+- If a name is ambiguous (e.g. two Emmas), voice asks a clarifying question and does not update.
+- If a student has no lesson on the target date, voice asks for clarification instead of guessing.
+- If command meaning is unclear (example: "Nobody came today"), voice asks confirmation wording.
+- The UI only reports success after post-execution verification passes.
+
+### Current limitations
+- Recurring/going-forward voice edits (for example "raise rate going forward") are not auto-applied yet.
+- Voice updates only existing lesson rows and does not create new recurring rows silently.
+
+## How We Guarantee Insight Correctness
+
+Insights now uses a SQL-first pipeline with verification:
+
+1. **Normalize + route**: deterministic rules detect intent, entities, and date range first.
+2. **Truth query execution**: canonical SQL truth-query definitions are mapped to deterministic metric execution against Supabase-scoped data (`user_id` filtered).
+3. **Response generation**: answers are templated from computed truth values only (no free-form numeric generation).
+4. **Verification gate**: low-confidence or ambiguous results trigger clarification instead of a guessed/default answer.
+5. **Regression tests**: a 60-question paraphrase matrix validates routing and blocks irrelevant default outputs.
+
+Debug mode:
+- Open dev tools and run `localStorage.setItem("insights_debug", "1")`, then refresh.
+- The Insights pipeline prints query, intent, extracted params, selected truth query, and summary result.

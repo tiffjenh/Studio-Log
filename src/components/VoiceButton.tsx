@@ -1,42 +1,24 @@
 /**
- * VoiceButton — microphone button that records speech, sends it to the
- * LLM-backed /api/voice endpoint, and applies attendance / edit actions.
- *
- * Uses the Web Speech API (SpeechRecognition) for on-device speech-to-text,
- * then calls the serverless function for NLP interpretation.
- *
- * Falls back to the local rule-based parser if the API is unavailable.
+ * VoiceButton — dashboard voice command entry.
+ * Uses strict command pipeline: parse -> validate -> execute -> verify.
  */
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import {
-  buildVoiceContext,
-  callVoiceAPI,
-  isVoiceLoggingResult,
-  type VoiceAPIResult,
-  type VoiceAPIAction,
-  type VoiceLoggingResult,
-  type UpdateLessonAction,
-} from "@/utils/voiceApi";
-import {
-  processVoiceTranscript,
-  buildScheduledLessons,
-  buildAllStudentList,
-} from "@/utils/voiceAssistant";
+import { Button, IconButton } from "@/components/ui/Button";
 import {
   getStudentsForDay,
   getLessonForStudentOnDate,
-  getEffectiveDurationMinutes,
-  getEffectiveRateCents,
-  toDateKey,
 } from "@/utils/earnings";
-import { parseVoiceCommand } from "@/lib/voice/parseVoiceCommand";
-import { resolveVoiceCommand } from "@/lib/voice/resolveEntities";
-import { executeVoiceIntent } from "@/lib/voice/executeVoiceIntent";
-import type { ResolvedVoiceCommand } from "@/lib/voice/types";
-import { VoiceConfirmationCard } from "@/components/VoiceAssistant";
+import { hasSupabase } from "@/lib/supabase";
+import { fetchLessons } from "@/store/supabaseSync";
+import {
+  handleVoiceCommand,
+  type DashboardContext,
+  type DashboardScheduledLesson,
+} from "@/lib/voice/homeVoicePipeline";
+import type { Lesson } from "@/types";
 
 /* ------------------------------------------------------------------ */
 /*  Web Speech API types (not in lib.dom for all TS configs)           */
@@ -75,7 +57,7 @@ declare global {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-type Phase = "idle" | "listening" | "processing" | "result" | "error" | "confirm";
+type Phase = "idle" | "listening" | "processing" | "result" | "error";
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -89,394 +71,54 @@ function langToSpeechLocale(lang: string): string {
 
 export default function VoiceButton({
   dateKey,
-  dayOfWeek,
+  dayOfWeek: _dayOfWeek,
   onDateChange,
 }: {
   dateKey: string;
   dayOfWeek: number;
   onDateChange?: (date: Date) => void;
 }) {
-  const { data, addLesson, updateLesson, reload } = useStoreContext();
+  const { data, updateLesson } = useStoreContext();
   const { lang } = useLanguage();
   const [phase, setPhase] = useState<Phase>("idle");
   const [transcript, setTranscript] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [unmatchedItems, setUnmatchedItems] = useState<{ text: string; reason: string }[]>([]);
   const [showPanel, setShowPanel] = useState(false);
-  const [pendingResolved, setPendingResolved] = useState<ResolvedVoiceCommand | null>(null);
-  const [confirmLoading, setConfirmLoading] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const dataRef = useRef(data);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   const supported =
     typeof window !== "undefined" &&
     !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
-  /* ---- Helper: find student name by id ---- */
-  const studentName = useCallback(
-    (id: string) => {
-      const s = data.students.find((st) => st.id === id);
-      return s ? `${s.firstName} ${s.lastName}` : "Unknown";
+  const getScheduledLessonsForDate = useCallback(
+    (targetDateKey: string): DashboardScheduledLesson[] => {
+      const targetDate = new Date(`${targetDateKey}T12:00:00`);
+      const dow = targetDate.getDay();
+      const students = getStudentsForDay(dataRef.current.students, dow, targetDateKey);
+      return students
+        .map((s) => {
+          const lesson = getLessonForStudentOnDate(dataRef.current.lessons, s.id, targetDateKey);
+          if (!lesson?.id) return null;
+          return {
+            lesson_id: lesson.id,
+            student_id: s.id,
+            student_name: `${s.firstName} ${s.lastName}`,
+            date: lesson.date,
+            time: lesson.timeOfDay ?? s.timeOfDay ?? "",
+            duration_minutes: lesson.durationMinutes,
+            amount_cents: lesson.amountCents,
+            completed: lesson.completed,
+          } satisfies DashboardScheduledLesson;
+        })
+        .filter((x): x is DashboardScheduledLesson => x != null);
     },
-    [data.students]
-  );
-
-  /* ---- Apply LLM API actions ---- */
-  const applyAPIActions = useCallback(
-    async (actions: VoiceAPIAction[], apiResult: VoiceAPIResult) => {
-      const lines: string[] = [];
-
-      for (const action of actions) {
-        switch (action.type) {
-          case "navigate_to_date": {
-            if (onDateChange) {
-              const d = new Date(action.date + "T12:00:00");
-              onDateChange(d);
-              const formatted = d.toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "short",
-                day: "numeric",
-              });
-              lines.push(`Navigated to ${formatted}`);
-            }
-            break;
-          }
-
-          case "navigate_to_tab": {
-            // Navigation to tabs can be handled by parent; for now just note it
-            lines.push(`Navigate to ${action.tab}`);
-            break;
-          }
-
-          case "set_attendance": {
-            const targetDate = action.date;
-            const existing = getLessonForStudentOnDate(
-              data.lessons,
-              action.student_id,
-              targetDate
-            );
-            if (existing) {
-              await updateLesson(existing.id, { completed: action.present });
-            } else {
-              const student = data.students.find((s) => s.id === action.student_id);
-              if (student) {
-                await addLesson({
-                  studentId: student.id,
-                  date: targetDate,
-                  durationMinutes: getEffectiveDurationMinutes(student, targetDate),
-                  amountCents: getEffectiveRateCents(student, targetDate),
-                  completed: action.present,
-                });
-              }
-            }
-            const name = studentName(action.student_id);
-            lines.push(action.present ? `✓ ${name} — attended` : `✗ ${name} — absent`);
-            break;
-          }
-
-          case "set_attendance_bulk": {
-            // Handle single date or range
-            const dates: string[] = [];
-            if (action.date) {
-              dates.push(action.date);
-            } else if (action.range) {
-              // Generate all dates in range
-              const start = new Date(action.range.start_date + "T12:00:00");
-              const end = new Date(action.range.end_date + "T12:00:00");
-              const d = new Date(start);
-              while (d <= end) {
-                dates.push(toDateKey(d));
-                d.setDate(d.getDate() + 1);
-              }
-            }
-
-            let totalMarked = 0;
-            for (const dt of dates) {
-              const dow = new Date(dt + "T12:00:00").getDay();
-              const dayStudents = getStudentsForDay(data.students, dow, dt);
-              for (const student of dayStudents) {
-                const existing = getLessonForStudentOnDate(data.lessons, student.id, dt);
-                if (existing) {
-                  await updateLesson(existing.id, { completed: action.present });
-                } else {
-                  await addLesson({
-                    studentId: student.id,
-                    date: dt,
-                    durationMinutes: getEffectiveDurationMinutes(student, dt),
-                    amountCents: getEffectiveRateCents(student, dt),
-                    completed: action.present,
-                  });
-                }
-                totalMarked++;
-              }
-            }
-
-            if (dates.length === 1) {
-              lines.push(
-                action.present
-                  ? `✓ All ${totalMarked} students marked attended`
-                  : `✗ All ${totalMarked} students marked absent`
-              );
-            } else {
-              lines.push(
-                action.present
-                  ? `✓ ${totalMarked} lessons marked attended (${dates.length} days)`
-                  : `✗ ${totalMarked} lessons marked absent (${dates.length} days)`
-              );
-            }
-            break;
-          }
-
-          case "clear_attendance": {
-            const existing = getLessonForStudentOnDate(
-              data.lessons,
-              action.student_id,
-              action.date
-            );
-            if (existing) {
-              await updateLesson(existing.id, { completed: false });
-            }
-            lines.push(`↩ ${studentName(action.student_id)} — cleared`);
-            break;
-          }
-
-          case "set_duration": {
-            const existing = getLessonForStudentOnDate(
-              data.lessons,
-              action.student_id,
-              action.date
-            );
-            if (existing) {
-              await updateLesson(existing.id, { durationMinutes: action.duration_minutes });
-            } else {
-              const student = data.students.find((s) => s.id === action.student_id);
-              if (student) {
-                await addLesson({
-                  studentId: student.id,
-                  date: action.date,
-                  durationMinutes: action.duration_minutes,
-                  amountCents: getEffectiveRateCents(student, action.date),
-                  completed: true,
-                });
-              }
-            }
-            lines.push(`${studentName(action.student_id)} — ${action.duration_minutes} min`);
-            break;
-          }
-
-          case "set_rate": {
-            const rateCents = Math.round(action.rate * 100);
-            const existing = getLessonForStudentOnDate(
-              data.lessons,
-              action.student_id,
-              action.date
-            );
-            if (existing) {
-              await updateLesson(existing.id, { amountCents: rateCents });
-            } else {
-              const student = data.students.find((s) => s.id === action.student_id);
-              if (student) {
-                await addLesson({
-                  studentId: student.id,
-                  date: action.date,
-                  durationMinutes: getEffectiveDurationMinutes(student, action.date),
-                  amountCents: rateCents,
-                  completed: true,
-                });
-              }
-            }
-            lines.push(`${studentName(action.student_id)} — $${action.rate}`);
-            break;
-          }
-
-          case "set_time": {
-            // Time changes aren't directly supported via lesson update yet;
-            // just acknowledge it
-            lines.push(`${studentName(action.student_id)} — time set to ${action.start_time}`);
-            break;
-          }
-        }
-      }
-
-      // Handle query intent — show info from resolved dates
-      if (apiResult.intent === "query" && actions.length === 0) {
-        // Basic query response: show today's summary
-        const scheduledCount = getStudentsForDay(data.students, dayOfWeek, dateKey).length;
-        lines.push(`You have ${scheduledCount} student${scheduledCount !== 1 ? "s" : ""} scheduled today.`);
-      }
-
-      return lines;
-    },
-    [data, addLesson, updateLesson, onDateChange, studentName, dayOfWeek, dateKey]
-  );
-
-  /* ---- New voice-logging schema: apply UPDATE_LESSON actions ---- */
-  const applyVoiceLoggingActions = useCallback(
-    async (result: VoiceLoggingResult): Promise<string[]> => {
-      const lines: string[] = [];
-      const studentName = (id: string) => {
-        const s = data.students.find((x) => x.id === id);
-        return s ? `${s.firstName} ${s.lastName}` : "Student";
-      };
-
-      for (const action of result.actions as UpdateLessonAction[]) {
-        if (action.type !== "UPDATE_LESSON") continue;
-        const studentId = action.student_id ?? (() => {
-          const raw = (action.student_name_raw || "").trim().toLowerCase();
-          if (!raw) return null;
-          const match = data.students.find((s) => {
-            const full = `${s.firstName} ${s.lastName}`.toLowerCase();
-            return full.includes(raw) || raw.includes(full) || full.split(/\s+/).some((p) => p.startsWith(raw) || raw.startsWith(p));
-          });
-          return match?.id ?? null;
-        })();
-        if (!studentId) {
-          lines.push(`Could not find student "${action.student_name_raw}"`);
-          continue;
-        }
-        const student = data.students.find((s) => s.id === studentId);
-        if (!student) continue;
-        const existing = getLessonForStudentOnDate(data.lessons, studentId, action.date);
-
-        const completed =
-          action.set_status === "attended" ? true : action.set_status === "not_attended" || action.set_status === "cancelled" ? false : existing?.completed ?? null;
-        const durationMinutes = action.set_duration_minutes ?? existing?.durationMinutes ?? getEffectiveDurationMinutes(student, action.date);
-        const amountCents = action.payment?.amount != null ? Math.round(action.payment.amount * 100) : (existing?.amountCents ?? getEffectiveRateCents(student, action.date));
-
-        if (existing) {
-          const updates: { completed?: boolean; durationMinutes?: number; amountCents?: number } = {};
-          if (completed !== null) updates.completed = completed;
-          if (action.set_duration_minutes != null) updates.durationMinutes = action.set_duration_minutes;
-          if (action.payment?.amount != null) updates.amountCents = amountCents;
-          if (Object.keys(updates).length > 0) await updateLesson(existing.id, updates);
-        } else {
-          await addLesson({
-            studentId,
-            date: action.date,
-            durationMinutes,
-            amountCents,
-            completed: completed === true,
-          });
-        }
-
-        if (action.set_status === "attended") lines.push(`✓ ${studentName(studentId)} — attended`);
-        else if (action.set_status === "not_attended" || action.set_status === "cancelled") lines.push(`✗ ${studentName(studentId)} — ${action.set_status === "cancelled" ? "cancelled" : "absent"}`);
-        else if (action.payment?.amount != null) lines.push(`${studentName(studentId)} — $${action.payment.amount}${action.payment.method ? ` (${action.payment.method})` : ""}`);
-        else lines.push(`✓ ${studentName(studentId)} — updated`);
-      }
-      return lines;
-    },
-    [data, addLesson, updateLesson]
-  );
-
-  /* ---- Fallback: apply local parser actions ---- */
-  const applyLocalActions = useCallback(
-    async (text: string): Promise<{ feedback: string; unmatched: { text: string; reason: string }[] }> => {
-      const allStudents = buildAllStudentList(data.students);
-
-      // First pass: detect date
-      let voiceResult = processVoiceTranscript(text, [], allStudents, dateKey);
-      const targetDateKey = voiceResult.navigated_date ?? dateKey;
-      const targetDate = new Date(targetDateKey + "T12:00:00");
-      const targetDayOfWeek = targetDate.getDay();
-
-      if (voiceResult.navigated_date && onDateChange) {
-        onDateChange(targetDate);
-      }
-
-      // Second pass: with correct date's students
-      const targetStudents = getStudentsForDay(data.students, targetDayOfWeek, targetDateKey);
-      const scheduled = buildScheduledLessons(targetStudents, targetDateKey);
-      voiceResult = processVoiceTranscript(text, scheduled, allStudents, dateKey);
-
-      const feedbackLines: string[] = [];
-
-      if (voiceResult.navigated_date) {
-        const navDate = new Date(voiceResult.navigated_date + "T12:00:00");
-        const formatted = navDate.toLocaleDateString("en-US", {
-          weekday: "long",
-          month: "short",
-          day: "numeric",
-        });
-        feedbackLines.push(`Navigated to ${formatted}`);
-      }
-
-      if (voiceResult.intent === "clarify" && voiceResult.actions.length === 0) {
-        if (voiceResult.navigated_date && voiceResult.unmatched_mentions.length === 0) {
-          return { feedback: feedbackLines.join("\n") || "Done!", unmatched: [] };
-        }
-        return {
-          feedback: voiceResult.clarifying_question || "I didn't understand that.",
-          unmatched: voiceResult.unmatched_mentions.map((u) => ({
-            text: u.spoken_name,
-            reason: u.reason,
-          })),
-        };
-      }
-
-      // Apply actions
-      const actionDate = voiceResult.navigated_date ?? (voiceResult.actions[0]?.date ?? dateKey);
-      for (const action of voiceResult.actions) {
-        const student = data.students.find((s) => s.id === action.student_id);
-        if (!student) continue;
-        const name = `${student.firstName} ${student.lastName}`;
-        const existing = getLessonForStudentOnDate(data.lessons, student.id, actionDate);
-
-        if (action.type === "set_attendance") {
-          if (existing) {
-            await updateLesson(existing.id, { completed: action.present });
-          } else {
-            await addLesson({
-              studentId: student.id,
-              date: actionDate,
-              durationMinutes: getEffectiveDurationMinutes(student, actionDate),
-              amountCents: getEffectiveRateCents(student, actionDate),
-              completed: action.present,
-            });
-          }
-          feedbackLines.push(action.present ? `✓ ${name} — attended` : `✗ ${name} — absent`);
-        }
-
-        if (action.type === "set_duration") {
-          if (existing) {
-            await updateLesson(existing.id, { durationMinutes: action.duration_minutes });
-          } else {
-            await addLesson({
-              studentId: student.id,
-              date: actionDate,
-              durationMinutes: action.duration_minutes,
-              amountCents: getEffectiveRateCents(student, actionDate),
-              completed: true,
-            });
-          }
-          feedbackLines.push(`${name} — ${action.duration_minutes} min`);
-        }
-
-        if (action.type === "set_rate") {
-          const rateCents = Math.round(action.rate * 100);
-          if (existing) {
-            await updateLesson(existing.id, { amountCents: rateCents });
-          } else {
-            await addLesson({
-              studentId: student.id,
-              date: actionDate,
-              durationMinutes: getEffectiveDurationMinutes(student, actionDate),
-              amountCents: rateCents,
-              completed: true,
-            });
-          }
-          feedbackLines.push(`${name} — $${action.rate}`);
-        }
-      }
-
-      return {
-        feedback: feedbackLines.join("\n") || "Done!",
-        unmatched: voiceResult.unmatched_mentions.map((u) => ({
-          text: u.spoken_name,
-          reason: u.reason,
-        })),
-      };
-    },
-    [data, dateKey, dayOfWeek, addLesson, updateLesson, onDateChange]
+    []
   );
 
   /* ---- Start listening ---- */
@@ -505,99 +147,42 @@ export default function VoiceButton({
       setPhase("processing");
 
       try {
-        // 1) Voice Command Router: local parse + resolve (attendance + reschedule)
-        const payload = parseVoiceCommand(text, dateKey);
-        const resolveContext = {
-          students: data.students,
-          lessons: data.lessons,
-          dashboardDateKey: dateKey,
+        const dashboardContext: DashboardContext = {
+          user_id: dataRef.current.user?.id ?? "local-user",
+          selected_date: dateKey,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          scheduled_lessons: getScheduledLessonsForDate(dateKey),
         };
-        const resolved = resolveVoiceCommand(payload, resolveContext);
 
-        if (
-          (payload.intent === "ATTENDANCE_MARK" || payload.intent === "LESSON_RESCHEDULE") &&
-          resolved
-        ) {
-          const executeContext = {
-            updateLesson,
-            addLesson,
-            lessons: data.lessons,
-            students: data.students,
-          };
-          if (payload.confidence >= 0.75) {
-            await executeVoiceIntent(resolved, executeContext);
-            await reload?.();
-            setFeedback(resolved.summary);
-            setUnmatchedItems([]);
-            setPhase("result");
-            return;
-          }
-          setPendingResolved(resolved);
-          setFeedback(resolved.summary);
-          setPhase("confirm");
-          return;
+        const result = await handleVoiceCommand(text, dashboardContext, {
+          students: dataRef.current.students,
+          lessons: dataRef.current.lessons,
+          getScheduledLessonsForDate,
+          updateLessonById: (lessonId, updates) => updateLesson(lessonId, updates),
+          fetchLessonsForVerification: async (): Promise<Lesson[]> => {
+            if (hasSupabase() && dataRef.current.user?.id) {
+              return fetchLessons(dataRef.current.user.id);
+            }
+            await new Promise((r) => setTimeout(r, 0));
+            return dataRef.current.lessons;
+          },
+        });
+
+        if (result.plan?.target_date && result.plan.target_date !== dateKey && onDateChange) {
+          onDateChange(new Date(`${result.plan.target_date}T12:00:00`));
         }
 
-        // 2) Fallback: LLM API
-        const context = buildVoiceContext(data.students, data.lessons, dateKey);
-        const apiResult = await callVoiceAPI(text, context);
-
-        // New voice-logging schema (UPDATE_LESSON + followup)
-        if (isVoiceLoggingResult(apiResult)) {
-          if (apiResult.needs_followup && apiResult.followup_question) {
-            const choices = apiResult.followup_choices?.length
-              ? `\n${apiResult.followup_choices.map((c) => `• ${c}`).join("\n")}`
-              : "";
-            setFeedback(apiResult.followup_question + choices);
-            setPhase("result");
-            return;
-          }
-          const lines = await applyVoiceLoggingActions(apiResult);
-          setFeedback(lines.length ? lines.join("\n") : "Done!");
-          setUnmatchedItems([]);
-          setPhase("result");
-          return;
-        }
-
-        // Legacy schema: navigate if needed
-        const navAction = apiResult.actions.find(
-          (a): a is Extract<typeof a, { type: "navigate_to_date" }> =>
-            a.type === "navigate_to_date"
-        );
-        if (navAction && onDateChange) {
-          onDateChange(new Date(navAction.date + "T12:00:00"));
-        }
-
-        // Handle clarify intent
-        if (apiResult.intent === "clarify") {
-          setFeedback(apiResult.clarifying_question || "Could you say that again?");
-          setUnmatchedItems(
-            (apiResult.unmatched_mentions || []).map((u) => ({
-              text: u.spoken_text,
-              reason: u.reason,
-            }))
-          );
-          setPhase("result");
-          return;
-        }
-
-        // Apply legacy actions
-        const lines = await applyAPIActions(apiResult.actions, apiResult);
-        setFeedback(lines.join("\n") || "Done!");
-        setUnmatchedItems(
-          (apiResult.unmatched_mentions || []).map((u) => ({
-            text: u.spoken_text,
-            reason: u.reason,
-          }))
-        );
+        const optionLines =
+          result.clarification_options && result.clarification_options.length > 0
+            ? `\n${result.clarification_options.map((o) => `• ${o}`).join("\n")}`
+            : "";
+        setFeedback(`${result.human_message}${optionLines}`);
+        setUnmatchedItems([]);
         setPhase("result");
       } catch (_err) {
-        // API unavailable — fall back to local rule-based parser
-        console.warn("Voice API unavailable, using local parser:", _err);
-        const localResult = await applyLocalActions(text);
-        setFeedback(localResult.feedback);
-        setUnmatchedItems(localResult.unmatched);
-        setPhase("result");
+        setFeedback("I couldn't process that command safely. Please try again.");
+        setUnmatchedItems([]);
+        setPhase("error");
       }
     };
 
@@ -629,7 +214,7 @@ export default function VoiceButton({
     };
 
     recognition.start();
-  }, [data, dateKey, applyAPIActions, applyVoiceLoggingActions, applyLocalActions, onDateChange, updateLesson, addLesson, reload]);
+  }, [lang, dateKey, onDateChange, updateLesson, getScheduledLessonsForDate]);
 
   /* ---- Stop listening ---- */
   const stopListening = useCallback(() => {
@@ -644,34 +229,6 @@ export default function VoiceButton({
     setTranscript("");
     setFeedback(null);
     setUnmatchedItems([]);
-    setPendingResolved(null);
-  }, []);
-
-  /* ---- Confirm / Cancel voice command (when confidence < 0.75) ---- */
-  const handleConfirmVoice = useCallback(async () => {
-    if (!pendingResolved) return;
-    setConfirmLoading(true);
-    try {
-      const executeContext = {
-        updateLesson,
-        addLesson,
-        lessons: data.lessons,
-        students: data.students,
-      };
-      await executeVoiceIntent(pendingResolved, executeContext);
-      await reload?.();
-      setFeedback(pendingResolved.summary);
-      setPhase("result");
-    } finally {
-      setPendingResolved(null);
-      setConfirmLoading(false);
-    }
-  }, [pendingResolved, updateLesson, addLesson, data.lessons, data.students, reload]);
-
-  const handleCancelConfirm = useCallback(() => {
-    setPendingResolved(null);
-    setFeedback("Cancelled.");
-    setPhase("result");
   }, []);
 
   if (!supported) return null;
@@ -681,25 +238,17 @@ export default function VoiceButton({
   return (
     <>
       {/* Floating mic button */}
-      <button
+      <IconButton
         type="button"
         onClick={isListening ? stopListening : startListening}
         aria-label={isListening ? "Stop listening" : "Voice input"}
+        variant={isListening ? "danger" : "primary"}
+        size="lg"
         style={{
           position: "fixed",
           bottom: 88,
           right: 20,
-          width: 56,
-          height: 56,
-          borderRadius: "50%",
-          background: "var(--avatar-gradient)",
           color: "#fff",
-          border: "none",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
           zIndex: 900,
           transition: "background 0.2s, transform 0.15s",
           transform: isListening ? "scale(1.1)" : "scale(1)",
@@ -728,7 +277,7 @@ export default function VoiceButton({
             <line x1="8" y1="23" x2="16" y2="23" />
           </svg>
         )}
-      </button>
+      </IconButton>
 
       {/* Feedback panel (slides up from bottom) */}
       {showPanel && (
@@ -763,24 +312,17 @@ export default function VoiceButton({
                 ? "Listening..."
                 : phase === "processing"
                   ? "Processing..."
-                  : phase === "confirm"
-                    ? "Confirm?"
-                    : "Voice Input"}
+                  : "Voice Input"}
             </span>
-            <button
+            <IconButton
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={closePanel}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontSize: 20,
-                color: "var(--text-muted)",
-                padding: "4px 8px",
-              }}
+              aria-label="Close"
             >
               &times;
-            </button>
+            </IconButton>
           </div>
 
           {/* Listening indicator */}
@@ -824,19 +366,6 @@ export default function VoiceButton({
                 </p>
               )}
               <span>Processing...</span>
-            </div>
-          )}
-
-          {/* Confirmation card (low confidence or ambiguous) */}
-          {phase === "confirm" && pendingResolved && (
-            <div style={{ padding: "4px 0" }}>
-              <VoiceConfirmationCard
-                summary={pendingResolved.summary}
-                transcript={transcript}
-                onConfirm={handleConfirmVoice}
-                onCancel={handleCancelConfirm}
-                isLoading={confirmLoading}
-              />
             </div>
           )}
 
@@ -889,35 +418,25 @@ export default function VoiceButton({
               )}
               {/* Try again / close buttons */}
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button
+                <Button
                   type="button"
+                  variant="primary"
+                  size="sm"
                   onClick={() => {
                     closePanel();
                     setTimeout(startListening, 100);
                   }}
-                  className="pill"
-                  style={{
-                    padding: "10px 18px",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    fontFamily: "var(--font-sans)",
-                  }}
                 >
                   Try again
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={closePanel}
-                  className="pill pill--active"
-                  style={{
-                    padding: "10px 18px",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    fontFamily: "var(--font-sans)",
-                  }}
                 >
                   Done
-                </button>
+                </Button>
               </div>
             </div>
           )}

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useLanguage } from "@/context/LanguageContext";
+import { Button } from "@/components/ui/Button";
 
 const OPTIONS: { code: "en" | "es" | "zh"; label: string }[] = [
   { code: "en", label: "EN" },
@@ -22,24 +23,16 @@ export default function LanguageSwitcher() {
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button
+      <Button
         type="button"
+        variant="secondary"
+        size="sm"
         onClick={() => setOpen((o) => !o)}
         aria-label="Switch language"
-        style={{
-          padding: "8px 12px",
-          borderRadius: 8,
-          border: "1px solid var(--border)",
-          background: "var(--card)",
-          color: "var(--text)",
-          fontSize: 14,
-          fontWeight: 600,
-          fontFamily: "var(--font-sans)",
-          cursor: "pointer",
-        }}
+        style={{ minWidth: 52 }}
       >
         {OPTIONS.find((o) => o.code === lang)?.label ?? "EN"}
-      </button>
+      </Button>
       {open && (
         <div
           style={{
@@ -56,29 +49,27 @@ export default function LanguageSwitcher() {
           }}
         >
           {OPTIONS.map((opt) => (
-            <button
+            <Button
               key={opt.code}
               type="button"
+              variant="tab"
+              active={lang === opt.code}
+              size="sm"
+              fullWidth
               onClick={() => {
                 setLang(opt.code);
                 setOpen(false);
               }}
               style={{
-                display: "block",
                 width: "100%",
-                padding: "10px 16px",
-                border: "none",
-                background: lang === opt.code ? "rgba(201, 123, 148, 0.15)" : "transparent",
-                color: "var(--text)",
-                fontSize: 14,
-                fontWeight: 600,
-                fontFamily: "var(--font-sans)",
-                cursor: "pointer",
                 textAlign: "left",
+                justifyContent: "flex-start",
+                borderRadius: 0,
+                boxShadow: "none",
               }}
             >
               {opt.label}
-            </button>
+            </Button>
           ))}
         </div>
       )}

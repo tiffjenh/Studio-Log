@@ -5,6 +5,7 @@ import { runForecast } from "@/lib/forecasts/runForecast";
 import type { EarningsRow, ForecastResponse, StudentSummary, SupportedLocale } from "@/lib/forecasts/types";
 import { useLanguage } from "@/context/LanguageContext";
 import { translateForInsights } from "@/utils/insightsLanguage";
+import { Button, IconButton } from "@/components/ui/Button";
 
 type Props = {
   earnings: EarningsRow[];
@@ -174,38 +175,29 @@ export default function ForecastsPanel({ earnings, students, rangeContext, voice
           />
         </div>
 
-        <button
+        <Button
           type="button"
           onClick={onSubmit}
-          className="pill"
+          variant="primary"
+          size={isStacked ? "lg" : "md"}
           style={{
-            padding: isStacked ? "14px 24px" : "12px 16px",
-            fontSize: isStacked ? 16 : 14,
-            fontFamily: "var(--font-sans)",
             ...(isStacked ? { width: "100%", maxWidth: 480 } : {}),
           }}
           disabled={loading}
+          loading={loading}
         >
-          {loading ? "…" : "Search"}
-        </button>
+          Search
+        </Button>
 
         {voiceButtonPosition === "inline" && (
-          <button
+          <IconButton
             type="button"
             onClick={startVoice}
             aria-label={isListening ? "Stop listening" : "Voice input"}
+            variant={isListening ? "danger" : "primary"}
+            size="md"
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: "50%",
-              background: isListening ? "#dc2626" : "var(--primary, #c97b94)",
               color: "#fff",
-              border: "none",
-              boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
               flexShrink: 0,
             }}
             disabled={!canUseVoice || loading}
@@ -217,30 +209,22 @@ export default function ForecastsPanel({ earnings, students, rangeContext, voice
               <line x1="12" y1="19" x2="12" y2="23" />
               <line x1="8" y1="23" x2="16" y2="23" />
             </svg>
-          </button>
+          </IconButton>
         )}
       </div>
 
       {voiceButtonPosition === "floating" && (
-        <button
+        <IconButton
           type="button"
           onClick={isListening ? undefined : startVoice}
           aria-label={isListening ? "Stop listening" : "Voice input"}
+          variant={isListening ? "danger" : "primary"}
+          size="lg"
           style={{
             position: "fixed",
             bottom: 88,
             right: 20,
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            background: isListening ? "#dc2626" : "var(--primary, #c97b94)",
             color: "#fff",
-            border: "none",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
-            cursor: canUseVoice && !loading ? "pointer" : "default",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
             zIndex: 900,
             transition: "background 0.2s, transform 0.15s",
             transform: isListening ? "scale(1.1)" : "scale(1)",
@@ -260,7 +244,7 @@ export default function ForecastsPanel({ earnings, students, rangeContext, voice
               <line x1="8" y1="23" x2="16" y2="23" />
             </svg>
           )}
-        </button>
+        </IconButton>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

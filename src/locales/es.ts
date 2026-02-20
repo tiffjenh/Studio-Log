@@ -9,7 +9,7 @@ export default {
   },
   landing: {
     title: "Studio Log",
-    tagline: "registra clases e ingresos",
+    tagline: "track students, clients and earnings",
     logIn: "Iniciar sesión",
     signUp: "Registrarse",
     logInButton: "Entrar",
@@ -22,8 +22,6 @@ export default {
     forgotPasswordHint: "Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.",
     sendResetLink: "Enviar enlace",
     backToLogin: "Volver a iniciar sesión",
-    noAccount: "¿No tienes cuenta? Regístrate",
-    haveAccount: "¿Ya tienes cuenta? Iniciar sesión",
   },
   common: {
     save: "Guardar",

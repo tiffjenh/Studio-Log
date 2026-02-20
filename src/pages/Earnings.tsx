@@ -15,6 +15,8 @@ import {
   isStudentHistorical,
 } from "@/utils/earnings";
 import type { Lesson } from "@/types";
+import { Button, IconButton } from "@/components/ui/Button";
+import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon } from "@/components/ui/Icons";
 
 const TABS = ["Daily", "Weekly", "Monthly", "Yearly", "Students"] as const;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -441,18 +443,15 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0 }}>{t("earnings.title")}</h1>
-        <button
+        <IconButton
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={openDownloadModal}
           aria-label="Download earnings"
-          style={{ background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}
         >
-          <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-        </button>
+          <DownloadIcon />
+        </IconButton>
       </div>
 
       {/* Download modal overlay */}
@@ -467,13 +466,15 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <h2 style={{ fontSize: 20, fontWeight: 600, margin: 0, fontFamily: "var(--font-sans)" }}>Download Earnings</h2>
-              <button
+              <IconButton
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => setDownloadOpen(false)}
-                style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "var(--text)", lineHeight: 1 }}
+                aria-label="Close"
               >
                 &times;
-              </button>
+              </IconButton>
             </div>
 
             {/* Year */}
@@ -495,26 +496,20 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
               <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Format</span>
               <div style={{ display: "flex", gap: 8 }}>
                 {(["csv", "pdf"] as const).map((fmt) => (
-                  <button
+                  <Button
                     key={fmt}
                     type="button"
+                    variant="tab"
+                    active={dlFormat === fmt}
+                    size="sm"
                     onClick={() => setDlFormat(fmt)}
                     style={{
                       flex: 1,
-                      padding: "10px 0",
-                      fontSize: 15,
-                      fontWeight: 600,
-                      fontFamily: "var(--font-sans)",
-                      borderRadius: 10,
-                      border: dlFormat === fmt ? "2px solid var(--text)" : "1px solid var(--border)",
-                      background: dlFormat === fmt ? "var(--text)" : "var(--card)",
-                      color: dlFormat === fmt ? "var(--card, #fff)" : "var(--text)",
-                      cursor: "pointer",
                       textTransform: "uppercase",
                     }}
                   >
                     {fmt}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -523,112 +518,86 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
             <div style={{ marginBottom: 24 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Deliver to</span>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <button
+                <Button
                   type="button"
+                  variant="tab"
+                  active={dlDelivery === "device"}
+                  size="sm"
+                  fullWidth
                   onClick={() => setDlDelivery("device")}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
-                    padding: "10px 14px",
-                    fontSize: 15,
-                    fontFamily: "var(--font-sans)",
-                    borderRadius: 10,
-                    border: dlDelivery === "device" ? "2px solid var(--text)" : "1px solid var(--border)",
-                    background: "var(--card)",
-                    color: "var(--text)",
-                    cursor: "pointer",
                     textAlign: "left",
+                    justifyContent: "flex-start",
                   }}
+                  leftIcon={<DownloadIcon size={18} />}
                 >
-                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
                   Download to device
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="tab"
+                  active={dlDelivery === "email"}
+                  size="sm"
+                  fullWidth
                   onClick={() => setDlDelivery("email")}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
-                    padding: "10px 14px",
-                    fontSize: 15,
-                    fontFamily: "var(--font-sans)",
-                    borderRadius: 10,
-                    border: dlDelivery === "email" ? "2px solid var(--text)" : "1px solid var(--border)",
-                    background: "var(--card)",
-                    color: "var(--text)",
-                    cursor: "pointer",
                     textAlign: "left",
+                    justifyContent: "flex-start",
                   }}
+                  leftIcon={
+                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="4" width="20" height="16" rx="2" />
+                      <path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7" />
+                    </svg>
+                  }
                 >
-                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="4" width="20" height="16" rx="2" />
-                    <path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7" />
-                  </svg>
                   Email to {data.user?.email ? data.user.email : "profile"}
-                </button>
+                </Button>
               </div>
             </div>
 
             {/* Action button */}
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="md"
               onClick={handleDownload}
-              style={{
-                width: "100%",
-                padding: "12px 0",
-                fontSize: 16,
-                fontWeight: 600,
-                fontFamily: "var(--font-sans)",
-                borderRadius: 12,
-                border: "none",
-                background: "var(--text)",
-                color: "var(--card, #fff)",
-                cursor: "pointer",
-              }}
+              fullWidth
             >
               {dlDelivery === "email" ? "Download & Open Email" : "Download"}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
         {TABS.map((tab) => (
-          <button
+          <Button
             key={tab}
             type="button"
+            variant="tab"
+            size="sm"
+            active={activeTab === tab}
             onClick={() => setActiveTab(tab)}
-            className={activeTab === tab ? "pill pill--active" : "pill"}
-            style={{
-              flex: "1 1 0",
-              minWidth: 0,
-              minHeight: 40,
-              textAlign: "center",
-              fontFamily: "var(--font-sans)",
-              fontSize: 13,
-              padding: "10px 6px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            style={{ flex: "1 1 0", minWidth: 0 }}
           >
             {t(TAB_KEYS[tab])}
-          </button>
+          </Button>
         ))}
       </div>
 
       {activeTab === "Weekly" && (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => { setWeeklyMonthOffset((o) => o - 1); setSelectedWeekStartKey(null); }} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Previous month">‹</button>
+            <IconButton type="button" variant="secondary" size="sm" onClick={() => { setWeeklyMonthOffset((o) => o - 1); setSelectedWeekStartKey(null); }} aria-label="Previous month"><ChevronLeftIcon /></IconButton>
             <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{weeklyMonthTitle}</div>
-            <button type="button" onClick={() => { setWeeklyMonthOffset((o) => o + 1); setSelectedWeekStartKey(null); }} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next month">›</button>
+            <IconButton type="button" variant="secondary" size="sm" onClick={() => { setWeeklyMonthOffset((o) => o + 1); setSelectedWeekStartKey(null); }} aria-label="Next month"><ChevronRightIcon /></IconButton>
           </div>
           <div className="float-card" style={{ marginBottom: 24 }}>
             {weeklyData.length > 0 ? (
@@ -662,7 +631,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <strong>{startFormatted} – {endFormatted}</strong>
-                  <button type="button" onClick={() => setSelectedWeekStartKey(null)} style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setSelectedWeekStartKey(null)}>Close</Button>
                 </div>
                 <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
@@ -701,9 +670,9 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
       {activeTab === "Monthly" && (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-            <button type="button" onClick={() => { setMonthlyYearOffset((o) => o - 1); setSelectedMonthKey(null); }} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Previous year">‹</button>
+            <IconButton type="button" variant="secondary" size="sm" onClick={() => { setMonthlyYearOffset((o) => o - 1); setSelectedMonthKey(null); }} aria-label="Previous year"><ChevronLeftIcon /></IconButton>
             <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{monthlyTitle}</div>
-            <button type="button" onClick={() => { setMonthlyYearOffset((o) => o + 1); setSelectedMonthKey(null); }} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next year">›</button>
+            <IconButton type="button" variant="secondary" size="sm" onClick={() => { setMonthlyYearOffset((o) => o + 1); setSelectedMonthKey(null); }} aria-label="Next year"><ChevronRightIcon /></IconButton>
           </div>
           <div className="hero-card" style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 16 }}>{t("earnings.overview")}</div>
@@ -738,17 +707,21 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                   const monthKey = `${displayYear}-${String(i + 1).padStart(2, "0")}`;
                   const isSelected = selectedMonthKey === monthKey;
                   return (
-                    <div
+                    <Button
                       key={i}
-                      role="button"
+                      type="button"
+                      variant="tab"
+                      size="sm"
+                      active={isSelected}
+                      fullWidth
                       onClick={() => setSelectedMonthKey((prev) => (prev === monthKey ? null : monthKey))}
                       className="card-list-item"
-                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20, cursor: "pointer", background: isSelected ? "var(--bg-hover, rgba(0,0,0,0.03))" : undefined }}
+                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20, borderRadius: 0, boxShadow: "none" }}
                     >
                       <span>{label}</span>
                       <span style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>{visibleMonthlyHours[i] % 1 === 0 ? visibleMonthlyHours[i] : visibleMonthlyHours[i].toFixed(1)} hrs</span>
                       <span style={{ fontWeight: 600, textAlign: "right" }}>{formatCurrency(visibleMonthlyTotals[i])}</span>
-                    </div>
+                    </Button>
                   );
                 })}
               </div>
@@ -778,7 +751,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <strong>{monthFormatted}</strong>
-                  <button type="button" onClick={() => setSelectedMonthKey(null)} style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setSelectedMonthKey(null)}>Close</Button>
                 </div>
                 <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
@@ -840,17 +813,21 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                 {yearlyLabels.map((label, i) => {
                   const isSelected = selectedYearKey === label;
                   return (
-                    <div
+                    <Button
                       key={label}
-                      role="button"
+                      type="button"
+                      variant="tab"
+                      size="sm"
+                      active={isSelected}
+                      fullWidth
                       onClick={() => setSelectedYearKey((prev) => (prev === label ? null : label))}
                       className="card-list-item"
-                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20, cursor: "pointer", background: isSelected ? "var(--bg-hover, rgba(0,0,0,0.03))" : undefined }}
+                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20, borderRadius: 0, boxShadow: "none" }}
                     >
                       <span>{label}{parseInt(label) === thisYear ? " (YTD)" : ""}</span>
                       <span style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>{yearlyHours[i] % 1 === 0 ? yearlyHours[i] : yearlyHours[i].toFixed(1)} hrs</span>
                       <span style={{ fontWeight: 600, textAlign: "right" }}>{formatCurrency(yearlyTotals[i])}</span>
-                    </div>
+                    </Button>
                   );
                 })}
               </div>
@@ -883,7 +860,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <strong>{yrStr}{isCurrentYear ? " (YTD)" : ""}</strong>
-                  <button type="button" onClick={() => setSelectedYearKey(null)} style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setSelectedYearKey(null)}>Close</Button>
                 </div>
                 <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
@@ -929,9 +906,9 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
               <div className="headline-serif" style={{ fontSize: 26, fontWeight: 400 }}>{formatCurrency(dailyWeekTotal)}</div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, paddingBottom: 2 }}>
-              <button type="button" onClick={() => setDailyWeekOffset((o) => o - 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Previous week">‹</button>
+              <IconButton type="button" variant="secondary" size="sm" onClick={() => setDailyWeekOffset((o) => o - 1)} aria-label="Previous week"><ChevronLeftIcon /></IconButton>
               <span style={{ fontSize: 15, color: "var(--text)" }}>{dailyRangeStart} – {dailyRangeEnd}</span>
-              <button type="button" onClick={() => setDailyWeekOffset((o) => o + 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next week">›</button>
+              <IconButton type="button" variant="secondary" size="sm" onClick={() => setDailyWeekOffset((o) => o + 1)} aria-label="Next week"><ChevronRightIcon /></IconButton>
             </div>
           </div>
           <div className="float-card" style={{ marginBottom: 24 }}>
@@ -959,7 +936,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <strong>{dateFormatted}</strong>
-                  <button type="button" onClick={() => setSelectedDayDateKey(null)} style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", background: "none", border: "none", cursor: "pointer" }}>Close</button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setSelectedDayDateKey(null)}>Close</Button>
                 </div>
                 <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
@@ -1037,11 +1014,11 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
         return (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-              <button type="button" onClick={() => setStudentsYearOffset((o) => o - 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Previous year">&#8249;</button>
+              <IconButton type="button" variant="secondary" size="sm" onClick={() => setStudentsYearOffset((o) => o - 1)} aria-label="Previous year"><ChevronLeftIcon /></IconButton>
               <h2 className="headline-serif" style={{ fontSize: 20, fontWeight: 400, margin: 0 }}>
                 {studentsDisplayYear} earnings{studentsDisplayYear === thisYear ? " YTD" : ""}
               </h2>
-              <button type="button" onClick={() => setStudentsYearOffset((o) => o + 1)} className="pill" style={{ minWidth: 40, minHeight: 40, padding: 8 }} aria-label="Next year">&#8250;</button>
+              <IconButton type="button" variant="secondary" size="sm" onClick={() => setStudentsYearOffset((o) => o + 1)} aria-label="Next year"><ChevronRightIcon /></IconButton>
             </div>
             {/* Search + Sort on one line */}
             <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
@@ -1085,42 +1062,12 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
             </div>
             {/* Active / Inactive segmented toggle */}
             <div style={{ display: "flex", gap: 0, marginBottom: 20, borderRadius: "var(--radius-pill)", padding: 4, background: "rgba(180, 160, 180, 0.08)", border: "1px solid var(--border)", width: "fit-content" }}>
-              <button
-                type="button"
-                onClick={() => setStudentsStatusFilter("active")}
-                style={{
-                  padding: "10px 20px",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  border: studentsStatusFilter === "active" ? "1px solid var(--border)" : "1px solid transparent",
-                  borderRadius: "var(--radius-pill)",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-sans)",
-                  background: studentsStatusFilter === "active" ? "var(--avatar-gradient)" : "transparent",
-                  boxShadow: studentsStatusFilter === "active" ? "var(--shadow-soft)" : "none",
-                  color: studentsStatusFilter === "active" ? "var(--text)" : "var(--text-muted)",
-                }}
-              >
+              <Button type="button" variant="tab" size="sm" active={studentsStatusFilter === "active"} onClick={() => setStudentsStatusFilter("active")} style={{ border: "none" }}>
                 Active
-              </button>
-              <button
-                type="button"
-                onClick={() => setStudentsStatusFilter("inactive")}
-                style={{
-                  padding: "10px 20px",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  border: studentsStatusFilter === "inactive" ? "1px solid var(--border)" : "1px solid transparent",
-                  borderRadius: "var(--radius-pill)",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-sans)",
-                  background: studentsStatusFilter === "inactive" ? "var(--avatar-gradient)" : "transparent",
-                  boxShadow: studentsStatusFilter === "inactive" ? "var(--shadow-soft)" : "none",
-                  color: studentsStatusFilter === "inactive" ? "var(--text)" : "var(--text-muted)",
-                }}
-              >
+              </Button>
+              <Button type="button" variant="tab" size="sm" active={studentsStatusFilter === "inactive"} onClick={() => setStudentsStatusFilter("inactive")} style={{ border: "none" }}>
                 Inactive
-              </button>
+              </Button>
             </div>
             <div className="float-card" style={{ padding: 0, overflow: "hidden" }}>
               {isEmptyInactive && (

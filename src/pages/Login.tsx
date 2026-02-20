@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
+import { Button } from "@/components/ui/Button";
 
 export default function Login() {
   const { setUser } = useStoreContext();
@@ -33,12 +34,9 @@ export default function Login() {
           onChange={(e) => setPassword(e.target.value)}
           style={inputStyle}
         />
-        <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 8, marginBottom: 16 }}>
+        <Button type="submit" variant="primary" fullWidth style={{ marginTop: 8, marginBottom: 16 }}>
           Log In
-        </button>
-        <div style={{ textAlign: "center" }}>
-          <Link to="/create-account" style={{ color: "var(--primary)", fontSize: 16 }}>Don't have an account? Sign up</Link>
-        </div>
+        </Button>
         <div style={{ textAlign: "center", marginTop: 16 }}>
           <Link to="/forgot-password" style={{ color: "var(--text-muted)", fontSize: 14 }}>Forgot password?</Link>
         </div>

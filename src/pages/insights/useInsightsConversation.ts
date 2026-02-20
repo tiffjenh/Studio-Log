@@ -1,24 +1,41 @@
 /**
  * useInsightsConversation — multi-turn chat state for Insights.
- * Stores messages (user/assistant), sends questions through runForecast, supports clear (New chat).
+ * Uses askInsights (deterministic parse → compute → verify → respond); falls back to runForecast for what-if narrative.
  */
 
 import { useState, useCallback } from "react";
-import { runForecast } from "@/lib/forecasts/runForecast";
+import { askInsights } from "@/lib/insights";
 import type { ForecastResponse } from "@/lib/forecasts/types";
 import type { EarningsRow, StudentSummary } from "@/lib/forecasts/types";
 import { detectQueryLanguage, translateForInsights } from "@/utils/insightsLanguage";
 import type { SupportedLocale } from "@/lib/forecasts/types";
+import type { AskInsightsResult, InsightsMetadata } from "@/lib/insights";
+import type { InsightIntent } from "@/lib/insights/schema";
+import type { ForecastIntent } from "@/lib/forecasts/types";
+import type { Lesson, Student } from "@/types";
 
-const MAX_TURNS_FOR_CONTEXT = 10;
+
+function mapInsightIntentToForecast(intent: InsightIntent): ForecastIntent {
+  if (intent === "percent_change_yoy") return "percent_change";
+  if (intent === "forecast_monthly" || intent === "forecast_yearly") return "forecast";
+  if (intent === "clarification" || intent === "general_fallback") return "insight";
+  return "general_qa";
+}
 
 export type ConversationMessage = {
   role: "user" | "assistant";
   content: string;
-  meta?: { response?: ForecastResponse };
+  meta?: {
+    response?: ForecastResponse;
+    insightsResult?: AskInsightsResult;
+    metadata?: InsightsMetadata;
+  };
 };
 
 export type UseInsightsConversationArgs = {
+  userId?: string;
+  lessons?: Lesson[];
+  roster?: Student[];
   earnings: EarningsRow[];
   students: StudentSummary[];
   locale: SupportedLocale;
@@ -26,7 +43,7 @@ export type UseInsightsConversationArgs = {
 };
 
 export function useInsightsConversation(args: UseInsightsConversationArgs) {
-  const { earnings, students, locale, timezone } = args;
+  const { userId, lessons, roster, earnings, students, locale, timezone } = args;
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,60 +63,75 @@ export function useInsightsConversation(args: UseInsightsConversationArgs) {
       setMessages((prev) => [...prev, { role: "user", content: q }]);
 
       try {
-        const lastTurns = messages.slice(-MAX_TURNS_FOR_CONTEXT).map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        const debugInsights = import.meta.env.DEV || (typeof window !== "undefined" && (window as unknown as { DEBUG_INSIGHTS?: boolean }).DEBUG_INSIGHTS);
+        const priorPlan = [...messages].reverse().find((m) => m.role === "assistant")?.meta?.insightsResult?.trace?.queryPlan;
+        const priorContext = priorPlan
+          ? {
+            intent: priorPlan.intent,
+            time_range: priorPlan.time_range,
+            student_filter: priorPlan.student_filter,
+            slots: priorPlan.slots,
+          }
+          : undefined;
 
-        const lastMetrics = messages.filter((m) => m.role === "assistant" && m.meta?.response?.metrics).slice(-1)[0]?.meta?.response?.metrics;
-        const res = await runForecast({
-          query: q,
-          locale,
-          timezone,
-          rangeContext: { mode: "forecasts" },
+        const insightsResult = await askInsights(q, {
+          user_id: userId,
+          lessons,
+          roster,
           earnings,
           students,
-          conversationContext:
-            lastTurns.length > 0 || lastMetrics
-              ? { lastTurns, lastComputedMetrics: lastMetrics ?? undefined }
-              : undefined,
+          timezone,
+          locale,
+          priorContext,
         });
+        if (debugInsights && insightsResult.trace) {
+          console.log("[Insights] trace", insightsResult.trace);
+        }
+
+        let displayText = insightsResult.finalAnswerText;
+        if (insightsResult.needsClarification && insightsResult.clarifyingQuestion) {
+          displayText = insightsResult.clarifyingQuestion;
+        }
 
         const responseLang = detectQueryLanguage(q);
-        let summary = res.summary;
-        let details = res.details ?? "";
-        let answer = res.answer;
-
         if (responseLang === "es" || responseLang === "zh") {
-          const [summaryTrans, detailsTrans] = await Promise.all([
-            translateForInsights(res.summary, responseLang),
-            res.details ? translateForInsights(res.details, responseLang) : Promise.resolve(""),
-          ]);
-          summary = summaryTrans;
-          details = detailsTrans;
-          if (res.answer?.body != null || res.answer?.title != null) {
-            const bodyTrans = res.answer.body ? await translateForInsights(res.answer.body, responseLang) : res.answer.body;
-            const titleTrans = res.answer.title ? await translateForInsights(res.answer.title, responseLang) : res.answer.title;
-            answer = { title: titleTrans ?? res.answer.title, body: bodyTrans ?? res.answer.body };
-          }
+          displayText = await translateForInsights(displayText, responseLang);
         }
 
-        // Use structured output when present: answer only + up to 2 supporting bullets; optional clarifying question.
-        const structured = res.structuredAnswer;
-        const parts: (string | undefined | false)[] = structured
-          ? [structured.answer, ...(structured.supporting?.length ? structured.supporting.map((s) => `• ${s}`) : [])]
-          : [answer?.title && `**${answer.title}**`, summary, details && details.trim(), res.assumptions?.length ? `Assumptions: ${res.assumptions.join(" ")}` : ""];
-        if (structured?.needs_clarification && structured.clarifying_question) {
-          parts.push(`Clarifying: ${structured.clarifying_question}`);
-        }
-        const assistantContent = parts.filter((x): x is string => Boolean(x)).join("\n\n");
+        // Build legacy res for meta so UI that reads meta still works
+        const planIntent = insightsResult.trace?.queryPlan?.intent ?? "clarification";
+        const out = insightsResult.computedResult?.outputs as Record<string, unknown> | undefined;
+        const res: ForecastResponse = {
+          intent: mapInsightIntentToForecast(planIntent),
+          summary: insightsResult.finalAnswerText,
+          details: "",
+          metrics: {
+            projected_monthly: (out?.projected_monthly_dollars as number) ?? null,
+            projected_yearly: (out?.projected_yearly_dollars as number) ?? null,
+            estimated_tax: (out?.estimated_tax_yearly_dollars as number) ?? null,
+            avg_weekly: (out?.avg_weekly_dollars as number) ?? null,
+            trend: "unknown",
+          },
+          confidence: "high",
+          assumptions: [],
+          calculations: [],
+          structuredAnswer: {
+            answer: insightsResult.finalAnswerText,
+            type: "other",
+            supporting: [],
+            needs_clarification: insightsResult.needsClarification,
+            clarifying_question: insightsResult.clarifyingQuestion,
+          },
+        };
+
+        const assistantContent = displayText;
 
         setMessages((prev) => [
           ...prev,
           {
             role: "assistant",
             content: assistantContent,
-            meta: { response: { ...res, summary, details, answer } },
+            meta: { response: res, insightsResult, metadata: insightsResult.metadata },
           },
         ]);
       } catch (e: unknown) {
@@ -113,7 +145,7 @@ export function useInsightsConversation(args: UseInsightsConversationArgs) {
         setIsLoading(false);
       }
     },
-    [earnings, students, locale, timezone, messages]
+    [userId, lessons, roster, earnings, students, locale, timezone, messages]
   );
 
   return { messages, sendMessage, clear, isLoading, error };

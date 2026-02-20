@@ -6,29 +6,12 @@ import { hasSupabase } from "@/lib/supabase";
 import { formatCurrency, getAllScheduledDays, toDateKey, isStudentActive, isStudentHistorical } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Student } from "@/types";
+import { Button } from "@/components/ui/Button";
+import { ChevronRightIcon } from "@/components/ui/Icons";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-const roundBtnStyle = {
-  width: 40,
-  height: 40,
-  minWidth: 40,
-  maxWidth: 40,
-  minHeight: 40,
-  maxHeight: 40,
-  borderRadius: "50%" as const,
-  display: "flex",
-  alignItems: "center" as const,
-  justifyContent: "center" as const,
-  border: "none",
-  cursor: "pointer" as const,
-  fontSize: 14,
-  fontWeight: 600,
-  padding: 0,
-  lineHeight: 1,
-};
 
 /** Parse timeOfDay string to minutes from midnight for sorting. Returns 9999 if unparseable (sorts last). */
 function timeOfDayToMinutes(t: string): number {
@@ -154,57 +137,20 @@ export default function Students() {
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          onClick={() => { setRosterTab("active"); setDayFilter(null); }}
-          className="pill"
-          style={{
-            padding: "10px 18px",
-            fontSize: 14,
-            fontWeight: 600,
-            fontFamily: "var(--font-sans)",
-            background: rosterTab === "active" ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
-            color: rosterTab === "active" ? "white" : "var(--text)",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
+        <Button type="button" variant="tab" size="sm" active={rosterTab === "active"} onClick={() => { setRosterTab("active"); setDayFilter(null); }}>
           {t("students.active")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setRosterTab("historical")}
-          className="pill"
-          style={{
-            padding: "10px 18px",
-            fontSize: 14,
-            fontWeight: 600,
-            fontFamily: "var(--font-sans)",
-            background: rosterTab === "historical" ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
-            color: rosterTab === "historical" ? "white" : "var(--text)",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
+        </Button>
+        <Button type="button" variant="tab" size="sm" active={rosterTab === "historical"} onClick={() => setRosterTab("historical")}>
           {t("students.historical")}
-        </button>
+        </Button>
       </div>
 
       {rosterTab === "active" && (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <button
-              type="button"
-              onClick={() => setDayFilter(null)}
-              style={{
-                ...roundBtnStyle,
-                background: dayFilter === null ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
-                color: dayFilter === null ? "white" : "var(--text)",
-                flexShrink: 0,
-              }}
-            >
+            <Button type="button" variant="tab" size="sm" active={dayFilter === null} onClick={() => setDayFilter(null)} style={{ flexShrink: 0 }}>
               {t("students.all")}
-            </button>
+            </Button>
             <input
               type="search"
               placeholder={t("students.searchPlaceholder")}
@@ -216,20 +162,18 @@ export default function Students() {
           </div>
           <div style={{ display: "flex", flexWrap: "nowrap", gap: 10, marginBottom: 20 }}>
             {DAY_SHORT.map((label, i) => (
-              <button
+              <Button
                 key={i}
                 type="button"
+                variant="tab"
+                size="sm"
+                active={dayFilter === i}
                 onClick={() => setDayFilter(i)}
-                style={{
-                  ...roundBtnStyle,
-                  background: dayFilter === i ? "var(--avatar-gradient)" : "rgba(201, 123, 148, 0.12)",
-                  color: dayFilter === i ? "white" : "var(--text)",
-                  flexShrink: 0,
-                }}
+                style={{ minWidth: 40, minHeight: 40, flexShrink: 0 }}
                 title={`${DAY_FULL[i]} (${countPerDay[i]})`}
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         </>
@@ -306,7 +250,7 @@ export default function Students() {
                           <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4, fontStyle: "italic" }}>{t("studentDetail.terminatingOn", { date: s.terminatedFromDate })}</div>
                         )}
                       </div>
-                      <span style={{ color: "var(--text-muted)", fontSize: 18 }}>›</span>
+                      <span style={{ color: "var(--text-muted)", display: "inline-flex", alignItems: "center" }}><ChevronRightIcon size={16} /></span>
                     </div>
                   </Link>
                 ))}
@@ -326,33 +270,22 @@ export default function Students() {
                   <div style={{ fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{t("students.terminatedOn", { date: s.terminatedFromDate ?? "" })}</div>
                 </div>
-                <span style={{ color: "var(--text-muted)", fontSize: 18 }}>›</span>
+                <span style={{ color: "var(--text-muted)", display: "inline-flex", alignItems: "center" }}><ChevronRightIcon size={16} /></span>
               </div>
             </Link>
           ))}
         </div>
       )}
       <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "center" }}>
-        <button
+        <Button
           type="button"
+          variant="danger"
+          size="md"
           onClick={() => setDeleteAllConfirmOpen(true)}
           disabled={totalCount === 0}
-          style={{
-            fontFamily: "var(--font-sans)",
-            fontSize: 14,
-            fontWeight: 600,
-            color: "#dc2626",
-            background: "transparent",
-            border: "1px solid #dc2626",
-            borderRadius: 999,
-            padding: "10px 20px",
-            cursor: totalCount === 0 ? "default" : "pointer",
-            opacity: totalCount === 0 ? 0.5 : 1,
-            boxShadow: "none",
-          }}
         >
           {t("students.deleteAllStudents")}
-        </button>
+        </Button>
       </div>
       {deleteAllConfirmOpen && (
         <div
@@ -383,32 +316,25 @@ export default function Students() {
               {t("students.deleteAllConfirmMessage")}
             </p>
             <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
-              <button
+              <Button
                 type="button"
+                variant="secondary"
+                size="sm"
                 onClick={() => !deleting && setDeleteAllConfirmOpen(false)}
                 disabled={deleting}
-                className="pill"
-                style={{ fontFamily: "var(--font-sans)", padding: "10px 20px", fontSize: 14, fontWeight: 500 }}
               >
                 {t("students.deleteAllCancel")}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="danger"
+                size="sm"
                 onClick={handleConfirmDeleteAll}
                 disabled={deleting}
-                className="pill"
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  padding: "10px 20px",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  background: "var(--avatar-gradient)",
-                  color: "white",
-                  border: "none",
-                }}
+                loading={deleting}
               >
-                {deleting ? t("common.loading") || "..." : t("students.deleteAllConfirm")}
-              </button>
+                {t("students.deleteAllConfirm")}
+              </Button>
             </div>
           </div>
         </div>

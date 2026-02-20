@@ -4,7 +4,7 @@
  * UI: pastel background, floating cards, centered search (no background), gradient mic, chat-style results.
  */
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { dedupeLessons, getEffectiveRateCents } from "@/utils/earnings";
@@ -12,6 +12,11 @@ import type { StudentSummary } from "@/lib/forecasts/types";
 import { INSIGHTS_CATEGORIES } from "./insightsConstants";
 import { useInsightsConversation } from "./insights/useInsightsConversation";
 import { useVoiceInput } from "./insights/useVoiceInput";
+import { evaluateInsightsQuestion } from "@/lib/insights";
+import type { InsightIntent } from "@/lib/insights/schema";
+import { INSIGHTS_TEST_QUESTIONS } from "@/features/insights/testQuestions";
+import { Button, IconButton } from "@/components/ui/Button";
+import { DownloadIcon } from "@/components/ui/Icons";
 
 export default function Insights() {
   const { data } = useStoreContext();
@@ -55,6 +60,9 @@ export default function Insights() {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const { messages, sendMessage, clear, isLoading, error } = useInsightsConversation({
+    userId: data.user?.id,
+    lessons: data.lessons,
+    roster: data.students,
     earnings,
     students,
     locale,
@@ -65,11 +73,18 @@ export default function Insights() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
 
   const preferredLang = lang === "es" ? "es" : lang === "zh" ? "zh" : "en";
+  const [voiceEmptyError, setVoiceEmptyError] = useState<string | null>(null);
   const voice = useVoiceInput({
     preferredLang,
     onTranscript(text) {
-      setQueryText(text);
-      sendMessage(text);
+      const trimmed = text.trim();
+      if (!trimmed) {
+        setVoiceEmptyError("Try again");
+        return;
+      }
+      setVoiceEmptyError(null);
+      setQueryText(trimmed);
+      sendMessage(trimmed);
     },
   });
 
@@ -97,6 +112,106 @@ export default function Insights() {
     setQueryText(question);
     sendMessage(question);
   }
+
+  type TestResultRow = {
+    question: string;
+    expectedIntent: string;
+    expectedMetric: string;
+    detectedIntent: string;
+    handlerUsed: string;
+    expectedMetricValue: string;
+    gotMetricValue: string;
+    pass: boolean;
+    errorMessage: string | null;
+    responsePreview: string;
+  };
+  const [testResults, setTestResults] = useState<TestResultRow[] | null>(null);
+  const [testRunning, setTestRunning] = useState(false);
+  const runInsightsTests = useCallback(async () => {
+    setTestRunning(true);
+    setTestResults(null);
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const results: TestResultRow[] = [];
+    for (const t of INSIGHTS_TEST_QUESTIONS) {
+      try {
+        const evalResult = await evaluateInsightsQuestion(
+          {
+            id: `panel-${results.length + 1}`,
+            language: "en",
+            text: t.question,
+            expected_intent: t.expectedIntent,
+            expected_metric: t.expectedMetric,
+            expects_clarification: t.expectedClarificationNeeded,
+            notes: t.notes,
+          },
+          {
+            user_id: data.user?.id,
+            lessons: data.lessons,
+            roster: data.students,
+            earnings,
+            students,
+            timezone,
+            locale: "en-US",
+          }
+        );
+        const pass = evalResult.row.verdict === "PASS";
+        const planIntent = evalResult.row.detected_intent as InsightIntent;
+        results.push({
+          question: t.question,
+          expectedIntent: t.expectedIntent,
+          expectedMetric: evalResult.row.expected_metric ?? "auto",
+          detectedIntent: planIntent,
+          handlerUsed: planIntent,
+          expectedMetricValue: evalResult.row.expected_metric_value,
+          gotMetricValue: evalResult.row.got_metric_value,
+          pass,
+          errorMessage: evalResult.row.fail_reasons.length > 0 ? evalResult.row.fail_reasons.join("; ") : null,
+          responsePreview: evalResult.row.llm_answer.slice(0, 80) + (evalResult.row.llm_answer.length > 80 ? "…" : ""),
+        });
+      } catch (e) {
+        results.push({
+          question: t.question,
+          expectedIntent: t.expectedIntent,
+          expectedMetric: "auto",
+          detectedIntent: "—",
+          handlerUsed: "—",
+          expectedMetricValue: "—",
+          gotMetricValue: "—",
+          pass: false,
+          errorMessage: e instanceof Error ? e.message : String(e),
+          responsePreview: "",
+        });
+      }
+    }
+    setTestResults(results);
+    setTestRunning(false);
+  }, [earnings, students, data.user?.id, data.lessons, data.students, lang]);
+
+  const downloadTestResults = useCallback(() => {
+    if (!testResults || testResults.length === 0) return;
+    const escape = (v: string) => `"${String(v).replace(/"/g, '""')}"`;
+    const headers = ["Question", "Expected Intent", "Expected Metric", "Detected Intent", "Handler Used", "Expected Metric Value", "Got Metric Value", "Pass", "Error", "Response Preview"];
+    const rows = testResults.map((r) => [
+      escape(r.question),
+      escape(r.expectedIntent),
+      escape(r.expectedMetric),
+      escape(r.detectedIntent),
+      escape(r.handlerUsed),
+      escape(r.expectedMetricValue),
+      escape(r.gotMetricValue),
+      escape(r.pass ? "PASS" : "FAIL"),
+      escape(r.errorMessage ?? ""),
+      escape(r.responsePreview),
+    ]);
+    const csv = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `insights-test-results-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [testResults]);
 
   const floatingCard = {
     background: "var(--card)",
@@ -154,27 +269,23 @@ export default function Insights() {
           <ul className="insights-category-list" style={{ listStyle: "none", margin: "12px 0 0", padding: 0, border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", background: "var(--card)", boxShadow: "var(--shadow-card)" }}>
             {INSIGHTS_CATEGORIES.find((c) => c.label === selectedCategory)?.questions.map((q, i, arr) => (
               <li key={q} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border)" : "none" }}>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => onCategoryQuestion(q)}
                   disabled={isLoading}
-                  className="insights-category-item"
                   style={{
                     width: "100%",
-                    padding: "12px 18px",
                     textAlign: "left",
-                    border: "none",
-                    background: "transparent",
-                    color: "var(--text)",
-                    fontSize: 14,
-                    fontFamily: "var(--font-sans)",
-                    cursor: isLoading ? "default" : "pointer",
                     borderRadius: 0,
+                    justifyContent: "flex-start",
+                    boxShadow: "none",
                     transition: "background 0.15s ease",
                   }}
                 >
                   {q}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -230,25 +341,17 @@ export default function Insights() {
               }}
             />
           </div>
-          <button
+          <IconButton
             type="button"
             onClick={voice.phase === "recording" ? voice.stopRecording : voice.startRecording}
             disabled={!voice.supported || isLoading}
             aria-label={voice.phase === "recording" ? "Stop recording" : "Voice input"}
+            variant={voice.phase === "recording" ? "danger" : "primary"}
+            size="md"
             className="insights-voice-btn"
             style={{
-              width: 48,
-              height: 48,
-              borderRadius: "50%",
-              border: "none",
-              background: "var(--avatar-gradient)",
               color: "#fff",
-              cursor: voice.supported && !isLoading ? "pointer" : "default",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
               flexShrink: 0,
-              boxShadow: "var(--shadow-soft)",
               animation: voice.phase === "recording" ? "insights-voice-pulse 1.2s ease-in-out infinite" : "none",
               transition: "filter 0.2s ease, transform 0.15s ease",
             }}
@@ -259,7 +362,7 @@ export default function Insights() {
               <line x1="12" y1="19" x2="12" y2="23" />
               <line x1="8" y1="23" x2="16" y2="23" />
             </svg>
-          </button>
+          </IconButton>
         </div>
       </div>
 
@@ -268,50 +371,80 @@ export default function Insights() {
           Listening…
         </p>
       )}
-      {voice.error && (
-        <p style={{ textAlign: "center", fontSize: 13, color: "#dc2626", margin: "4px 0 8px" }}>{voice.error}</p>
+      {(voice.error || voiceEmptyError) && (
+        <p style={{ textAlign: "center", fontSize: 13, color: "#dc2626", margin: "4px 0 8px" }}>{voice.error || voiceEmptyError}</p>
       )}
 
       {/* Ask button + New chat: side by side, centered */}
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 24 }}>
-        <button
+        <Button type="button" variant="primary" size="sm" onClick={onSubmit} disabled={isLoading} loading={isLoading}>
+          Ask
+        </Button>
+        <Button
           type="button"
-          onClick={onSubmit}
-          className="pill"
-          disabled={isLoading}
-          style={{
-            padding: "10px 22px",
-            fontSize: 14,
-            fontFamily: "var(--font-sans)",
-            fontWeight: 600,
-            background: "#ffffff",
-            color: "#1a1a1a",
-            border: "1px solid var(--border)",
-            boxShadow: "var(--shadow-soft)",
-            cursor: isLoading ? "default" : "pointer",
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setQueryText("");
+            setVoiceEmptyError(null);
+            searchInputRef.current?.focus();
           }}
         >
-          {isLoading ? "…" : "Ask"}
-        </button>
-        <button
-          type="button"
-          onClick={clear}
-          className="pill"
-          style={{
-            padding: "8px 14px",
-            fontSize: 13,
-            fontWeight: 600,
-            fontFamily: "var(--font-sans)",
-            border: "1px solid var(--border)",
-            background: "var(--card)",
-            color: "var(--text-muted)",
-            cursor: "pointer",
-            boxShadow: "var(--shadow-soft)",
-          }}
-        >
+          Clear
+        </Button>
+        <Button type="button" variant="secondary" size="sm" onClick={clear}>
           New chat
-        </button>
+        </Button>
       </div>
+
+      {/* Dev-only: Insights test harness */}
+      {import.meta.env.DEV && (
+        <div style={{ marginBottom: 24, padding: 16, background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--radius-card)", fontSize: 13 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--text-muted)" }}>Diagnostics</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            <Button type="button" variant="secondary" size="sm" onClick={runInsightsTests} disabled={testRunning} loading={testRunning}>
+              {testRunning ? "Running…" : "Run Insights Tests"}
+            </Button>
+            {testResults && testResults.length > 0 && (
+              <Button type="button" variant="secondary" size="sm" onClick={downloadTestResults} leftIcon={<DownloadIcon size={10} />}>
+                Download results
+              </Button>
+            )}
+          </div>
+          {testResults && (
+            <div style={{ marginTop: 12, overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                    <th style={{ textAlign: "left", padding: "6px 8px" }}>Question</th>
+                    <th style={{ textAlign: "left", padding: "6px 8px" }}>Expected</th>
+                    <th style={{ textAlign: "left", padding: "6px 8px" }}>Detected</th>
+                    <th style={{ textAlign: "left", padding: "6px 8px" }}>Expected metric</th>
+                    <th style={{ textAlign: "left", padding: "6px 8px" }}>Got metric</th>
+                    <th style={{ textAlign: "left", padding: "6px 8px" }}>Pass</th>
+                    <th style={{ textAlign: "left", padding: "6px 8px" }}>Error</th>
+                    <th style={{ textAlign: "left", padding: "6px 8px" }}>Response</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {testResults.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ padding: "6px 8px", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis" }} title={r.question}>{r.question}</td>
+                      <td style={{ padding: "6px 8px" }}>{r.expectedIntent}</td>
+                      <td style={{ padding: "6px 8px" }}>{r.detectedIntent}</td>
+                      <td style={{ padding: "6px 8px" }}>{r.expectedMetricValue}</td>
+                      <td style={{ padding: "6px 8px" }}>{r.gotMetricValue}</td>
+                      <td style={{ padding: "6px 8px", color: r.pass ? "var(--success)" : "#dc2626" }}>{r.pass ? "✓" : "✗"}</td>
+                      <td style={{ padding: "6px 8px", color: "#dc2626" }}>{r.errorMessage ?? "—"}</td>
+                      <td style={{ padding: "6px 8px", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }} title={r.responsePreview}>{r.responsePreview}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Gradient loader while thinking */}
       {isLoading && (
@@ -386,6 +519,80 @@ export default function Insights() {
                     )
                   )}
                 </div>
+                {/* Metadata: lesson count + date range, shown under every answer */}
+                {m.meta?.metadata && !m.meta.insightsResult?.needsClarification && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      fontSize: 11,
+                      color: "var(--text-muted)",
+                      fontFamily: "var(--font-sans)",
+                      borderTop: "1px solid var(--border)",
+                      paddingTop: 8,
+                    }}
+                  >
+                    Based on {m.meta.metadata.lesson_count} completed lesson{m.meta.metadata.lesson_count !== 1 ? "s" : ""}
+                    {m.meta.metadata.date_range_label ? ` · ${m.meta.metadata.date_range_label}` : ""}
+                  </div>
+                )}
+                {/* Dev-only: View details accordion */}
+                {import.meta.env.DEV && m.meta?.insightsResult?.trace && (
+                  <details
+                    style={{
+                      marginTop: 8,
+                      fontSize: 11,
+                      fontFamily: "var(--font-sans)",
+                    }}
+                  >
+                    <summary
+                      style={{
+                        cursor: "pointer",
+                        color: "var(--text-muted)",
+                        userSelect: "none",
+                        outline: "none",
+                      }}
+                    >
+                      View details
+                    </summary>
+                    <div
+                      style={{
+                        marginTop: 8,
+                        padding: "8px 10px",
+                        background: "rgba(0,0,0,0.04)",
+                        borderRadius: 6,
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      <div><strong>Intent:</strong> {m.meta.insightsResult.trace.queryPlan.intent}</div>
+                      <div><strong>Router:</strong> {m.meta.metadata?.router_used ?? "regex"}</div>
+                      <div><strong>Truth key:</strong> {m.meta.insightsResult.trace.queryPlan.sql_truth_query_key}</div>
+                      {(m.meta.insightsResult.trace.queryPlan.time_range?.label ?? m.meta.insightsResult.trace.queryPlan.time_range?.start) && (
+                        <div><strong>Range:</strong> {m.meta.insightsResult.trace.queryPlan.time_range?.label ?? m.meta.insightsResult.trace.queryPlan.time_range?.start}</div>
+                      )}
+                      {m.meta.insightsResult.trace.verifierErrors?.length > 0 && (
+                        <div style={{ color: "#dc2626" }}>
+                          <strong>Verifier:</strong> {m.meta.insightsResult.trace.verifierErrors.join("; ")}
+                        </div>
+                      )}
+                      <details style={{ marginTop: 6 }}>
+                        <summary style={{ cursor: "pointer", color: "var(--text-muted)" }}>Raw computed outputs</summary>
+                        <pre
+                          style={{
+                            marginTop: 4,
+                            padding: "6px 8px",
+                            background: "rgba(0,0,0,0.06)",
+                            borderRadius: 4,
+                            overflowX: "auto",
+                            fontSize: 10,
+                            maxHeight: 200,
+                          }}
+                        >
+                          {JSON.stringify(m.meta.insightsResult.computedResult?.outputs, null, 2)}
+                        </pre>
+                      </details>
+                    </div>
+                  </details>
+                )}
               </div>
             )}
           </div>

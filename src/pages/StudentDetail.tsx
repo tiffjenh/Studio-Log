@@ -9,6 +9,7 @@ import StudentAvatar from "@/components/StudentAvatar";
 import { hasSupabase } from "@/lib/supabase";
 import { fetchStudentChangeEvents, insertStudentChangeEvent } from "@/store/supabaseSync";
 import type { DaySchedule, Student, StudentChangeEvent } from "@/types";
+import { Button, IconButton } from "@/components/ui/Button";
 
 const DURATIONS = [30, 45, 60, 90, 120];
 const DURATION_LABELS: Record<number, string> = { 30: "30 min", 45: "45 min", 60: "1 hr", 90: "1.5 hr", 120: "2 hr" };
@@ -531,9 +532,9 @@ export default function StudentDetail() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {!editing ? (
-            <button type="button" onClick={handleStartEdit} className="pill pill--active" style={{ padding: "10px 18px", fontFamily: "var(--font-sans)" }}>{t("common.edit")}</button>
+            <Button type="button" variant="tab" size="sm" active onClick={handleStartEdit}>{t("common.edit")}</Button>
           ) : (
-            <button type="button" onClick={() => setDeleteConfirmOpen(true)} className="btn" style={{ padding: "4px 10px", fontSize: 12, fontWeight: 600, border: "1px solid rgba(220,38,38,0.4)", background: "transparent", color: "#dc2626", ...fontStyle }}>{t("common.delete")}</button>
+            <Button type="button" variant="danger" size="sm" onClick={() => setDeleteConfirmOpen(true)}>{t("common.delete")}</Button>
           )}
         </div>
       </div>
@@ -554,7 +555,7 @@ export default function StudentDetail() {
             </p>
             {scheduleChangeCancelMessage ? <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--success, #16a34a)" }}>{scheduleChangeCancelMessage}</p> : null}
           </div>
-          <button type="button" onClick={handleCancelUpcomingChange} className="btn" style={{ border: "1px solid var(--border)", background: "var(--card)", ...fontStyle }}>{t("common.cancel")}</button>
+          <Button type="button" variant="secondary" size="sm" onClick={handleCancelUpcomingChange}>{t("common.cancel")}</Button>
         </div>
       )}
 
@@ -566,7 +567,7 @@ export default function StudentDetail() {
             </p>
             {terminationCancelMessage ? <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--success, #16a34a)" }}>{terminationCancelMessage}</p> : null}
           </div>
-          <button type="button" onClick={handleCancelTermination} className="btn" style={{ border: "1px solid var(--border)", background: "var(--card)", ...fontStyle }}>{t("common.cancel")}</button>
+          <Button type="button" variant="secondary" size="sm" onClick={handleCancelTermination}>{t("common.cancel")}</Button>
         </div>
       )}
 
@@ -579,9 +580,9 @@ export default function StudentDetail() {
           <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" style={inputStyle} required />
           {/* + Day above first lesson module, right side */}
           <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 12 }}>
-            <button type="button" onClick={addScheduleEntry} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 999, border: "none", background: "var(--avatar-gradient)", color: "#ffffff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-sans)", boxShadow: "var(--shadow-soft)" }}>
-              + Day
-            </button>
+            <Button type="button" variant="primary" size="sm" onClick={addScheduleEntry} leftIcon={<span>+</span>}>
+              Day
+            </Button>
           </div>
           {/* Schedule entries */}
           {scheduleEntries.map((entry) => (
@@ -589,38 +590,38 @@ export default function StudentDetail() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <span style={{ fontWeight: 700, fontSize: 15, ...fontStyle }}>{DAYS_FULL[entry.dayOfWeek]} Lesson</span>
                 {scheduleEntries.length > 1 && (
-                  <button type="button" onClick={() => removeScheduleEntry(entry.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#dc2626", padding: "4px 8px", fontWeight: 600, ...fontStyle }}>Delete Day</button>
+                  <Button type="button" variant="danger" size="sm" onClick={() => removeScheduleEntry(entry.id)}>Delete Day</Button>
                 )}
               </div>
               <label style={labelStyle}>Day of week</label>
               <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
                 {DAY_SHORT.map((label, i) => (
-                  <button key={i} type="button" onClick={() => updateEntry(entry.id, "dayOfWeek", i)} className={entry.dayOfWeek === i ? "pill pill--active" : "pill"} style={{ flex: "1 1 0", minWidth: 0, padding: "8px 2px", fontSize: 13, textAlign: "center", ...fontStyle }}>{label}</button>
+                  <Button key={i} type="button" variant="tab" size="sm" active={entry.dayOfWeek === i} onClick={() => updateEntry(entry.id, "dayOfWeek", i)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>{label}</Button>
                 ))}
               </div>
               <label style={labelStyle}>Lesson duration</label>
               <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
                 {DURATIONS.map((m) => (
-                  <button key={m} type="button" onClick={() => updateEntry(entry.id, "durationMinutes", m)} className={entry.durationMinutes === m ? "pill pill--active" : "pill"} style={{ flex: "1 1 0", minWidth: 0, padding: "8px 2px", fontSize: 13, textAlign: "center", ...fontStyle }}>
+                  <Button key={m} type="button" variant="tab" size="sm" active={entry.durationMinutes === m} onClick={() => updateEntry(entry.id, "durationMinutes", m)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>
                     {DURATION_LABELS[m]}
-                  </button>
+                  </Button>
                 ))}
               </div>
               <label style={labelStyle}>Rate</label>
-              <button type="button" onClick={() => openPerDayRateModal(entry.id)} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+              <Button type="button" variant="secondary" size="md" onClick={() => openPerDayRateModal(entry.id)} fullWidth style={{ marginBottom: 16, textAlign: "left", justifyContent: "flex-start" }}>
                 {entry.rateDollars ? `${getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$"}${entry.rateDollars}` : (getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$") + "0"}
-              </button>
+              </Button>
               <label style={labelStyle}>Time</label>
-              <button type="button" onClick={() => openPerDayTimePicker(entry.id)} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 0, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+              <Button type="button" variant="secondary" size="md" onClick={() => openPerDayTimePicker(entry.id)} fullWidth style={{ textAlign: "left", justifyContent: "flex-start" }}>
                 {entry.timeOfDay || "5:00 PM"}
-              </button>
+              </Button>
             </div>
           ))}
 
           {error ? <p style={{ color: "#dc2626", marginBottom: 16, ...fontStyle }}>{error}</p> : null}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 16, justifyContent: "center" }}>
-            <button type="submit" className="btn btn-primary" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, ...fontStyle }}>{t("common.save")}</button>
-            <button type="button" onClick={handleCancelEdit} className="btn" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, border: "1px solid var(--border)", background: "#ffffff", color: "var(--text)", ...fontStyle }}>{t("common.cancel")}</button>
+            <Button type="submit" variant="secondary" size="sm">{t("common.save")}</Button>
+            <Button type="button" variant="secondary" size="sm" onClick={handleCancelEdit}>{t("common.cancel")}</Button>
           </div>
         </form>
 
@@ -628,22 +629,27 @@ export default function StudentDetail() {
         <div style={{ marginTop: 20, marginBottom: 28 }}>
           {/* Buttons row - always side by side */}
           <div style={{ display: "flex", gap: 8, marginBottom: (changeScheduleOpen || terminateStudentOpen) ? 12 : 0 }}>
-            <button
+            <Button
               type="button"
+              variant="tab"
+              size="md"
+              active={changeScheduleOpen}
               onClick={() => { setChangeScheduleOpen((o) => !o); setTerminateStudentOpen(false); }}
-              style={{ flex: "1 1 0", minWidth: 0, display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-start", padding: "12px 14px", background: changeScheduleOpen ? "rgba(201, 123, 148, 0.1)" : "var(--bg)", border: "1px solid var(--border)", borderRadius: 12, cursor: "pointer", fontSize: "clamp(12px, 2.5vw, 16px)", fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text-muted)", textAlign: "left" }}
+              style={{ flex: "1 1 0", minWidth: 0, justifyContent: "flex-start", textAlign: "left", paddingLeft: 14, paddingRight: 14 }}
             >
               <span style={{ fontSize: 14 }}>{changeScheduleOpen ? "\u25BC" : "\u25B6"}</span>
               {t("studentDetail.changeSchedule")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="danger"
+              size="md"
               onClick={() => { setTerminateStudentOpen((o) => !o); setChangeScheduleOpen(false); }}
-              style={{ flex: "1 1 0", minWidth: 0, display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-start", padding: "12px 14px", background: terminateStudentOpen ? "rgba(201, 123, 148, 0.1)" : "var(--bg)", border: "1px solid var(--border)", borderRadius: 12, cursor: "pointer", fontSize: "clamp(12px, 2.5vw, 16px)", fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text-muted)", textAlign: "left" }}
+              style={{ flex: "1 1 0", minWidth: 0, justifyContent: "flex-start", textAlign: "left", paddingLeft: 14, paddingRight: 14 }}
             >
               <span style={{ fontSize: 14 }}>{terminateStudentOpen ? "\u25BC" : "\u25B6"}</span>
               {t("studentDetail.terminateStudent")}
-            </button>
+            </Button>
           </div>
           {/* Expanded content - full width below */}
           {changeScheduleOpen && (
@@ -654,47 +660,47 @@ export default function StudentDetail() {
                 <DatePicker value={scheduleChangeFromDate} onChange={setScheduleChangeFromDate} placeholder="Select date" />
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 12 }}>
-                <button type="button" onClick={addSchedChangeEntry} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 999, border: "none", background: "var(--avatar-gradient)", color: "#ffffff", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-sans)", boxShadow: "var(--shadow-soft)" }}>
-                  + Day
-                </button>
+                <Button type="button" variant="primary" size="sm" onClick={addSchedChangeEntry} leftIcon={<span>+</span>}>
+                  Day
+                </Button>
               </div>
               {schedChangeEntries.map((entry) => (
                 <div key={entry.id} style={{ marginBottom: 20, padding: 16, borderRadius: 12, border: "1px solid var(--border)", background: "var(--bg)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                     <span style={{ fontWeight: 700, fontSize: 15, ...fontStyle }}>{DAYS_FULL[entry.dayOfWeek]} Lesson</span>
                     {schedChangeEntries.length > 1 && (
-                      <button type="button" onClick={() => removeSchedChangeEntry(entry.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#dc2626", padding: "4px 8px", fontWeight: 600, ...fontStyle }}>Delete Day</button>
+                      <Button type="button" variant="danger" size="sm" onClick={() => removeSchedChangeEntry(entry.id)}>Delete Day</Button>
                     )}
                   </div>
                   <label style={labelStyle}>{t("studentDetail.newDayOfWeek")}</label>
                   <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
                     {DAY_SHORT.map((label, i) => (
-                      <button key={i} type="button" onClick={() => updateSchedChangeEntry(entry.id, "dayOfWeek", i)} className={entry.dayOfWeek === i ? "pill pill--active" : "pill"} style={{ flex: "1 1 0", minWidth: 0, padding: "8px 2px", fontSize: 13, textAlign: "center", ...fontStyle }}>{label}</button>
+                      <Button key={i} type="button" variant="tab" size="sm" active={entry.dayOfWeek === i} onClick={() => updateSchedChangeEntry(entry.id, "dayOfWeek", i)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>{label}</Button>
                     ))}
                   </div>
                   <label style={labelStyle}>{t("studentDetail.newLessonDuration")}</label>
                   <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
                     {DURATIONS.map((m) => (
-                      <button key={m} type="button" onClick={() => updateSchedChangeEntry(entry.id, "durationMinutes", m)} className={entry.durationMinutes === m ? "pill pill--active" : "pill"} style={{ flex: "1 1 0", minWidth: 0, padding: "8px 2px", fontSize: 13, textAlign: "center", ...fontStyle }}>
+                      <Button key={m} type="button" variant="tab" size="sm" active={entry.durationMinutes === m} onClick={() => updateSchedChangeEntry(entry.id, "durationMinutes", m)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>
                         {DURATION_LABELS[m]}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                   <label style={labelStyle}>{t("studentDetail.newRate")}</label>
-                  <button type="button" onClick={() => openSchedChangeRateModal(entry.id)} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+                  <Button type="button" variant="secondary" size="md" onClick={() => openSchedChangeRateModal(entry.id)} fullWidth style={{ marginBottom: 16, textAlign: "left", justifyContent: "flex-start" }}>
                     {entry.rateDollars ? `${getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$"}${entry.rateDollars}` : (getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$") + "0"}
-                  </button>
+                  </Button>
                   <label style={labelStyle}>{t("common.newTime")}</label>
-                  <button type="button" onClick={() => openSchedChangeTimePicker(entry.id)} style={{ width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 0, fontSize: 16, textAlign: "left", background: "var(--card)", cursor: "pointer", ...fontStyle }}>
+                  <Button type="button" variant="secondary" size="md" onClick={() => openSchedChangeTimePicker(entry.id)} fullWidth style={{ textAlign: "left", justifyContent: "flex-start" }}>
                     {entry.timeOfDay || "5:00 PM"}
-                  </button>
+                  </Button>
                 </div>
               ))}
               {scheduleChangeError ? <p style={{ color: "#dc2626", marginBottom: 12, ...fontStyle }}>{scheduleChangeError}</p> : null}
               {scheduleChangeSaveMessage ? <p style={{ color: "var(--success, #16a34a)", marginBottom: 12, ...fontStyle }}>{scheduleChangeSaveMessage}</p> : null}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12, justifyContent: "center" }}>
-                <button type="button" onClick={handleSaveScheduleChange} className="btn btn-primary" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, ...fontStyle }}>{t("studentDetail.saveScheduleChanges")}</button>
-                <button type="button" onClick={() => setChangeScheduleOpen(false)} className="btn" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, border: "1px solid var(--border)", background: "#ffffff", color: "var(--text)", ...fontStyle }}>{t("common.cancel")}</button>
+                <Button type="button" variant="primary" size="sm" onClick={handleSaveScheduleChange}>{t("studentDetail.saveScheduleChanges")}</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setChangeScheduleOpen(false)}>{t("common.cancel")}</Button>
               </div>
             </div>
           )}
@@ -707,8 +713,8 @@ export default function StudentDetail() {
               </div>
               {terminationSaveMessage ? <p style={{ color: "var(--success, #16a34a)", marginBottom: 12, ...fontStyle }}>{terminationSaveMessage}</p> : null}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, justifyContent: "center" }}>
-                <button type="button" onClick={handleSaveTermination} className="btn btn-primary" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, ...fontStyle }} disabled={!terminatedFromDate.trim()}>{t("common.save")}</button>
-                <button type="button" onClick={() => setTerminateStudentOpen(false)} className="btn" style={{ fontSize: 13, padding: "8px 16px", minHeight: 36, border: "1px solid var(--border)", background: "#ffffff", color: "var(--text)", ...fontStyle }}>{t("common.cancel")}</button>
+                <Button type="button" variant="secondary" size="sm" onClick={handleSaveTermination} disabled={!terminatedFromDate.trim()}>{t("common.save")}</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setTerminateStudentOpen(false)}>{t("common.cancel")}</Button>
               </div>
             </div>
           )}
@@ -720,8 +726,8 @@ export default function StudentDetail() {
               <h3 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 600 }}>{t("common.areYouSure")}</h3>
               <p style={{ margin: "0 0 20px", fontSize: 14, color: "var(--text-muted)" }}>{t("common.deleteStudentConfirm")}</p>
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                <button type="button" onClick={() => setDeleteConfirmOpen(false)} className="btn" style={{ border: "1px solid var(--border)", background: "var(--card)", ...fontStyle }}>{t("common.cancel")}</button>
-                <button type="button" onClick={handleDelete} className="btn" style={{ border: "1px solid rgba(220,38,38,0.4)", background: "transparent", color: "#dc2626", ...fontStyle }}>{t("common.delete")}</button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setDeleteConfirmOpen(false)}>{t("common.cancel")}</Button>
+                <Button type="button" variant="danger" size="sm" onClick={handleDelete}>{t("common.delete")}</Button>
               </div>
             </div>
           </div>
@@ -731,19 +737,19 @@ export default function StudentDetail() {
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setPerDayRateModalOpen(false)}>
             <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                <button type="button" onClick={() => setPerDayRateModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>&times;</button>
+                <IconButton type="button" variant="ghost" size="sm" onClick={() => setPerDayRateModalOpen(false)} aria-label="Close">&times;</IconButton>
               </div>
               <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text-muted)" }}>{scheduleEntries.length > 1 ? `${DAY_SHORT[scheduleEntries.find((e) => e.id === perDayRateModalDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}Rate</p>
               <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 16, color: "var(--text)" }}>{(getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$")}{perDayRateKeypadValue || "0"}</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                  <button key={n} type="button" onClick={() => setPerDayRateKeypadValue((v) => v + n)} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>{n}</button>
+                  <Button key={n} type="button" variant="secondary" size="sm" onClick={() => setPerDayRateKeypadValue((v) => v + n)}>{n}</Button>
                 ))}
-                <button type="button" onClick={() => setPerDayRateKeypadValue((v) => (v.includes(".") ? v : v + "."))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, cursor: "pointer", ...fontStyle }}>.</button>
-                <button type="button" onClick={() => setPerDayRateKeypadValue((v) => v + "0")} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>0</button>
-                <button type="button" onClick={() => setPerDayRateKeypadValue((v) => v.slice(0, -1))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "rgba(180, 160, 180, 0.12)", fontSize: 18, cursor: "pointer", ...fontStyle }}>&larr;</button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setPerDayRateKeypadValue((v) => (v.includes(".") ? v : v + "."))}>.</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setPerDayRateKeypadValue((v) => v + "0")}>0</Button>
+                <Button type="button" variant="tab" size="sm" onClick={() => setPerDayRateKeypadValue((v) => v.slice(0, -1))}>&larr;</Button>
               </div>
-              <button type="button" onClick={applyPerDayRate} className="btn btn-primary" style={{ width: "100%", ...fontStyle }}>Set rate</button>
+              <Button type="button" variant="primary" size="md" onClick={applyPerDayRate} fullWidth>Set rate</Button>
             </div>
           </div>
         )}
@@ -751,7 +757,7 @@ export default function StudentDetail() {
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setPerDayTimePickerOpen(false)}>
             <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                <button type="button" onClick={() => setPerDayTimePickerOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>&times;</button>
+                <IconButton type="button" variant="ghost" size="sm" onClick={() => setPerDayTimePickerOpen(false)} aria-label="Close">&times;</IconButton>
               </div>
               <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>{scheduleEntries.length > 1 ? `${DAY_SHORT[scheduleEntries.find((e) => e.id === perDayTimePickerDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}Select time</p>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
@@ -765,13 +771,13 @@ export default function StudentDetail() {
                   </select>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <button type="button" onClick={() => setPerDayTimePickerAmPm("AM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: perDayTimePickerAmPm === "AM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, ...fontStyle }}>AM</button>
-                  <button type="button" onClick={() => setPerDayTimePickerAmPm("PM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: perDayTimePickerAmPm === "PM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, ...fontStyle }}>PM</button>
+                  <Button type="button" variant="tab" size="sm" active={perDayTimePickerAmPm === "AM"} onClick={() => setPerDayTimePickerAmPm("AM")}>AM</Button>
+                  <Button type="button" variant="tab" size="sm" active={perDayTimePickerAmPm === "PM"} onClick={() => setPerDayTimePickerAmPm("PM")}>PM</Button>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button type="button" onClick={() => setPerDayTimePickerOpen(false)} style={{ padding: "10px 20px", background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", ...fontStyle }}>Cancel</button>
-                <button type="button" onClick={applyPerDayTime} className="btn btn-primary" style={{ padding: "10px 20px", ...fontStyle }}>OK</button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setPerDayTimePickerOpen(false)}>Cancel</Button>
+                <Button type="button" variant="primary" size="sm" onClick={applyPerDayTime}>OK</Button>
               </div>
             </div>
           </div>
@@ -780,19 +786,19 @@ export default function StudentDetail() {
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setSchedChangeRateModalOpen(false)}>
             <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                <button type="button" onClick={() => setSchedChangeRateModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>&times;</button>
+                <IconButton type="button" variant="ghost" size="sm" onClick={() => setSchedChangeRateModalOpen(false)} aria-label="Close">&times;</IconButton>
               </div>
               <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text-muted)" }}>{schedChangeEntries.length > 1 ? `${DAY_SHORT[schedChangeEntries.find((e) => e.id === schedChangeRateModalDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}New rate</p>
               <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 16, color: "var(--text)" }}>{(getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$")}{schedChangeRateKeypadValue || "0"}</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                  <button key={n} type="button" onClick={() => setSchedChangeRateKeypadValue((v) => v + n)} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>{n}</button>
+                  <Button key={n} type="button" variant="secondary" size="sm" onClick={() => setSchedChangeRateKeypadValue((v) => v + n)}>{n}</Button>
                 ))}
-                <button type="button" onClick={() => setSchedChangeRateKeypadValue((v) => (v.includes(".") ? v : v + "."))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, cursor: "pointer", ...fontStyle }}>.</button>
-                <button type="button" onClick={() => setSchedChangeRateKeypadValue((v) => v + "0")} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, cursor: "pointer", ...fontStyle }}>0</button>
-                <button type="button" onClick={() => setSchedChangeRateKeypadValue((v) => v.slice(0, -1))} style={{ padding: "14px", borderRadius: 12, border: "1px solid var(--border)", background: "rgba(180, 160, 180, 0.12)", fontSize: 18, cursor: "pointer", ...fontStyle }}>&larr;</button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setSchedChangeRateKeypadValue((v) => (v.includes(".") ? v : v + "."))}>.</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setSchedChangeRateKeypadValue((v) => v + "0")}>0</Button>
+                <Button type="button" variant="tab" size="sm" onClick={() => setSchedChangeRateKeypadValue((v) => v.slice(0, -1))}>&larr;</Button>
               </div>
-              <button type="button" onClick={applySchedChangeRate} className="btn btn-primary" style={{ width: "100%", ...fontStyle }}>Set rate</button>
+              <Button type="button" variant="primary" size="md" onClick={applySchedChangeRate} fullWidth>Set rate</Button>
             </div>
           </div>
         )}
@@ -800,7 +806,7 @@ export default function StudentDetail() {
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setSchedChangeTimePickerOpen(false)}>
             <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                <button type="button" onClick={() => setSchedChangeTimePickerOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--text-muted)" }}>&times;</button>
+                <IconButton type="button" variant="ghost" size="sm" onClick={() => setSchedChangeTimePickerOpen(false)} aria-label="Close">&times;</IconButton>
               </div>
               <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>{schedChangeEntries.length > 1 ? `${DAY_SHORT[schedChangeEntries.find((e) => e.id === schedChangeTimePickerDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}New time</p>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
@@ -814,13 +820,13 @@ export default function StudentDetail() {
                   </select>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <button type="button" onClick={() => setSchedChangeTimePickerAmPm("AM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: schedChangeTimePickerAmPm === "AM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, ...fontStyle }}>AM</button>
-                  <button type="button" onClick={() => setSchedChangeTimePickerAmPm("PM")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--border)", background: schedChangeTimePickerAmPm === "PM" ? "rgba(201, 123, 148, 0.2)" : "var(--card)", fontWeight: 600, cursor: "pointer", fontSize: 14, ...fontStyle }}>PM</button>
+                  <Button type="button" variant="tab" size="sm" active={schedChangeTimePickerAmPm === "AM"} onClick={() => setSchedChangeTimePickerAmPm("AM")}>AM</Button>
+                  <Button type="button" variant="tab" size="sm" active={schedChangeTimePickerAmPm === "PM"} onClick={() => setSchedChangeTimePickerAmPm("PM")}>PM</Button>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button type="button" onClick={() => setSchedChangeTimePickerOpen(false)} style={{ padding: "10px 20px", background: "none", border: "none", color: "var(--primary)", fontWeight: 600, cursor: "pointer", ...fontStyle }}>Cancel</button>
-                <button type="button" onClick={applySchedChangeTime} className="btn btn-primary" style={{ padding: "10px 20px", ...fontStyle }}>OK</button>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setSchedChangeTimePickerOpen(false)}>Cancel</Button>
+                <Button type="button" variant="primary" size="sm" onClick={applySchedChangeTime}>OK</Button>
               </div>
             </div>
           </div>
@@ -964,28 +970,28 @@ export default function StudentDetail() {
                                     }
                                   };
                                   return (
-                                    <div
+                                    <Button
                                       key={dateKey}
-                                      role="button"
-                                      tabIndex={0}
+                                      type="button"
+                                      variant={attended ? "secondary" : "tab"}
+                                      size="sm"
+                                      fullWidth
                                       onClick={handleToggle}
-                                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleToggle(); } }}
                                       style={{
                                         display: "flex",
                                         justifyContent: "space-between",
                                         alignItems: "center",
-                                        padding: 12,
                                         margin: 0,
                                         borderRadius: 12,
                                         background: attended ? "var(--card)" : "rgba(0,0,0,0.06)",
                                         color: attended ? "var(--text)" : "var(--text-muted)",
-                                        cursor: "pointer",
                                         border: attended ? "1px solid var(--border)" : "1px solid transparent",
+                                        boxShadow: "none",
                                       }}
                                     >
                                       <span style={{ fontSize: 14 }}>{dateKey}</span>
                                       <span style={{ fontWeight: 600 }}>{attended ? formatCurrency(computeLessonAmountCents(student, lesson!, dateKey)) : "—"}</span>
-                                    </div>
+                                    </Button>
                                   );
                                 })}
                               </div>
@@ -1003,14 +1009,9 @@ export default function StudentDetail() {
       )}
 
       <div style={{ paddingTop: 24, paddingBottom: 32, display: "flex", justifyContent: "center" }}>
-        <button
-          type="button"
-          onClick={() => setHistoryOpen(true)}
-          className="btn pill"
-          style={{ background: "#ffffff", border: "1px solid var(--border)", color: "var(--text)", fontSize: 13, padding: "8px 16px", fontFamily: "var(--font-sans)", boxShadow: "var(--shadow-soft)" }}
-        >
+        <Button type="button" variant="secondary" size="sm" onClick={() => setHistoryOpen(true)}>
           {t("studentDetail.history")}
-        </button>
+        </Button>
       </div>
 
       {historyOpen && (
@@ -1025,7 +1026,7 @@ export default function StudentDetail() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
               <span style={{ fontWeight: 600, fontSize: 18, ...fontStyle }}>{t("studentDetail.history")}</span>
-              <button type="button" onClick={() => setHistoryOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 24, color: "var(--text-muted)", lineHeight: 1 }} aria-label="Close">×</button>
+              <IconButton type="button" variant="ghost" size="sm" onClick={() => setHistoryOpen(false)} aria-label="Close">×</IconButton>
             </div>
             <div style={{ overflow: "auto", padding: 16 }}>
               {historyLoading ? (
