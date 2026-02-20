@@ -17,8 +17,10 @@ import { hasSupabase } from "@/lib/supabase";
 import { fetchLessons } from "@/store/supabaseSync";
 import {
   handleVoiceCommand,
+  resumePendingVoiceCommand,
   type DashboardContext,
   type DashboardScheduledLesson,
+  type PendingVoiceCommand,
   type VoiceDebug,
 } from "@/lib/voice/homeVoicePipeline";
 import type { Lesson } from "@/types";
@@ -99,6 +101,7 @@ export default function VoiceButton({
   const [transcript, setTranscript] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [clarificationOptions, setClarificationOptions] = useState<string[]>([]);
+  const [pendingCommand, setPendingCommand] = useState<PendingVoiceCommand | null>(null);
   const [appliedClarification, setAppliedClarification] = useState<string | null>(null);
   const [unmatchedItems, setUnmatchedItems] = useState<{ text: string; reason: string }[]>([]);
   const [showPanel, setShowPanel] = useState(false);
@@ -181,12 +184,14 @@ export default function VoiceButton({
 
       setFeedback(result.human_message);
       setClarificationOptions(result.clarification_options ?? []);
+      setPendingCommand(result.pending_command ?? null);
       setUnmatchedItems([]);
       setDebugPayload(result.debug ?? null);
       setPhase("result");
     } catch (_err) {
       setFeedback("I couldn't process that command safely. Please try again.");
       setClarificationOptions([]);
+      setPendingCommand(null);
       setUnmatchedItems([]);
       setDebugPayload(null);
       setPhase("error");
@@ -210,6 +215,7 @@ export default function VoiceButton({
     setTranscript("");
     setFeedback(null);
     setClarificationOptions([]);
+    setPendingCommand(null);
     setAppliedClarification(null);
     setUnmatchedItems([]);
     setDebugPayload(null);
@@ -264,6 +270,7 @@ export default function VoiceButton({
     setTranscript("");
     setFeedback(null);
     setClarificationOptions([]);
+    setPendingCommand(null);
     setAppliedClarification(null);
     setUnmatchedItems([]);
     setDebugPayload(null);
@@ -487,6 +494,43 @@ export default function VoiceButton({
                       variant="secondary"
                       size="sm"
                       onClick={async () => {
+                        const selectedCandidate = pendingCommand?.candidateStudents.find((c) => c.displayName === opt);
+                        if (pendingCommand && selectedCandidate) {
+                          setPhase("processing");
+                          const result = await resumePendingVoiceCommand(
+                            pendingCommand,
+                            { studentId: selectedCandidate.id },
+                            {
+                              students: dataRef.current.students,
+                              lessons: dataRef.current.lessons,
+                              getScheduledLessonsForDate,
+                              updateLessonById: (lessonId, updates) => updateLesson(lessonId, updates),
+                              addLesson: (lesson) => addLesson(lesson),
+                              fetchLessonsForVerification: async (): Promise<Lesson[]> => {
+                                if (hasSupabase() && dataRef.current.user?.id) {
+                                  return fetchLessons(dataRef.current.user.id);
+                                }
+                                await new Promise((r) => setTimeout(r, 0));
+                                return dataRef.current.lessons;
+                              },
+                            },
+                            {
+                              debug: import.meta.env.DEV || (canUseDebug && debugMode),
+                              dryRun: canUseDebug && dryRunMode,
+                            }
+                          );
+                          if (result.plan?.target_date && result.plan.target_date !== dateKey && onDateChange) {
+                            onDateChange(new Date(`${result.plan.target_date}T12:00:00`));
+                          }
+                          setAppliedClarification(result.status === "success" ? opt : null);
+                          setFeedback(result.human_message);
+                          setClarificationOptions(result.clarification_options ?? []);
+                          setPendingCommand(result.pending_command ?? null);
+                          setUnmatchedItems([]);
+                          setDebugPayload(result.debug ?? null);
+                          setPhase("result");
+                          return;
+                        }
                         const clarified = applyClarificationOption(transcript, opt);
                         setAppliedClarification(opt);
                         await runVoiceCommand(clarified);

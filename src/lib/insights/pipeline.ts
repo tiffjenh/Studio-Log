@@ -17,6 +17,13 @@ export type InsightsMetadata = {
   completed_only: true;
   /** Which router was used for intent classification. */
   router_used: "llm" | "regex";
+  explainability?: {
+    metricId: string;
+    dateRange: { start: string | null; end: string | null; label: string };
+    filters: { completedOnly: true; studentIds?: string[] };
+    counts: { lessonsConsidered: number; completedLessons: number };
+    aggregation: { type: string; formula: string };
+  };
 };
 
 export type AskInsightsContext = {
@@ -129,11 +136,52 @@ function extractMetadata(
     label = `${y} YTD`;
   }
 
+  const aggregationByIntent: Record<QueryPlan["intent"], { type: string; formula: string }> = {
+    student_highest_hourly_rate: { type: "argmax", formula: "max(student_hourly_rate_dollars)" },
+    student_lowest_hourly_rate: { type: "argmin", formula: "min(student_hourly_rate_dollars)" },
+    students_below_average_rate: { type: "filter", formula: "student_hourly_rate_dollars < avg_hourly_rate_dollars" },
+    earnings_in_period: { type: "sum", formula: "sum(amount_dollars)" },
+    lessons_count_in_period: { type: "count", formula: "count(completed_lessons)" },
+    revenue_per_lesson_in_period: { type: "ratio", formula: "sum(amount_dollars) / count(completed_lessons)" },
+    earnings_ytd_for_student: { type: "sum", formula: "sum(amount_dollars where student=target)" },
+    student_missed_most_lessons_in_year: { type: "argmax", formula: "max(missed_lessons_count)" },
+    student_attendance_summary: { type: "ratio", formula: "attended_lessons / scheduled_lessons" },
+    revenue_per_student_in_period: { type: "group_by", formula: "sum(amount_dollars) by student" },
+    avg_weekly_revenue: { type: "ratio", formula: "sum(amount_dollars) / week_count" },
+    cash_flow_trend: { type: "timeseries", formula: "weekly sum(amount_dollars) + direction" },
+    income_stability: { type: "dispersion", formula: "coefficient_of_variation(weekly revenue)" },
+    forecast_monthly: { type: "forecast", formula: "projected_monthly_dollars" },
+    forecast_yearly: { type: "forecast", formula: "projected_yearly_dollars" },
+    percent_change_yoy: { type: "percent_change", formula: "(current - previous) / previous" },
+    average_hourly_rate_in_period: { type: "ratio", formula: "sum(amount_dollars) / sum(hours)" },
+    day_of_week_earnings_max: { type: "argmax", formula: "max(sum(amount_dollars) by weekday)" },
+    general_fallback: { type: "fallback", formula: "deterministic fallback response" },
+    clarification: { type: "clarification", formula: "missing required parameters" },
+  };
+  const agg = aggregationByIntent[plan.intent] ?? { type: "unknown", formula: "unknown" };
+
   return {
     lesson_count: lessonCount,
     date_range_label: label,
     completed_only: true,
     router_used: routerUsed,
+    explainability: {
+      metricId: plan.sql_truth_query_key,
+      dateRange: {
+        start: plan.time_range?.start ?? null,
+        end: plan.time_range?.end ?? null,
+        label,
+      },
+      filters: {
+        completedOnly: true,
+        studentIds: plan.student_filter?.student_id ? [plan.student_filter.student_id] : undefined,
+      },
+      counts: {
+        lessonsConsidered: lessonCount,
+        completedLessons: lessonCount,
+      },
+      aggregation: agg,
+    },
   };
 }
 export async function askInsights(questionText: string, context: AskInsightsContext): Promise<AskInsightsResult> {

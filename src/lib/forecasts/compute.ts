@@ -652,6 +652,9 @@ export function computeGeneralAnalytics(
       byCustomer.set(key, (byCustomer.get(key) ?? 0) + r.amount);
     }
     const sorted = [...byCustomer.entries()].sort((a, b) => b[1]! - a[1]!);
+    if (sorted.length === 0) {
+      return { directAnswer: "No earnings data found for that period.", calculations: [], assumptions: [], confidence: "low" };
+    }
     const [name, total] = sorted[0]!;
     if (sorted.length === 1 && (name === "Unknown" || !name)) {
       return { directAnswer: "Earnings aren’t broken down by student in this data. Add student/customer info to see who pays the most.", calculations: [], assumptions: [], confidence: "low" };
@@ -676,6 +679,9 @@ export function computeGeneralAnalytics(
       byCustomer.set(key, (byCustomer.get(key) ?? 0) + r.amount);
     }
     const sorted = [...byCustomer.entries()].sort((a, b) => a[1]! - b[1]!);
+    if (sorted.length === 0) {
+      return { directAnswer: "No earnings data found for that period.", calculations: [], assumptions: [], confidence: "low" };
+    }
     const [name, total] = sorted[0]!;
     if (sorted.length === 1 && (name === "Unknown" || !name)) {
       return { directAnswer: "Earnings aren't broken down by student. Add student info to see who earned you the least.", calculations: [], assumptions: [], confidence: "low" };

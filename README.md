@@ -72,7 +72,8 @@ Homepage/dashboard voice uses a strict command pipeline: parse -> validate -> ex
   - "Set Chloe rate to 60 per hour"
 
 ### Safety and clarification behavior
-- If a name is ambiguous (e.g. two Emmas), voice asks a clarifying question and does not update.
+- If a name is ambiguous (e.g. two Emmas), voice asks a clarifying question and stores a pending command.
+- Choosing a clarification candidate now resumes the original command and auto-applies it to the selected student.
 - If a student has no lesson on the target date, voice asks for clarification instead of guessing.
 - If command meaning is unclear (example: "Nobody came today"), voice asks confirmation wording.
 - The UI only reports success after post-execution verification passes.
@@ -94,3 +95,13 @@ Insights now uses a SQL-first pipeline with verification:
 Debug mode:
 - Open dev tools and run `localStorage.setItem("insights_debug", "1")`, then refresh.
 - The Insights pipeline prints query, intent, extracted params, selected truth query, and summary result.
+- You can also enable debug from URL with `?debug=1` for the Insights debug details panel.
+
+## Voice + Insights test commands
+
+- Run all tests: `npm test`
+- Run voice pipeline tests only: `npx vitest run src/lib/voice/__tests__/homeVoicePipeline.test.ts`
+- Run insights regressions only:
+  - `npx vitest run src/lib/insights/__tests__/pipeline.test.ts`
+  - `npx vitest run src/lib/insights/__tests__/cannedQuestionsHarness.test.ts`
+- Build check: `npm run build`

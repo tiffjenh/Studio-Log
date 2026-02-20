@@ -69,6 +69,12 @@ const commandSchema = z.discriminatedUnion("intent", [
     scope: z.enum(["single_date", "going_forward"]).default("single_date"),
   }),
   z.object({
+    intent: z.literal("set_amount"),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    target: z.object({ names: nameListSchema }),
+    amount_dollars: z.number().positive(),
+  }),
+  z.object({
     intent: z.literal("help"),
   }),
 ]);
@@ -110,6 +116,12 @@ export type CommandResult = {
   human_message: string;
   plan: CommandPlan | null;
   clarification_options?: string[];
+  clarification?: {
+    type: "student_ambiguity";
+    ambiguous_name: string;
+    candidate_students: Array<{ id: string; displayName: string }>;
+  };
+  pending_command?: PendingVoiceCommand;
   debug?: VoiceDebug;
 };
 
@@ -166,6 +178,28 @@ export type VoiceDebug = {
 export type VoiceHandlerOptions = {
   debug?: boolean;
   dryRun?: boolean;
+  resolutionOverrides?: {
+    forcedStudentIdByNameQuery?: Record<string, string>;
+  };
+  pendingCommandId?: string;
+};
+
+export type PendingVoiceCommand = {
+  id: string;
+  transcriptRaw: string;
+  transcriptNormalized: string;
+  context: Pick<DashboardContext, "selected_date" | "timezone" | "user_id">;
+  parsedEntities: {
+    parsedDate?: string;
+    parsedTime?: string;
+    parsedDurationMinutes?: number;
+    parsedAmountCents?: number;
+    names?: string[];
+  };
+  intentCandidate?: StructuredCommand["intent"];
+  ambiguousName: string;
+  candidateStudents: Array<{ id: string; displayName: string }>;
+  createdAt: string;
 };
 
 export type VoicePipelineAdapter = {
@@ -204,6 +238,26 @@ const MONTH_INDEX: Record<string, number> = {
 
 const VALID_DURATIONS = new Set([30, 45, 60, 90, 120]);
 const WEEKDAY_TOKEN_RE = /\b(sunday|sun|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thurs|friday|fri|saturday|sat)\b/i;
+const WORD_NUMBER_MAP: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirty: 30,
+  forty: 40,
+  fortyfive: 45,
+  fifty: 50,
+  sixty: 60,
+  ninety: 90,
+};
 
 function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -293,11 +347,26 @@ function parseRelativeOrExplicitDate(text: string, fallbackDateKey: string): str
 
 function parseDurationMinutes(text: string): number | null {
   const t = norm(text);
+  if (/\bhour\s+and\s+(a\s+)?half\b/.test(t)) return 90;
+  if (/\b(an?|one|1)\s+hour\s+and\s+(a\s+)?half\b/.test(t)) return 90;
+  if (/\b(one|1)\s+and\s+a\s+half(\s+hours?)?\b/.test(t)) return 90;
   if (/\bhalf\s+an?\s+hour\b/.test(t)) return 30;
   const minMatch = t.match(/\b(\d+)\s*(minutes?|mins?)\b/);
   if (minMatch) return Number(minMatch[1]);
+  const wordMinuteMatch = t.match(/\b(one hundred (and )?twenty|ninety|sixty|forty five|forty-five|thirty)\s*(minutes?|mins?)\b/);
+  if (wordMinuteMatch) {
+    const cleaned = wordMinuteMatch[1].replace(/\s+/g, "").replace(/-/g, "");
+    if (cleaned === "onehundredandtwenty" || cleaned === "onehundredtwenty") return 120;
+    const mapped = WORD_NUMBER_MAP[cleaned];
+    if (mapped != null) return mapped;
+  }
   const hrMatch = t.match(/\b(\d+(?:\.\d+)?)\s*(hours?|hrs?)\b/);
   if (hrMatch) return Math.round(Number(hrMatch[1]) * 60);
+  const wordHourMatch = t.match(/\b(one|two|three|four|five)\s+hours?\b/);
+  if (wordHourMatch) {
+    const mapped = WORD_NUMBER_MAP[wordHourMatch[1]];
+    if (mapped != null) return mapped * 60;
+  }
   if (/\bone\s+hour\b/.test(t)) return 60;
   if (/\b1\s*hour\b/.test(t)) return 60;
   if (/\b90\s*minutes?\b/.test(t)) return 90;
@@ -341,10 +410,23 @@ function parseTimeString(text: string): string | null {
 
 function parseRatePerHour(text: string): number | null {
   const t = norm(text);
-  const direct = t.match(/\$?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*hr|per\s*hour|an?\s*hour|dollars?|bucks?)\b/);
+  const direct = t.match(/\$?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*hr|\/\s*hour|per\s*hour|hourly|an?\s*hour)\b/);
   if (direct) return Number(direct[1]);
   const simple = t.match(/\brate\s+to\s+\$?\s*(\d+(?:\.\d+)?)\b|\bprice\s+to\s+\$?\s*(\d+(?:\.\d+)?)\b/);
   if (simple) return Number(simple[1] ?? simple[2]);
+  return null;
+}
+
+function parseMoneyAmount(text: string): number | null {
+  const lower = text.toLowerCase().replace(/,/g, "");
+  const direct = lower.match(/\$\s*(\d+(?:\.\d+)?)/);
+  if (direct) return Number(direct[1]);
+  const t = norm(text);
+  const worded = t.match(/\b(\d+(?:\.\d+)?)\s*(dollars?|bucks?)\b/);
+  if (worded) return Number(worded[1]);
+  // STT sometimes strips the currency token and yields "class is now 100".
+  const bareLessonPrice = t.match(/\b(?:class|lesson)\s+(?:is\s+)?now\s+(\d+(?:\.\d+)?)\b/);
+  if (bareLessonPrice) return Number(bareLessonPrice[1]);
   return null;
 }
 
@@ -489,16 +571,48 @@ function scoreStudentNameMatch(
 function resolveNamesToStudents(
   names: string[],
   students: Student[],
-  debug?: VoiceDebug
+  debug?: VoiceDebug,
+  overrides?: {
+    forcedStudentIdByNameQuery?: Record<string, string>;
+  }
 ): { resolved: Student[]; ambiguous: { spoken: string; matches: Student[] }[]; missing: string[] } {
   const resolved: Student[] = [];
   const ambiguous: { spoken: string; matches: Student[] }[] = [];
   const missing: string[] = [];
   const used = new Set<string>();
+  const forcedByQuery = new Map<string, string>();
+  for (const [key, value] of Object.entries(overrides?.forcedStudentIdByNameQuery ?? {})) {
+    forcedByQuery.set(norm(key), value);
+  }
 
   for (const rawName of names) {
     const spoken = norm(rawName).replace(/\bs\b$/, "").trim();
     if (!spoken) continue;
+    const forcedId = forcedByQuery.get(spoken);
+    if (forcedId) {
+      const forcedStudent = students.find((s) => s.id === forcedId);
+      if (forcedStudent && !used.has(forcedStudent.id)) {
+        used.add(forcedStudent.id);
+        resolved.push(forcedStudent);
+        debug?.studentResolution?.push({
+          nameQuery: titleCaseName(rawName),
+          strategy: "exact",
+          candidates: [
+            {
+              student_id: forcedStudent.id,
+              display_name: `${forcedStudent.firstName} ${forcedStudent.lastName}`,
+              score: 1,
+            },
+          ],
+          chosen: {
+            student_id: forcedStudent.id,
+            display_name: `${forcedStudent.firstName} ${forcedStudent.lastName}`,
+            score: 1,
+          },
+        });
+        continue;
+      }
+    }
     const candidates = students
       .map((s) => {
         const scored = scoreStudentNameMatch(rawName, s);
@@ -621,7 +735,7 @@ function parseTranscriptToCommand(
   const targetDate = parseRelativeOrExplicitDate(text, context.selected_date);
   const parsedDuration = parseDurationMinutes(text);
   const parsedTime = parseTimeString(text);
-  const parsedRate = parseRatePerHour(text);
+  const parsedAmount = parseMoneyAmount(text);
   const knownNameMentions = extractKnownStudentMentions(text, students);
   const extractedNames = knownNameMentions.length > 0 ? knownNameMentions : extractStudentMentions(text);
   if (debug) {
@@ -633,7 +747,7 @@ function parseTranscriptToCommand(
       parsedDate: targetDate,
       parsedTime: parsedTime ?? undefined,
       parsedDurationMinutes: parsedDuration ?? undefined,
-      parsedAmountCents: parsedRate != null ? Math.round(parsedRate * 100) : undefined,
+      parsedAmountCents: parsedAmount != null ? Math.round(parsedAmount * 100) : undefined,
     };
   }
 
@@ -744,6 +858,39 @@ function parseTranscriptToCommand(
   }
 
   const rate = parseRatePerHour(text);
+  const amount = parseMoneyAmount(text);
+  const hasPricingVerb = /\b(change|set|update|is now|now|charge|cost|price|rate|pay)\b/.test(t);
+  const hasPerHourCue = /\b(per\s*hour|\/\s*hr|\/\s*hour|hourly|an?\s*hour)\b/.test(t) || /\brate\b/.test(t);
+  const hasPerLessonCue =
+    /\b(per\s*lesson|for\s+(the\s+)?(lesson|class)|lesson\s+is\s+now|class\s+is\s+now|lesson\s+now|class\s+now)\b/.test(t) ||
+    (/\b(lesson|class)\b/.test(t) && /\b(is now|now|cost|price|charge)\b/.test(t));
+  if (amount != null && hasPricingVerb) {
+    const names = knownNameMentions.length > 0 ? knownNameMentions : extractStudentMentions(text);
+    if (names.length === 0) return { needs_clarification: "Which student's lesson should I update?" };
+    if (hasPerLessonCue && !hasPerHourCue) {
+      if (debug) debug.intent = { name: "set_amount", router: "amountIntent" };
+      return {
+        intent: "set_amount",
+        date: targetDate,
+        target: { names },
+        amount_dollars: amount,
+      };
+    }
+    if (hasPerHourCue && !hasPerLessonCue) {
+      if (debug) debug.intent = { name: "set_rate", router: "rateIntent" };
+      return {
+        intent: "set_rate",
+        target: { names },
+        effective_date: targetDate,
+        rate_dollars_per_hour: amount,
+        scope: "single_date",
+      };
+    }
+    return {
+      needs_clarification: `Do you want $${amount.toFixed(2)} for the lesson, or $${amount.toFixed(2)} per hour?`,
+      options: ["Set lesson amount", "Set hourly rate"],
+    };
+  }
   if (rate != null && /\b(rate|price|raise|increase|hour)\b/.test(t)) {
     if (debug) debug.intent = { name: "set_rate", router: "rateIntent" };
     const names = knownNameMentions.length > 0 ? knownNameMentions : extractStudentMentions(text);
@@ -793,7 +940,8 @@ function createPlan(
   cmd: StructuredCommand,
   context: DashboardContext,
   adapter: VoicePipelineAdapter,
-  debug?: VoiceDebug
+  debug?: VoiceDebug,
+  options?: VoiceHandlerOptions
 ): CommandResult {
   if (cmd.intent === "help") {
     return {
@@ -935,13 +1083,18 @@ function createPlan(
       };
     }
 
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, options?.resolutionOverrides);
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return {
         status: "needs_clarification",
         human_message: `Which ${a.spoken}?`,
         clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`),
+        clarification: {
+          type: "student_ambiguity",
+          ambiguous_name: a.spoken,
+          candidate_students: a.matches.map((m) => ({ id: m.id, displayName: `${m.firstName} ${m.lastName}` })),
+        },
         plan: null,
       };
     }
@@ -1006,13 +1159,18 @@ function createPlan(
         plan: null,
       };
     }
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, options?.resolutionOverrides);
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
       return {
         status: "needs_clarification",
         human_message: `Which ${a.spoken}?`,
         clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`),
+        clarification: {
+          type: "student_ambiguity",
+          ambiguous_name: a.spoken,
+          candidate_students: a.matches.map((m) => ({ id: m.id, displayName: `${m.firstName} ${m.lastName}` })),
+        },
         plan: null,
       };
     }
@@ -1060,10 +1218,20 @@ function createPlan(
   }
 
   if (cmd.intent === "set_time") {
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, options?.resolutionOverrides);
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
-      return { status: "needs_clarification", human_message: `Which ${a.spoken}?`, clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`), plan: null };
+      return {
+        status: "needs_clarification",
+        human_message: `Which ${a.spoken}?`,
+        clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`),
+        clarification: {
+          type: "student_ambiguity",
+          ambiguous_name: a.spoken,
+          candidate_students: a.matches.map((m) => ({ id: m.id, displayName: `${m.firstName} ${m.lastName}` })),
+        },
+        plan: null,
+      };
     }
     if (resolved.missing.length > 0) {
       return { status: "needs_clarification", human_message: `I couldn't find: ${resolved.missing.join(", ")}.`, plan: null };
@@ -1106,10 +1274,20 @@ function createPlan(
   }
 
   if (cmd.intent === "move_lesson") {
-    const resolved = resolveNamesToStudents([cmd.target.name], allStudents, debug);
+    const resolved = resolveNamesToStudents([cmd.target.name], allStudents, debug, options?.resolutionOverrides);
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
-      return { status: "needs_clarification", human_message: `Which ${a.spoken}?`, clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`), plan: null };
+      return {
+        status: "needs_clarification",
+        human_message: `Which ${a.spoken}?`,
+        clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`),
+        clarification: {
+          type: "student_ambiguity",
+          ambiguous_name: a.spoken,
+          candidate_students: a.matches.map((m) => ({ id: m.id, displayName: `${m.firstName} ${m.lastName}` })),
+        },
+        plan: null,
+      };
     }
     if (resolved.missing.length > 0 || resolved.resolved.length === 0) {
       return { status: "needs_clarification", human_message: `I couldn't find ${cmd.target.name}.`, plan: null };
@@ -1170,6 +1348,62 @@ function createPlan(
     };
   }
 
+  if (cmd.intent === "set_amount") {
+    const target = cmd.date ?? context.selected_date;
+    const amountCents = Math.round(cmd.amount_dollars * 100);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, options?.resolutionOverrides);
+    if (resolved.ambiguous.length > 0) {
+      const a = resolved.ambiguous[0];
+      return {
+        status: "needs_clarification",
+        human_message: `Which ${a.spoken}?`,
+        clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`),
+        clarification: {
+          type: "student_ambiguity",
+          ambiguous_name: a.spoken,
+          candidate_students: a.matches.map((m) => ({ id: m.id, displayName: `${m.firstName} ${m.lastName}` })),
+        },
+        plan: null,
+      };
+    }
+    if (resolved.missing.length > 0) {
+      return { status: "needs_clarification", human_message: `I couldn't find: ${resolved.missing.join(", ")}.`, plan: null };
+    }
+    for (const student of resolved.resolved) {
+      const lesson = findLessonForStudentOnDate(student.id, target);
+      if (!lesson) {
+        return {
+          status: "needs_clarification",
+          human_message: `No lesson found for ${student.firstName} ${student.lastName} on ${formatPrettyDate(target)}. Try a different date?`,
+          plan: null,
+        };
+      }
+      plan.updates.push({
+        lesson_id: lesson.id,
+        student_id: student.id,
+        student_name: `${student.firstName} ${student.lastName}`,
+        date: target,
+        updates: { amountCents },
+      });
+    }
+    if (plan.updates.length === 0) {
+      return {
+        status: "needs_clarification",
+        human_message: "I couldn't find a lesson to update. Try adding a date.",
+        plan: null,
+      };
+    }
+    plan.verification.expected_amount_cents = {
+      lesson_ids: plan.updates.map((u) => u.lesson_id),
+      value: amountCents,
+    };
+    return {
+      status: "success",
+      human_message: `Updated lesson amount to $${cmd.amount_dollars.toFixed(2)} for ${plan.updates.map((u) => u.student_name).join(", ")} on ${formatPrettyDate(target)}.`,
+      plan,
+    };
+  }
+
   if (cmd.intent === "set_rate") {
     if (cmd.scope === "going_forward") {
       return {
@@ -1180,10 +1414,20 @@ function createPlan(
     }
     const target = cmd.effective_date ?? context.selected_date;
     const rateCentsPerHour = Math.round(cmd.rate_dollars_per_hour * 100);
-    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug);
+    const resolved = resolveNamesToStudents(cmd.target.names, allStudents, debug, options?.resolutionOverrides);
     if (resolved.ambiguous.length > 0) {
       const a = resolved.ambiguous[0];
-      return { status: "needs_clarification", human_message: `Which ${a.spoken}?`, clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`), plan: null };
+      return {
+        status: "needs_clarification",
+        human_message: `Which ${a.spoken}?`,
+        clarification_options: a.matches.map((m) => `${m.firstName} ${m.lastName}`),
+        clarification: {
+          type: "student_ambiguity",
+          ambiguous_name: a.spoken,
+          candidate_students: a.matches.map((m) => ({ id: m.id, displayName: `${m.firstName} ${m.lastName}` })),
+        },
+        plan: null,
+      };
     }
     if (resolved.missing.length > 0) {
       return { status: "needs_clarification", human_message: `I couldn't find: ${resolved.missing.join(", ")}.`, plan: null };
@@ -1342,8 +1586,36 @@ export async function handleVoiceCommand(
     debug.intent = { name: parsed.data.intent, router: "schema" };
   }
 
-  const planned = createPlan(parsed.data, context, adapter, debug);
-  if (planned.status !== "success" || !planned.plan) return withDebug(planned);
+  const planned = createPlan(parsed.data, context, adapter, debug, options);
+  if (planned.status !== "success" || !planned.plan) {
+    if (planned.status === "needs_clarification" && planned.clarification?.type === "student_ambiguity") {
+      return withDebug({
+        ...planned,
+        pending_command: {
+          id: options?.pendingCommandId ?? buildPendingCommandId(),
+          transcriptRaw: transcript,
+          transcriptNormalized: debug?.transcriptNormalized ?? norm(transcript),
+          context: {
+            selected_date: context.selected_date,
+            timezone: context.timezone,
+            user_id: context.user_id,
+          },
+          parsedEntities: {
+            parsedDate: debug?.entities?.parsedDate,
+            parsedTime: debug?.entities?.parsedTime,
+            parsedDurationMinutes: debug?.entities?.parsedDurationMinutes,
+            parsedAmountCents: debug?.entities?.parsedAmountCents,
+            names: debug?.entities?.names,
+          },
+          intentCandidate: parsed.data.intent,
+          ambiguousName: planned.clarification.ambiguous_name,
+          candidateStudents: planned.clarification.candidate_students,
+          createdAt: new Date().toISOString(),
+        },
+      });
+    }
+    return withDebug(planned);
+  }
   if (debug && planned.plan) {
     debug.plan = {
       updates: planned.plan.updates,
@@ -1362,8 +1634,8 @@ export async function handleVoiceCommand(
       "No updates or creates were generated."
     );
     return withDebug({
-      status: "error",
-      human_message: "No updates were generated from that command.",
+      status: "needs_clarification",
+      human_message: "I couldn't find a matching lesson for that request. Try a different date or student.",
       plan: null,
     });
   }
@@ -1427,4 +1699,38 @@ export async function handleVoiceCommand(
 
   if (debug) console.log("[voice-debug]", debug);
   return withDebug(planned);
+}
+
+function buildPendingCommandId(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `pending-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+}
+
+export async function resumePendingVoiceCommand(
+  pending: PendingVoiceCommand,
+  resolution: { studentId: string },
+  adapter: VoicePipelineAdapter,
+  options?: Omit<VoiceHandlerOptions, "resolutionOverrides" | "pendingCommandId">
+): Promise<CommandResult> {
+  return handleVoiceCommand(
+    pending.transcriptRaw,
+    {
+      user_id: pending.context.user_id,
+      selected_date: pending.context.selected_date,
+      timezone: pending.context.timezone,
+      scheduled_lessons: adapter.getScheduledLessonsForDate(pending.context.selected_date),
+    },
+    adapter,
+    {
+      ...options,
+      pendingCommandId: pending.id,
+      resolutionOverrides: {
+        forcedStudentIdByNameQuery: {
+          [pending.ambiguousName]: resolution.studentId,
+        },
+      },
+    }
+  );
 }

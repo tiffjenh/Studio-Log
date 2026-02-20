@@ -58,6 +58,10 @@ export default function Insights() {
 
   const locale = lang === "es" ? "es-ES" : lang === "zh" ? "zh-CN" : "en-US";
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const insightsDebugEnabled = import.meta.env.DEV || (typeof window !== "undefined" && (
+    new URLSearchParams(window.location.search).get("debug") === "1" ||
+    localStorage.getItem("insights_debug") === "1"
+  ));
 
   const { messages, sendMessage, clear, isLoading, error } = useInsightsConversation({
     userId: data.user?.id,
@@ -520,7 +524,7 @@ export default function Insights() {
                   )}
                 </div>
                 {/* Metadata: lesson count + date range, shown under every answer */}
-                {m.meta?.metadata && !m.meta.insightsResult?.needsClarification && (
+                {m.meta?.metadata && !m.meta.insightsResult?.needsClarification && m.meta.metadata.lesson_count > 0 && (
                   <div
                     style={{
                       marginTop: 10,
@@ -536,7 +540,7 @@ export default function Insights() {
                   </div>
                 )}
                 {/* Dev-only: View details accordion */}
-                {import.meta.env.DEV && m.meta?.insightsResult?.trace && (
+                {insightsDebugEnabled && m.meta?.insightsResult?.trace && (
                   <details
                     style={{
                       marginTop: 8,
@@ -585,6 +589,12 @@ export default function Insights() {
                       )}
                       {(m.meta.insightsResult.trace.queryPlan.time_range?.label ?? m.meta.insightsResult.trace.queryPlan.time_range?.start) && (
                         <div><strong>Range:</strong> {m.meta.insightsResult.trace.queryPlan.time_range?.label ?? m.meta.insightsResult.trace.queryPlan.time_range?.start}</div>
+                      )}
+                      {m.meta.metadata?.explainability && (
+                        <div>
+                          <strong>Explainability:</strong>{" "}
+                          {JSON.stringify(m.meta.metadata.explainability)}
+                        </div>
                       )}
                       {m.meta.insightsResult.trace.verifierErrors?.length > 0 && (
                         <div style={{ color: "#dc2626" }}>
