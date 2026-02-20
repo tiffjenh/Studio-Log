@@ -24,6 +24,8 @@ export const insightIntentEnum = z.enum([
   "student_lowest_hourly_rate",
   "students_below_average_rate",
   "earnings_in_period",
+  "lessons_count_in_period",
+  "revenue_per_lesson_in_period",
   "earnings_ytd_for_student",
   "student_missed_most_lessons_in_year",
   "student_attendance_summary",

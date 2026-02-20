@@ -80,6 +80,8 @@ function deriveTruthKey(intent: InsightIntent): string {
     student_lowest_hourly_rate: "student_lowest_hourly_rate",
     students_below_average_rate: "students_below_average_rate",
     earnings_in_period: "earnings_in_period",
+    lessons_count_in_period: "lessons_count_in_period",
+    revenue_per_lesson_in_period: "revenue_per_lesson_in_period",
     earnings_ytd_for_student: "earnings_ytd_for_student",
     student_missed_most_lessons_in_year: "student_missed_most_lessons_in_year",
     student_attendance_summary: "student_attendance_summary",
@@ -96,7 +98,12 @@ function deriveTruthKey(intent: InsightIntent): string {
 }
 
 function routeIntent(normalized: string): InsightIntent {
+  if (/^how many lessons did i teach last month$/.test(normalized)) return "lessons_count_in_period";
+  if (/^what s my revenue per lesson$/.test(normalized) || /^what is my revenue per lesson$/.test(normalized)) return "revenue_per_lesson_in_period";
+  if (/^what day of the week do i earn the most$/.test(normalized)) return "day_of_week_earnings_max";
   if (/\bwho missed the most|missed most lessons|most missed lessons|most absences\b/.test(normalized)) return "student_missed_most_lessons_in_year";
+  if (/\bhow many lessons\b|\blesson count\b|\bcount lessons\b|\bnumber of lessons\b/.test(normalized)) return "lessons_count_in_period";
+  if (/\brevenue per lesson\b|\baverage revenue per lesson\b|\bavg revenue per lesson\b/.test(normalized)) return "revenue_per_lesson_in_period";
   if (/\bhighest hourly rate|highest hourly student|pays the most per hour|highest paying student|highest paying per hour\b/.test(normalized)) return "student_highest_hourly_rate";
   if (/\blowest hourly rate|lowest hourly student|least hourly rate student|who pays the least per hour|who is lowest per hour|pays the least\b/.test(normalized)) return "student_lowest_hourly_rate";
   if (/\bbelow my average rate|below my average hourly rate|below average hourly rate|below average hourly|students below average|students below my average|under average rate\b/.test(normalized)) return "students_below_average_rate";
@@ -124,7 +131,7 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
     const def = defaultRangeForIntent("day_of_week_earnings_max", todayISO);
     time_range = toTimeRange(def, "ytd");
   }
-  if (!time_range && (routedIntent === "earnings_in_period" || routedIntent === "average_hourly_rate_in_period" || routedIntent === "revenue_per_student_in_period")) {
+  if (!time_range && (routedIntent === "earnings_in_period" || routedIntent === "average_hourly_rate_in_period" || routedIntent === "revenue_per_student_in_period" || routedIntent === "lessons_count_in_period" || routedIntent === "revenue_per_lesson_in_period")) {
     const def = defaultRangeForIntent(routedIntent, todayISO);
     time_range = toTimeRange(def, def.label?.includes("YTD") ? "ytd" : "rolling_days");
   }
@@ -138,7 +145,7 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
       ? "Which year should I use for missed lessons?"
       : routedIntent === "earnings_ytd_for_student" || routedIntent === "student_attendance_summary"
         ? "Which student did you mean?"
-        : "Did you mean earnings, attendance, rate comparison, or forecast?"
+        : "Did you mean earnings or attendance?"
     : null;
 
   const intent: InsightIntent = needsClarification ? "clarification" : routedIntent;
@@ -155,7 +162,16 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
     normalized_query: normalized,
     time_range,
     student_filter: student_name ? { student_name } : undefined,
-    requested_metric: /%|percent|percentage/.test(normalized) ? "percent" : /\bwho\b/.test(normalized) ? "who" : "dollars",
+    requested_metric:
+      routedIntent === "lessons_count_in_period"
+        ? "count"
+        : routedIntent === "revenue_per_lesson_in_period" || routedIntent === "average_hourly_rate_in_period"
+          ? "rate"
+          : /%|percent|percentage/.test(normalized)
+            ? "percent"
+            : /\bwho\b/.test(normalized)
+              ? "who"
+              : "dollars",
     needs_clarification: needsClarification,
     clarifying_question,
     required_missing_params: missingParams,

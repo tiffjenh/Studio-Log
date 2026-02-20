@@ -2,6 +2,7 @@ import type { EarningsRow, StudentSummary } from "@/lib/forecasts/types";
 import type { Lesson, Student } from "@/types";
 import { parseToQueryPlan } from "./parse";
 import { computeFromPlan } from "./compute";
+import { runInsightsSupabaseSanityCheck } from "./truthQueries";
 import { resultToAnswer } from "./respond";
 import { runInsightsVerifier } from "./verifier";
 import { type ComputedResult, type InsightsTrace, type QueryPlan } from "./schema";
@@ -58,12 +59,14 @@ function mapRouterIntentToPlanIntent(raw: string): QueryPlan["intent"] {
   if (x === "earnings_by_range" || x === "earnings_total" || x === "earnings_in_month" || x === "earnings_by_student") return "earnings_in_period";
   if (x === "student_ytd" || x === "student_earnings_for_year") return "earnings_ytd_for_student";
   if (x === "revenue_per_student_breakdown" || x === "top_student_by_earnings") return "revenue_per_student_in_period";
-  if (x === "revenue_per_lesson" || x === "avg_monthly_earnings" || x === "best_month" || x === "worst_month") return "earnings_in_period";
+  if (x === "revenue_per_lesson") return "revenue_per_lesson_in_period";
+  if (x === "avg_monthly_earnings" || x === "best_month" || x === "worst_month") return "earnings_in_period";
   if (x === "revenue_per_hour" || x === "avg_hourly_rate") return "average_hourly_rate_in_period";
   if (x === "forecast") return "forecast_monthly";
   if (x === "percent_change_yoy") return "percent_change_yoy";
   if (x === "best_day_of_week" || x === "day_of_week_earnings") return "day_of_week_earnings_max";
-  if (x === "lessons_count" || x === "total_hours" || x === "avg_lessons_per_week" || x === "cash_flow" || x === "tax_estimate" || x === "on_track" || x.startsWith("what_if_")) return "general_fallback";
+  if (x === "lessons_count") return "lessons_count_in_period";
+  if (x === "total_hours" || x === "avg_lessons_per_week" || x === "cash_flow" || x === "tax_estimate" || x === "on_track" || x.startsWith("what_if_")) return "general_fallback";
   return "general_fallback";
 }
 
@@ -131,6 +134,9 @@ export async function askInsights(questionText: string, context: AskInsightsCont
   const debug = isDebugEnabled();
   let plan: QueryPlan = parseToQueryPlan(query, priorContext);
   let routerUsed: "llm" | "regex" = "regex";
+  if (debug && context.user_id) {
+    await runInsightsSupabaseSanityCheck(context.user_id);
+  }
 
   if (
     plan.intent === "clarification" &&
@@ -151,6 +157,8 @@ export async function askInsights(questionText: string, context: AskInsightsCont
               llmIntent === "students_below_average_rate" ? "students_below_average_rate" :
                 llmIntent === "earnings_ytd_for_student" ? "earnings_ytd_for_student" :
                   llmIntent === "revenue_per_student_in_period" ? "revenue_per_student_in_period" :
+                  llmIntent === "lessons_count_in_period" ? "lessons_count_in_period" :
+                    llmIntent === "revenue_per_lesson_in_period" ? "revenue_per_lesson_in_period" :
                     llmIntent === "average_hourly_rate_in_period" ? "average_hourly_rate_in_period" :
                       llmIntent === "forecast_monthly" ? "forecast_monthly" :
                         llmIntent === "percent_change_yoy" ? "percent_change_yoy" :
@@ -239,6 +247,8 @@ export async function askInsights(questionText: string, context: AskInsightsCont
       raw_query: query,
       normalized_query: plan.normalized_query,
       detected_intent: plan.intent,
+      needs_clarification: plan.needs_clarification,
+      missing_params: plan.required_missing_params ?? [],
       entities: { student_filter: plan.student_filter, time_range: plan.time_range },
       sql_truth_query_key: plan.sql_truth_query_key,
       sql_params: trace.sqlParams,

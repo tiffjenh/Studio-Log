@@ -60,6 +60,18 @@ SELECT COALESCE(SUM(amount_cents),0)::bigint AS total_cents
 FROM public.lessons
 WHERE user_id = $1 AND completed = true AND lesson_date BETWEEN $2 AND $3;
 `,
+  lessons_count_in_period: `
+SELECT COUNT(*) FILTER (WHERE completed = true)::int AS lesson_count
+FROM public.lessons
+WHERE user_id = $1 AND lesson_date BETWEEN $2 AND $3;
+`,
+  revenue_per_lesson_in_period: `
+SELECT
+  COUNT(*) FILTER (WHERE completed = true)::int AS lesson_count,
+  COALESCE(SUM(amount_cents) FILTER (WHERE completed = true), 0)::bigint AS total_cents
+FROM public.lessons
+WHERE user_id = $1 AND lesson_date BETWEEN $2 AND $3;
+`,
   earnings_ytd_for_student: `
 SELECT COALESCE(SUM(l.amount_cents),0)::bigint AS total_cents
 FROM public.lessons l
@@ -99,6 +111,14 @@ type TruthDataContext = {
 };
 
 type TruthResult = Record<string, unknown>;
+
+function isInsightsDebugEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    Boolean((window as unknown as { DEBUG_INSIGHTS?: boolean }).DEBUG_INSIGHTS) ||
+    localStorage.getItem("insights_debug") === "1"
+  );
+}
 
 function centsToDollars(cents: number): number {
   return Math.round((cents / 100) * 100) / 100;
@@ -162,6 +182,42 @@ async function loadData(ctx: TruthDataContext): Promise<{ lessons: Lesson[]; stu
   };
 }
 
+export async function runInsightsSupabaseSanityCheck(userId?: string): Promise<void> {
+  if (!userId || !hasSupabase() || !supabase) return;
+  const { data, error } = await supabase
+    .from("lessons")
+    .select("lesson_date,amount_cents,duration_minutes,completed,student_id")
+    .eq("user_id", userId)
+    .order("lesson_date", { ascending: false })
+    .limit(20);
+  if (error) {
+    console.warn("[Insights][sanity] fetch error", error.message);
+    return;
+  }
+  const rows = (data ?? []) as Array<{
+    lesson_date: string;
+    amount_cents: number;
+    duration_minutes: number;
+    completed: boolean;
+    student_id: string;
+  }>;
+  if (rows.length === 0) {
+    console.log("[Insights][sanity]", { rows: 0, completed: 0, not_completed: 0 });
+    return;
+  }
+  const completedCount = rows.filter((r) => r.completed).length;
+  const minDate = rows.reduce((m, r) => (r.lesson_date < m ? r.lesson_date : m), rows[0].lesson_date);
+  const maxDate = rows.reduce((m, r) => (r.lesson_date > m ? r.lesson_date : m), rows[0].lesson_date);
+  console.log("[Insights][sanity]", {
+    rows: rows.length,
+    completed: completedCount,
+    not_completed: rows.length - completedCount,
+    min_lesson_date: minDate,
+    max_lesson_date: maxDate,
+    sample: rows.slice(0, 5),
+  });
+}
+
 function matchStudentIdByName(students: Student[], rawName?: string): string | null {
   if (!rawName) return null;
   return resolveStudentName(students, rawName);
@@ -172,11 +228,40 @@ export async function runTruthQuery(
   ctx: TruthDataContext,
   params: Record<string, unknown>
 ): Promise<TruthResult> {
+  const debug = isInsightsDebugEnabled();
   const data = await loadData(ctx);
   const start = String(params.start_date ?? "");
   const end = String(params.end_date ?? "");
   const lessons = data.lessons.filter((l) => !start || !end || dateInRange(l.date, start, end));
   const studentsById = new Map(data.students.map((s) => [s.id, s]));
+  if (debug) {
+    console.log("[Insights][truthQuery]", {
+      key,
+      filters: {
+        user_id: ctx.user_id ?? null,
+        start_date: start || null,
+        end_date: end || null,
+        completed_only_intent:
+          key === "earnings_in_period" ||
+          key === "revenue_per_student_in_period" ||
+          key === "average_hourly_rate_in_period" ||
+          key === "day_of_week_earnings_max" ||
+          key === "lessons_count_in_period" ||
+          key === "revenue_per_lesson_in_period",
+        student_name: (params.student_name as string | undefined) ?? null,
+      },
+      source: data.source,
+      rows_in_range: lessons.length,
+      sample: lessons.slice(0, 5).map((l) => ({
+        id: l.id,
+        student_id: l.studentId,
+        lesson_date: l.date,
+        amount_cents: l.amountCents,
+        duration_minutes: l.durationMinutes,
+        completed: l.completed,
+      })),
+    });
+  }
 
   switch (key) {
     case "earnings_in_period": {
@@ -195,6 +280,40 @@ export async function runTruthQuery(
         total_cents: totalCents,
         total_dollars: centsToDollars(totalCents),
         zero_cause,
+        data_source: data.source,
+      };
+    }
+    case "lessons_count_in_period": {
+      const completedLessons = lessons.filter((l) => l.completed);
+      return {
+        lesson_count: completedLessons.length,
+        zero_cause:
+          completedLessons.length === 0
+            ? lessons.length === 0
+              ? "no_rows_in_range"
+              : "no_completed_lessons_in_range"
+            : null,
+        data_source: data.source,
+      };
+    }
+    case "revenue_per_lesson_in_period": {
+      const completedLessons = lessons.filter((l) => l.completed);
+      const totalCents = completedLessons.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
+      const perLessonCents =
+        completedLessons.length > 0 ? totalCents / completedLessons.length : 0;
+      return {
+        lesson_count: completedLessons.length,
+        total_cents: totalCents,
+        avg_cents_per_lesson: perLessonCents,
+        avg_dollars_per_lesson: centsToDollars(perLessonCents),
+        zero_cause:
+          completedLessons.length === 0
+            ? lessons.length === 0
+              ? "no_rows_in_range"
+              : "no_completed_lessons_in_range"
+            : totalCents === 0
+              ? "sum_zero_with_rows"
+              : null,
         data_source: data.source,
       };
     }
@@ -347,8 +466,8 @@ export async function runTruthQuery(
       }
       if (byDow.size === 0) {
         return {
-          dow: 0,
-          dow_label: "Sunday",
+          dow: null,
+          dow_label: null,
           total_cents: 0,
           total_dollars: 0,
           zero_cause: lessons.length === 0 ? "no_rows_in_range" : "no_completed_lessons_in_range",
@@ -358,6 +477,16 @@ export async function runTruthQuery(
       const sorted = [...byDow.entries()].sort((a, b) => b[1] - a[1]);
       const [dow, totalCents] = sorted[0]!;
       const DOW_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      if (totalCents === 0) {
+        return {
+          dow: null,
+          dow_label: null,
+          total_cents: 0,
+          total_dollars: 0,
+          zero_cause: "sum_zero_with_rows",
+          data_source: data.source,
+        };
+      }
       return {
         dow,
         dow_label: DOW_LABELS[dow] ?? "Unknown",

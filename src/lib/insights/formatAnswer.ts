@@ -44,6 +44,7 @@ export function formatBelowAverage(
 export function formatDayOfWeekMax(out: { dow_label?: string; total_dollars?: number }): string {
   const day = out.dow_label ?? "—";
   const v = (out.total_dollars as number) ?? 0;
+  if (!out.dow_label || v <= 0) return "No earnings found in this period.";
   return `**${day}** — ${fmt(v)}`;
 }
 
@@ -72,8 +73,24 @@ export function formatRevenuePerStudent(
 ): string {
   const rows = (out.rows as Array<{ student_name: string; total_dollars: number }>) ?? [];
   if (rows.length === 0) return "No completed lessons in that period.";
-  const bullets = rows.slice(0, 5).map((r) => `• **${r.student_name}** — ${fmt(r.total_dollars)}`).join("\n");
+  const bullets = rows.map((r) => `• **${r.student_name}** — ${fmt(r.total_dollars)}`).join("\n");
   return bullets;
+}
+
+export function formatLessonsCountInPeriod(out: { lesson_count?: number }): string {
+  const n = (out.lesson_count as number | undefined) ?? 0;
+  if (n <= 0) return "No completed lessons found for that period.";
+  return `${n} completed lesson${n === 1 ? "" : "s"}.`;
+}
+
+export function formatRevenuePerLessonInPeriod(out: {
+  avg_dollars_per_lesson?: number;
+  lesson_count?: number;
+}): string {
+  const n = (out.lesson_count as number | undefined) ?? 0;
+  if (n <= 0) return "No completed lessons found for that period.";
+  const v = (out.avg_dollars_per_lesson as number | undefined) ?? 0;
+  return `${fmt(v)} per completed lesson (${n} lesson${n === 1 ? "" : "s"}).`;
 }
 
 export function formatPercentChangeYoy(out: {

@@ -1,6 +1,8 @@
 import type { ComputedResult } from "./schema";
 import {
   formatEarningsInPeriod,
+  formatLessonsCountInPeriod,
+  formatRevenuePerLessonInPeriod,
   formatEarningsYtdStudent,
   formatHighestLowestHourly,
   formatAverageHourly,
@@ -27,6 +29,10 @@ export function resultToAnswer(computed: ComputedResult): string {
   switch (intent) {
     case "earnings_in_period":
       return formatEarningsInPeriod(out);
+    case "lessons_count_in_period":
+      return formatLessonsCountInPeriod(out);
+    case "revenue_per_lesson_in_period":
+      return formatRevenuePerLessonInPeriod(out);
     case "earnings_ytd_for_student":
       return formatEarningsYtdStudent(out);
     case "student_highest_hourly_rate":

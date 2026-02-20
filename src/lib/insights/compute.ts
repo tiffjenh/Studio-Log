@@ -21,7 +21,9 @@ function confidenceFromOutputs(plan: QueryPlan, outputs: Record<string, unknown>
     outputs.percent_change != null ||
     outputs.projected_monthly_dollars != null ||
     outputs.projected_yearly_dollars != null ||
-    outputs.dow_label != null;
+    outputs.dow_label != null ||
+    outputs.lesson_count != null ||
+    outputs.avg_dollars_per_lesson != null;
   if (!hasSignal) return "low";
   if (plan.student_filter?.confidence != null && plan.student_filter.confidence < 0.8) return "low";
   return "high";

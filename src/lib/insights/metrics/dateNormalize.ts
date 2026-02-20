@@ -12,6 +12,10 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
+function toDateKeyLocal(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export function monthRange(year: number, month: number): NormalizedRange {
   const lastDay = new Date(year, month, 0).getDate();
   return { start: `${year}-${pad(month)}-01`, end: `${year}-${pad(month)}-${pad(lastDay)}`, label: `${year}-${pad(month)}` };
@@ -45,12 +49,12 @@ export function normalizeDateRange(query: string, todayISO?: string): Normalized
   if (/\blast 7 days|past 7 days\b/.test(q)) {
     const d = new Date(today + "T12:00:00");
     d.setDate(d.getDate() - 6);
-    return { start: d.toISOString().slice(0, 10), end: today, label: "last_7_days" };
+    return { start: toDateKeyLocal(d), end: today, label: "last_7_days" };
   }
   if (/\blast 30 days|past 30 days\b/.test(q)) {
     const d = new Date(today + "T12:00:00");
     d.setDate(d.getDate() - 29);
-    return { start: d.toISOString().slice(0, 10), end: today, label: "last_30_days" };
+    return { start: toDateKeyLocal(d), end: today, label: "last_30_days" };
   }
   return undefined;
 }
@@ -63,5 +67,5 @@ export function defaultRangeForIntent(intent: string, todayISO?: string): Normal
   }
   const d = new Date(today + "T12:00:00");
   d.setDate(d.getDate() - 29);
-  return { start: d.toISOString().slice(0, 10), end: today, label: "last_30_days" };
+  return { start: toDateKeyLocal(d), end: today, label: "last_30_days" };
 }
