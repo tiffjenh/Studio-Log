@@ -16,6 +16,9 @@ function hasValidResult(out: Record<string, unknown>): boolean {
   if (typeof out.percent_change === "number" || (out.percent_change == null && out.year_a != null)) return true;
   if (out.projected_monthly_dollars != null || out.projected_yearly_dollars != null) return true;
   if (out.attended_lessons != null || out.attendance_rate_percent != null) return true;
+  if (out.avg_weekly_dollars != null) return true;
+  if (Array.isArray(out.weekly_series)) return true;
+  if (typeof out.stability_label === "string") return true;
   return false;
 }
 

@@ -69,11 +69,20 @@ export function formatAttendanceSummary(out: {
 }
 
 export function formatRevenuePerStudent(
-  out: { rows?: Array<{ student_name: string; total_dollars: number }> }
+  out: {
+    rows?: Array<{ student_name: string; total_dollars: number }>;
+    requested_top_n?: number | null;
+    available_count?: number;
+  }
 ): string {
   const rows = (out.rows as Array<{ student_name: string; total_dollars: number }>) ?? [];
   if (rows.length === 0) return "No completed lessons in that period.";
   const bullets = rows.map((r) => `• **${r.student_name}** — ${fmt(r.total_dollars)}`).join("\n");
+  const requestedTopN = typeof out.requested_top_n === "number" ? out.requested_top_n : null;
+  const available = (out.available_count as number | undefined) ?? rows.length;
+  if (requestedTopN && available < requestedTopN) {
+    return `${bullets}\n\nOnly ${available} student${available === 1 ? "" : "s"} had revenue in this period.`;
+  }
   return bullets;
 }
 
@@ -117,4 +126,39 @@ export function formatForecast(out: {
   if (monthly != null) return `${fmt(monthly)}/month`;
   if (yearly != null) return `${fmt(yearly)}/year`;
   return "Not enough data to project.";
+}
+
+export function formatAvgWeeklyRevenue(out: { avg_weekly_dollars?: number; weeks_count?: number }): string {
+  const v = (out.avg_weekly_dollars as number | undefined) ?? 0;
+  const n = (out.weeks_count as number | undefined) ?? 0;
+  if (n <= 0) return "No completed lessons found for that period.";
+  return `${fmt(v)} average per week (${n} week${n === 1 ? "" : "s"}).`;
+}
+
+export function formatCashFlowTrend(out: {
+  direction?: "up" | "down" | "flat";
+  weekly_series?: Array<{ start_date: string; total_dollars: number }>;
+}): string {
+  const series = (out.weekly_series as Array<{ start_date: string; total_dollars: number }>) ?? [];
+  if (series.length === 0) return "No completed lessons found for that period.";
+  const direction = out.direction ?? "flat";
+  const directionLabel = direction === "up" ? "upward" : direction === "down" ? "downward" : "flat";
+  const preview = series.slice(-5).map((p) => `${p.start_date}: ${fmt(p.total_dollars)}`).join(" · ");
+  return `Cash flow trend is **${directionLabel}**.\n${preview}`;
+}
+
+export function formatIncomeStability(out: {
+  stability_label?: "stable" | "moderate" | "volatile" | "insufficient_data";
+  coefficient_of_variation?: number | null;
+  weeks_count?: number;
+}): string {
+  const label = out.stability_label ?? "insufficient_data";
+  const weeks = (out.weeks_count as number | undefined) ?? 0;
+  if (label === "insufficient_data" || weeks < 2) {
+    return "Not enough weekly data to assess stability.";
+  }
+  const cv = out.coefficient_of_variation != null ? `${(out.coefficient_of_variation * 100).toFixed(1)}%` : "n/a";
+  if (label === "stable") return `Income looks **stable** (variation ${cv}).`;
+  if (label === "volatile") return `Income looks **volatile** (variation ${cv}).`;
+  return `Income is **moderately variable** (variation ${cv}).`;
 }

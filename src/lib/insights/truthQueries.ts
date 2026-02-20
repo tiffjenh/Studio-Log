@@ -2,6 +2,15 @@ import { hasSupabase, supabase } from "@/lib/supabase";
 import { computeForecast } from "@/lib/forecasts/compute";
 import { resolveStudentName } from "@/lib/insights/metrics/entityResolution";
 import { computeLessonAmountCents } from "@/utils/earnings";
+import {
+  bestWeekdayByRevenue,
+  coefficientOfVariation,
+  describeTrend,
+  normalizeCompletedLessons,
+  revenuePerLesson,
+  topStudentsByRevenue,
+  weeklyRevenueSeries,
+} from "@/lib/insights/metrics/earningsTruth";
 import type { Lesson, Student } from "@/types";
 
 export const SQL_TRUTH_QUERIES: Record<string, string> = {
@@ -88,6 +97,30 @@ WHERE l.user_id = $1 AND l.completed = true AND l.lesson_date BETWEEN $2 AND $3
 GROUP BY s.id, s.first_name, s.last_name
 ORDER BY total_cents DESC;
 `,
+  avg_weekly_revenue: `
+SELECT DATE_TRUNC('week', lesson_date)::date AS week_start,
+       COALESCE(SUM(amount_cents),0)::bigint AS total_cents
+FROM public.lessons
+WHERE user_id = $1 AND completed = true AND lesson_date BETWEEN $2 AND $3
+GROUP BY 1
+ORDER BY 1 ASC;
+`,
+  cash_flow_trend: `
+SELECT DATE_TRUNC('week', lesson_date)::date AS week_start,
+       COALESCE(SUM(amount_cents),0)::bigint AS total_cents
+FROM public.lessons
+WHERE user_id = $1 AND completed = true AND lesson_date BETWEEN $2 AND $3
+GROUP BY 1
+ORDER BY 1 ASC;
+`,
+  income_stability: `
+SELECT DATE_TRUNC('week', lesson_date)::date AS week_start,
+       COALESCE(SUM(amount_cents),0)::bigint AS total_cents
+FROM public.lessons
+WHERE user_id = $1 AND completed = true AND lesson_date BETWEEN $2 AND $3
+GROUP BY 1
+ORDER BY 1 ASC;
+`,
   student_attendance_summary: `
 SELECT
   COUNT(*)::int AS total_lessons,
@@ -144,6 +177,15 @@ function effectiveCents(l: Lesson, studentsById: Map<string, Student>): number {
 }
 
 async function loadData(ctx: TruthDataContext): Promise<{ lessons: Lesson[]; students: Student[]; source: "supabase" | "memory" }> {
+  // Keep Insights aligned with on-screen Earnings values by preferring in-memory
+  // store snapshots when they are provided by the caller.
+  if (ctx.lessons && ctx.students) {
+    return {
+      lessons: ctx.lessons,
+      students: ctx.students,
+      source: "memory",
+    };
+  }
   if (hasSupabase() && supabase && ctx.user_id) {
     const [{ data: lessonsRows, error: lessonErr }, { data: studentRows, error: studentErr }] = await Promise.all([
       supabase
@@ -236,6 +278,7 @@ export async function runTruthQuery(
   const start = String(params.start_date ?? "");
   const end = String(params.end_date ?? "");
   const lessons = data.lessons.filter((l) => !start || !end || dateInRange(l.date, start, end));
+  const completedLessons = normalizeCompletedLessons(lessons);
   const studentsById = new Map(data.students.map((s) => [s.id, s]));
   if (debug) {
     console.log("[Insights][truthQuery]", {
@@ -250,7 +293,10 @@ export async function runTruthQuery(
           key === "average_hourly_rate_in_period" ||
           key === "day_of_week_earnings_max" ||
           key === "lessons_count_in_period" ||
-          key === "revenue_per_lesson_in_period",
+          key === "revenue_per_lesson_in_period" ||
+          key === "avg_weekly_revenue" ||
+          key === "cash_flow_trend" ||
+          key === "income_stability",
         student_name: (params.student_name as string | undefined) ?? null,
       },
       source: data.source,
@@ -268,7 +314,6 @@ export async function runTruthQuery(
 
   switch (key) {
     case "earnings_in_period": {
-      const completedLessons = lessons.filter((l) => l.completed);
       const totalCents = completedLessons.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
       const zero_cause =
         totalCents !== 0
@@ -287,7 +332,6 @@ export async function runTruthQuery(
       };
     }
     case "lessons_count_in_period": {
-      const completedLessons = lessons.filter((l) => l.completed);
       return {
         lesson_count: completedLessons.length,
         zero_cause:
@@ -300,15 +344,15 @@ export async function runTruthQuery(
       };
     }
     case "revenue_per_lesson_in_period": {
-      const completedLessons = lessons.filter((l) => l.completed);
       const totalCents = completedLessons.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
-      const perLessonCents =
-        completedLessons.length > 0 ? totalCents / completedLessons.length : 0;
+      const perLessonDollars = revenuePerLesson(
+        completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) }))
+      );
       return {
         lesson_count: completedLessons.length,
         total_cents: totalCents,
-        avg_cents_per_lesson: perLessonCents,
-        avg_dollars_per_lesson: centsToDollars(perLessonCents),
+        avg_cents_per_lesson: completedLessons.length > 0 ? totalCents / completedLessons.length : 0,
+        avg_dollars_per_lesson: perLessonDollars,
         zero_cause:
           completedLessons.length === 0
             ? lessons.length === 0
@@ -321,20 +365,70 @@ export async function runTruthQuery(
       };
     }
     case "revenue_per_student_in_period": {
-      const byStudent = new Map<string, number>();
-      for (const l of lessons) {
-        if (!l.completed) continue;
-        byStudent.set(l.studentId, (byStudent.get(l.studentId) ?? 0) + effectiveCents(l, studentsById));
+      const topN =
+        typeof params.top_n === "number"
+          ? params.top_n
+          : typeof params.top_n === "string"
+            ? Number(params.top_n)
+            : undefined;
+      const mapped = completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) }));
+      const { rows, available_count } = topStudentsByRevenue(mapped, studentsById, Number.isFinite(topN) ? topN : undefined);
+      return { rows, available_count, requested_top_n: topN ?? null, data_source: data.source };
+    }
+    case "avg_weekly_revenue": {
+      if (!start || !end) return { error: "missing_range", data_source: data.source };
+      const series = weeklyRevenueSeries(
+        completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) })),
+        start,
+        end
+      );
+      const totalCents = series.reduce((sum, p) => sum + p.total_cents, 0);
+      const avgWeekly = series.length > 0 ? totalCents / series.length : 0;
+      return {
+        weekly_series: series,
+        weeks_count: series.length,
+        avg_weekly_cents: avgWeekly,
+        avg_weekly_dollars: centsToDollars(avgWeekly),
+        total_cents: totalCents,
+        total_dollars: centsToDollars(totalCents),
+        data_source: data.source,
+      };
+    }
+    case "cash_flow_trend": {
+      if (!start || !end) return { error: "missing_range", data_source: data.source };
+      const series = weeklyRevenueSeries(
+        completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) })),
+        start,
+        end
+      );
+      return {
+        weekly_series: series,
+        weeks_count: series.length,
+        direction: describeTrend(series),
+        data_source: data.source,
+      };
+    }
+    case "income_stability": {
+      if (!start || !end) return { error: "missing_range", data_source: data.source };
+      const series = weeklyRevenueSeries(
+        completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) })),
+        start,
+        end
+      );
+      const cv = coefficientOfVariation(series);
+      let label: "stable" | "moderate" | "volatile" | "insufficient_data" = "insufficient_data";
+      if (cv != null) {
+        if (cv < 0.2) label = "stable";
+        else if (cv < 0.45) label = "moderate";
+        else label = "volatile";
       }
-      const rows = [...byStudent.entries()]
-        .map(([studentId, cents]) => ({
-          student_id: studentId,
-          student_name: studentsById.get(studentId) ? toName(studentsById.get(studentId)!) : "Unknown",
-          total_cents: cents,
-          total_dollars: centsToDollars(cents),
-        }))
-        .sort((a, b) => b.total_cents - a.total_cents);
-      return { rows, data_source: data.source };
+      return {
+        weekly_series: series,
+        weeks_count: series.length,
+        coefficient_of_variation: cv,
+        stability_label: label,
+        data_source: data.source,
+      };
     }
     case "earnings_ytd_for_student": {
       const studentId =
@@ -454,47 +548,24 @@ export async function runTruthQuery(
       };
     }
     case "average_hourly_rate_in_period": {
-      const completedOnly = lessons.filter((l) => l.completed);
-      const totalCents = completedOnly.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
-      const totalMins = completedOnly.reduce((acc, l) => acc + l.durationMinutes, 0);
+      const totalCents = completedLessons.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
+      const totalMins = completedLessons.reduce((acc, l) => acc + l.durationMinutes, 0);
       const hourlyCents = totalMins > 0 ? (totalCents / totalMins) * 60 : 0;
       return { hourly_cents: hourlyCents, hourly_dollars: centsToDollars(hourlyCents), data_source: data.source };
     }
     case "day_of_week_earnings_max": {
-      const byDow = new Map<number, number>();
-      for (const l of lessons) {
-        if (!l.completed) continue;
-        const dow = new Date(l.date + "T12:00:00").getDay();
-        byDow.set(dow, (byDow.get(dow) ?? 0) + effectiveCents(l, studentsById));
-      }
-      if (byDow.size === 0) {
-        return {
-          dow: null,
-          dow_label: null,
-          total_cents: 0,
-          total_dollars: 0,
-          zero_cause: lessons.length === 0 ? "no_rows_in_range" : "no_completed_lessons_in_range",
-          data_source: data.source,
-        };
-      }
-      const sorted = [...byDow.entries()].sort((a, b) => b[1] - a[1]);
-      const [dow, totalCents] = sorted[0]!;
-      const DOW_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      if (totalCents === 0) {
-        return {
-          dow: null,
-          dow_label: null,
-          total_cents: 0,
-          total_dollars: 0,
-          zero_cause: "sum_zero_with_rows",
-          data_source: data.source,
-        };
-      }
+      const best = bestWeekdayByRevenue(
+        completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) }))
+      );
       return {
-        dow,
-        dow_label: DOW_LABELS[dow] ?? "Unknown",
-        total_cents: totalCents,
-        total_dollars: centsToDollars(totalCents),
+        ...best,
+        zero_cause:
+          best.zero_cause ??
+          (completedLessons.length === 0
+            ? lessons.length === 0
+              ? "no_rows_in_range"
+              : "no_completed_lessons_in_range"
+            : null),
         data_source: data.source,
       };
     }

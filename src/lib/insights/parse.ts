@@ -52,6 +52,30 @@ function extractStudentName(query: string): string | undefined {
   return undefined;
 }
 
+function parseTopN(normalized: string): number | undefined {
+  const direct = normalized.match(/\btop\s+(\d+)\b/);
+  if (direct) return Number(direct[1]);
+  const leading = normalized.match(/\b(\d+)\s+(highest|top)\b.*\bstudents?\b/);
+  if (leading) return Number(leading[1]);
+  const words: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+  };
+  const word = normalized.match(/\btop\s+(one|two|three|four|five|six|seven|eight|nine|ten)\b/);
+  if (word) return words[word[1]];
+  const leadingWord = normalized.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+(highest|top)\b.*\bstudents?\b/);
+  if (leadingWord) return words[leadingWord[1]];
+  return undefined;
+}
+
 function inferMissingParams(
   routedIntent: InsightIntent,
   normalized: string,
@@ -86,6 +110,9 @@ function deriveTruthKey(intent: InsightIntent): string {
     student_missed_most_lessons_in_year: "student_missed_most_lessons_in_year",
     student_attendance_summary: "student_attendance_summary",
     revenue_per_student_in_period: "revenue_per_student_in_period",
+    avg_weekly_revenue: "avg_weekly_revenue",
+    cash_flow_trend: "cash_flow_trend",
+    income_stability: "income_stability",
     forecast_monthly: "forecast_monthly",
     forecast_yearly: "forecast_yearly",
     percent_change_yoy: "percent_change_yoy",
@@ -101,6 +128,9 @@ function routeIntent(normalized: string): InsightIntent {
   if (/^how many lessons did i teach last month$/.test(normalized)) return "lessons_count_in_period";
   if (/^what s my revenue per lesson$/.test(normalized) || /^what is my revenue per lesson$/.test(normalized)) return "revenue_per_lesson_in_period";
   if (/^what day of the week do i earn the most$/.test(normalized)) return "day_of_week_earnings_max";
+  if (/\b(cash flow trend|income trend|revenue trend|earnings trend|cash flow trending|revenue trending|earnings trending)\b/.test(normalized)) return "cash_flow_trend";
+  if (/\b(stable|stability|volatile|volatility)\b/.test(normalized) && /\b(income|earnings|revenue|cash flow)\b/.test(normalized)) return "income_stability";
+  if ((/\baverage\b.*\bper week\b/.test(normalized) || /\baverage weekly\b/.test(normalized)) && /\b(earn|revenue|income|cash flow)\b/.test(normalized)) return "avg_weekly_revenue";
   if (/\bwho missed the most|missed most lessons|most missed lessons|most absences\b/.test(normalized)) return "student_missed_most_lessons_in_year";
   if (/\bhow many lessons\b|\blesson count\b|\bcount lessons\b|\bnumber of lessons\b/.test(normalized)) return "lessons_count_in_period";
   if (/\brevenue per lesson\b|\baverage revenue per lesson\b|\bavg revenue per lesson\b/.test(normalized)) return "revenue_per_lesson_in_period";
@@ -112,7 +142,12 @@ function routeIntent(normalized: string): InsightIntent {
   if (/\bwhat day (?:of the week )?do i earn the most|(?:which |what )?day (?:of the week )?is best for earnings|day of the week.*earn the most|earn the most on which day|best day for earnings|which day do i earn the most\b/.test(normalized)) return "day_of_week_earnings_max";
   if ((/\bytd\b/.test(normalized) || /\byear to date\b/.test(normalized)) && (/\bearn me\b/.test(normalized) || /\b[a-z]+\s+[a-z]+\s+ytd\b/.test(normalized) || /\bytd from\b/.test(normalized) || /\byear to date earnings\b/.test(normalized))) return "earnings_ytd_for_student";
   if (/\battendance summary\b/.test(normalized)) return "student_attendance_summary";
-  if (/\btop 3 students by revenue|top 3 by revenue|top 3 students|top three students|top students(?: by revenue)?|revenue per student|revenue ranking|student revenue breakdown|best students by revenue\b/.test(normalized)) return "revenue_per_student_in_period";
+  if (/\b(top\s+\d+|top\s+(one|two|three|four|five|six|seven|eight|nine|ten)|highest)\b.*\b(student|students)\b.*\b(revenue|earnings|income)\b/.test(normalized)) return "revenue_per_student_in_period";
+  if (/\btop\s+\d+\b.*\bby\b.*\b(revenue|earnings|income)\b/.test(normalized)) return "revenue_per_student_in_period";
+  if (/\btop\s+(one|two|three|four|five|six|seven|eight|nine|ten)\b.*\bby\b.*\b(revenue|earnings|income)\b/.test(normalized)) return "revenue_per_student_in_period";
+  if (/\bwhich student\b.*\b(earn|earned|revenue|income)\b.*\bmost\b/.test(normalized)) return "revenue_per_student_in_period";
+  if (/\bwho\b.*\bearned?\b.*\bmost\b/.test(normalized)) return "revenue_per_student_in_period";
+  if (/\brevenue per student|revenue ranking|student revenue breakdown|best students by revenue\b/.test(normalized)) return "revenue_per_student_in_period";
   if (/\bforecast monthly|projected monthly|forecast this month|monthly projection|will i earn this month\b/.test(normalized)) return "forecast_monthly";
   if (/\bforecast yearly|projected yearly|forecast this year|yearly projection|will i earn this year\b/.test(normalized)) return "forecast_yearly";
   if (/%|percent|percentage/.test(normalized) && /\b(20\d{2}).*(20\d{2})\b/.test(normalized)) return "percent_change_yoy";
@@ -131,7 +166,7 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
     const def = defaultRangeForIntent("day_of_week_earnings_max", todayISO);
     time_range = toTimeRange(def, "ytd");
   }
-  if (!time_range && (routedIntent === "earnings_in_period" || routedIntent === "average_hourly_rate_in_period" || routedIntent === "revenue_per_student_in_period" || routedIntent === "lessons_count_in_period" || routedIntent === "revenue_per_lesson_in_period")) {
+  if (!time_range && (routedIntent === "earnings_in_period" || routedIntent === "average_hourly_rate_in_period" || routedIntent === "revenue_per_student_in_period" || routedIntent === "lessons_count_in_period" || routedIntent === "revenue_per_lesson_in_period" || routedIntent === "avg_weekly_revenue" || routedIntent === "cash_flow_trend" || routedIntent === "income_stability")) {
     const def = defaultRangeForIntent(routedIntent, todayISO);
     time_range = toTimeRange(def, def.label?.includes("YTD") ? "ytd" : "rolling_days");
   }
@@ -156,6 +191,13 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
     slots.year_b = Math.max(...years);
   }
   if (years.length > 0 && !slots.year) slots.year = years[0];
+  const topN = parseTopN(normalized);
+  if (routedIntent === "revenue_per_student_in_period") {
+    if (topN && topN > 0) slots.top_n = topN;
+    if (!slots.top_n && (/\bwhich student\b/.test(normalized) || /\bwho\b.*\bearned?\b.*\bmost\b/.test(normalized))) {
+      slots.top_n = 1;
+    }
+  }
 
   const plan: QueryPlan = {
     intent,

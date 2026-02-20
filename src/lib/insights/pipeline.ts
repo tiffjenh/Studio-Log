@@ -68,8 +68,11 @@ function mapRouterIntentToPlanIntent(raw: string): QueryPlan["intent"] {
   if (x === "forecast") return "forecast_monthly";
   if (x === "percent_change_yoy") return "percent_change_yoy";
   if (x === "best_day_of_week" || x === "day_of_week_earnings") return "day_of_week_earnings_max";
+  if (x === "cash_flow" || x === "cashflow_trend") return "cash_flow_trend";
+  if (x === "income_stability") return "income_stability";
+  if (x === "avg_weekly_revenue") return "avg_weekly_revenue";
   if (x === "lessons_count") return "lessons_count_in_period";
-  if (x === "total_hours" || x === "avg_lessons_per_week" || x === "cash_flow" || x === "tax_estimate" || x === "on_track" || x.startsWith("what_if_")) return "general_fallback";
+  if (x === "total_hours" || x === "avg_lessons_per_week" || x === "tax_estimate" || x === "on_track" || x.startsWith("what_if_")) return "general_fallback";
   return "general_fallback";
 }
 
@@ -97,10 +100,12 @@ function extractMetadata(
 ): InsightsMetadata {
   const out = computed?.outputs as Record<string, unknown> | undefined;
 
-  // Lesson count: prefer from outputs, else count earnings in the resolved range
+  // Lesson count: prefer explicit truth outputs to avoid contradictory UI metadata.
   let lessonCount = 0;
   if (typeof out?.lessons_count === "number") {
     lessonCount = out.lessons_count;
+  } else if (typeof out?.lesson_count === "number") {
+    lessonCount = out.lesson_count;
   } else if (typeof out?.entries_count === "number") {
     lessonCount = out.entries_count;
   } else if (typeof out?.below_count === "number") {
@@ -232,7 +237,10 @@ export async function askInsights(questionText: string, context: AskInsightsCont
       out.percent_change != null ||
       out.projected_monthly_dollars != null ||
       out.projected_yearly_dollars != null ||
-      out.attended_lessons != null);
+      out.attended_lessons != null ||
+      out.avg_weekly_dollars != null ||
+      Array.isArray(out.weekly_series) ||
+      out.stability_label != null);
   if (!hasValidMetric && (!verifier.passed || verifier.confidence === "low")) {
     finalAnswerText =
       plan.clarifying_question ??

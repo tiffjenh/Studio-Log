@@ -113,4 +113,33 @@ describe("Insights pipeline", () => {
     expect(truth.total_dollars as number).toBeGreaterThan(0);
     expect(typeof truth.dow_label).toBe("string");
   });
+
+  it("does not return contradictory empty state when lesson_count > 0", async () => {
+    const res = await askInsights("How many lessons did I teach last month?", ctx);
+    expect(res.metadata.lesson_count).toBeGreaterThan(0);
+    expect(res.finalAnswerText.toLowerCase()).not.toContain("no completed lessons found");
+  });
+
+  it("supports cash flow trend and returns multi-point trend output", async () => {
+    const res = await askInsights("What's my cash flow trend?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("cash_flow_trend");
+    const outputs = res.computedResult?.outputs as { weekly_series?: unknown[]; direction?: string } | undefined;
+    expect((outputs?.weekly_series?.length ?? 0)).toBeGreaterThanOrEqual(2);
+    expect(["up", "down", "flat"]).toContain(outputs?.direction);
+  });
+
+  it("supports stability questions without earnings/attendance clarification", async () => {
+    const res = await askInsights("Is my income stable or volatile?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("income_stability");
+    expect(/stable|volatile|moderately|not enough weekly data/i.test(res.finalAnswerText)).toBe(true);
+  });
+
+  it("returns exactly top N students when available", async () => {
+    const res = await askInsights("Top 3 students by revenue in 2026", ctx);
+    expect(res.needsClarification).toBe(false);
+    const rows = (res.computedResult?.outputs as { rows?: unknown[] } | undefined)?.rows ?? [];
+    expect(rows.length).toBe(3);
+  });
 });

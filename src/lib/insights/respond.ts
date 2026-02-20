@@ -11,6 +11,9 @@ import {
   formatMissedMost,
   formatAttendanceSummary,
   formatRevenuePerStudent,
+  formatAvgWeeklyRevenue,
+  formatCashFlowTrend,
+  formatIncomeStability,
   formatPercentChangeYoy,
   formatForecast,
 } from "./formatAnswer";
@@ -48,6 +51,12 @@ export function resultToAnswer(computed: ComputedResult): string {
       return formatAttendanceSummary(out);
     case "revenue_per_student_in_period":
       return formatRevenuePerStudent(out);
+    case "avg_weekly_revenue":
+      return formatAvgWeeklyRevenue(out);
+    case "cash_flow_trend":
+      return formatCashFlowTrend(out);
+    case "income_stability":
+      return formatIncomeStability(out);
     case "forecast_monthly":
     case "forecast_yearly":
       return formatForecast(out);
