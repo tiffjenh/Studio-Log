@@ -423,7 +423,6 @@ export default function Earnings() {
     yearlyLabels.push(yrStr);
   }
   const maxYearly = Math.max(...yearlyTotals, 1);
-  const yearlyGrandTotal = yearlyTotals.reduce((s, v) => s + v, 0);
 
   const dailyData = getDailyTotalsForWeek(completedLessons, now, dailyWeekOffset);
   const dailyWeekTotal = dailyData.reduce((s, d) => s + d.total, 0);

@@ -242,6 +242,7 @@ function extractMetadata(
     percent_change_yoy: { type: "percent_change", formula: "(current - previous) / previous" },
     average_hourly_rate_in_period: { type: "ratio", formula: "sum(amount_dollars) / sum(hours)" },
     day_of_week_earnings_max: { type: "argmax", formula: "max(sum(amount_dollars) by weekday)" },
+    on_track_goal: { type: "simulation", formula: "ytd run-rate vs annual_goal_dollars" },
     general_fallback: { type: "fallback", formula: "deterministic fallback response" },
     clarification: { type: "clarification", formula: "missing required parameters" },
   };
