@@ -34,6 +34,8 @@ export type AskInsightsContext = {
   students?: StudentSummary[];
   timezone?: string;
   locale?: string;
+  /** Selected UI language (drives clarifiers/fallback/formatting). */
+  language?: "en" | "es" | "zh";
   priorContext?: InsightsPriorContext;
 };
 
@@ -275,6 +277,7 @@ function extractMetadata(
 export async function askInsights(questionText: string, context: AskInsightsContext): Promise<AskInsightsResult> {
   const query = (questionText || "Show my earnings summary").trim();
   const { earnings, lessons, roster, priorContext } = context;
+  const language = context.language ?? "en";
   const debug = isDebugEnabled();
   let plan: QueryPlan = parseToQueryPlan(query, priorContext);
   let routerUsed: "llm" | "regex" = "regex";
@@ -376,14 +379,39 @@ export async function askInsights(questionText: string, context: AskInsightsCont
       out.suggested_set_aside_low_dollars != null ||
       Array.isArray(out.weekly_series) ||
       out.stability_label != null);
+  const strings = (() => {
+    if (language === "es") {
+      return {
+        genericFallback: "No estoy segura de tener suficiente confianza para responder. ¿Te refieres a ingresos, asistencia, tarifa o pronóstico?",
+        clarifyTimeframe: "¿Puedes especificar el período (por ejemplo, julio de 2024 o este año)?",
+        earningsBasedOn: (n: number, label: string) => `Basado en **${n}** clases completadas · ${label}`,
+        noLessons: (label: string) => `No se encontraron clases completadas para ese período. · ${label}`,
+      };
+    }
+    if (language === "zh") {
+      return {
+        genericFallback: "我不太有把握回答這個問題。你是指收入、出席、費率，還是預測？",
+        clarifyTimeframe: "你可以指定時間範圍嗎（例如 2024 年 7 月或今年）？",
+        earningsBasedOn: (n: number, label: string) => `根據 **${n}** 堂已完成課程 · ${label}`,
+        noLessons: (label: string) => `這個期間沒有已完成的課程。 · ${label}`,
+      };
+    }
+    return {
+      genericFallback: "I’m not sure I have enough confidence to answer that. Did you mean earnings, attendance, rate, or forecast?",
+      clarifyTimeframe: "Could you specify the timeframe (e.g. July 2024 or this year)?",
+      earningsBasedOn: (n: number, label: string) => `Based on **${n}** completed lessons · ${label}`,
+      noLessons: (label: string) => `No completed lessons found for that period. · ${label}`,
+    };
+  })();
+
   const hasMoneySignal = /\b(earn|earned|earnings|money|revenue|income|\$|dollars?)\b/.test(plan.normalized_query ?? "");
   if (!hasValidMetric && (!verifier.passed || verifier.confidence === "low")) {
     finalAnswerText =
       plan.clarifying_question ??
-      "I’m not sure I have enough confidence to answer that. Did you mean earnings, attendance, rate, or forecast?";
+      strings.genericFallback;
   }
   if (!hasValidMetric && !plan.clarifying_question && hasMoneySignal) {
-    finalAnswerText = "Could you specify the timeframe (e.g. July 2024 or this year)?";
+    finalAnswerText = strings.clarifyTimeframe;
   }
   const finalNeedsClarification =
     !hasValidMetric && (!verifier.passed || verifier.confidence === "low");
@@ -410,6 +438,18 @@ export async function askInsights(questionText: string, context: AskInsightsCont
   }
 
   const meta = extractMetadata(computed, earnings, plan, routerUsed);
+
+  // Earnings: return a concise, grounded card-style answer (localized).
+  if (!finalNeedsClarification && plan.intent === "earnings_in_period" && typeof out.total_dollars === "number") {
+    const label = meta.date_range_label;
+    const lessonCount = meta.lesson_count;
+    if (lessonCount <= 0) {
+      finalAnswerText = strings.noLessons(label);
+    } else {
+      // Keep the formatted number from the responder as the primary value.
+      finalAnswerText = `${finalAnswerText}\n${strings.earningsBasedOn(lessonCount, label)}`;
+    }
+  }
 
   return {
     finalAnswerText,

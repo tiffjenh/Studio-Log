@@ -71,6 +71,32 @@ describe("Insights pipeline", () => {
     expect(res.finalAnswerText.toLowerCase()).toContain("did you mean");
   });
 
+  it("answers earnings questions with relative and explicit timeframes (no generic fallback)", async () => {
+    const lastMonth = await askInsights("How much money did I make last month?", ctx);
+    expect(lastMonth.needsClarification).toBe(false);
+    expect(lastMonth.trace?.queryPlan.intent).toBe("earnings_in_period");
+    expect(lastMonth.finalAnswerText.toLowerCase()).not.toContain("did you mean earnings");
+
+    const jan = await askInsights("How much money did I make January 2026?", ctx);
+    expect(jan.needsClarification).toBe(false);
+    expect(jan.trace?.queryPlan.intent).toBe("earnings_in_period");
+    expect(jan.finalAnswerText.toLowerCase()).not.toContain("did you mean earnings");
+  });
+
+  it("returns earnings answers in selected language (ES/ZH) and parses timeframes", async () => {
+    const ctxEs = { ...ctx, locale: "es-ES" as const, language: "es" as const };
+    const es = await askInsights("¿Cuánto gané el mes pasado?", ctxEs);
+    expect(es.needsClarification).toBe(false);
+    expect(es.trace?.queryPlan.intent).toBe("earnings_in_period");
+    expect(es.finalAnswerText).toMatch(/Basado en/);
+
+    const ctxZh = { ...ctx, locale: "zh-CN" as const, language: "zh" as const };
+    const zh = await askInsights("上个月我赚了多少？", ctxZh);
+    expect(zh.needsClarification).toBe(false);
+    expect(zh.trace?.queryPlan.intent).toBe("earnings_in_period");
+    expect(zh.finalAnswerText).toMatch(/根據/);
+  });
+
   it("runs 60-question paraphrase matrix without irrelevant defaults", async () => {
     expect(INSIGHTS_TEST_QUESTIONS.length).toBeGreaterThanOrEqual(60);
     for (const tc of INSIGHTS_TEST_QUESTIONS.slice(0, 60)) {

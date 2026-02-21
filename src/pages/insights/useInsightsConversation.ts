@@ -7,7 +7,7 @@ import { useState, useCallback } from "react";
 import { askInsights } from "@/lib/insights";
 import type { ForecastResponse } from "@/lib/forecasts/types";
 import type { EarningsRow, StudentSummary } from "@/lib/forecasts/types";
-import { detectQueryLanguage, translateForInsights } from "@/utils/insightsLanguage";
+import { translateForInsights } from "@/utils/insightsLanguage";
 import type { SupportedLocale } from "@/lib/forecasts/types";
 import type { AskInsightsResult, InsightsMetadata } from "@/lib/insights";
 import type { InsightIntent } from "@/lib/insights/schema";
@@ -42,10 +42,12 @@ export type UseInsightsConversationArgs = {
   students: StudentSummary[];
   locale: SupportedLocale;
   timezone: string;
+  /** Selected UI language (drives response language). */
+  language?: "en" | "es" | "zh";
 };
 
 export function useInsightsConversation(args: UseInsightsConversationArgs) {
-  const { userId, lessons, roster, earnings, students, locale, timezone } = args;
+  const { userId, lessons, roster, earnings, students, locale, timezone, language = "en" } = args;
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +89,7 @@ export function useInsightsConversation(args: UseInsightsConversationArgs) {
           students,
           timezone,
           locale,
+          language,
           priorContext,
         });
         if (insightsResult.needsClarification) {
@@ -105,9 +108,9 @@ export function useInsightsConversation(args: UseInsightsConversationArgs) {
           displayText = insightsResult.clarifyingQuestion;
         }
 
-        const responseLang = detectQueryLanguage(qUser);
-        if (responseLang === "es" || responseLang === "zh") {
-          displayText = await translateForInsights(displayText, responseLang);
+        // Return answers in the selected UI language (not the detected query language).
+        if (language === "es" || language === "zh") {
+          displayText = await translateForInsights(displayText, language);
         }
 
         // Build legacy res for meta so UI that reads meta still works

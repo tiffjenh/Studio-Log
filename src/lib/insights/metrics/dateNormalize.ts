@@ -8,6 +8,21 @@ const MONTHS: Record<string, number> = {
   september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
 };
 
+const MONTHS_ES: Record<string, number> = {
+  ene: 1, enero: 1,
+  feb: 2, febrero: 2,
+  mar: 3, marzo: 3,
+  abr: 4, abril: 4,
+  may: 5, mayo: 5,
+  jun: 6, junio: 6,
+  jul: 7, julio: 7,
+  ago: 8, agosto: 8,
+  sep: 9, sept: 9, septiembre: 9, setiembre: 9,
+  oct: 10, octubre: 10,
+  nov: 11, noviembre: 11,
+  dic: 12, diciembre: 12,
+};
+
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -29,19 +44,55 @@ export function normalizeDateRange(query: string, todayISO?: string): Normalized
   const now = todayISO ? new Date(todayISO + "T12:00:00") : new Date();
   const today = todayISO ?? now.toISOString().slice(0, 10);
   const yearNow = now.getFullYear();
-  const q = query.toLowerCase().trim();
-  if (/\bytd|year to date|this year\b/.test(q)) return { start: `${yearNow}-01-01`, end: today, label: `${yearNow} YTD` };
-  if (/\blast month\b/.test(q)) {
+  const q = query
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[¿¡]/g, " ")
+    .trim();
+
+  // YTD / current year-to-date (EN/ES/ZH)
+  if (
+    /\b(ytd|year to date|this year)\b/.test(q) ||
+    /\b(ano\s+hasta\s+la\s+fecha|acumulado\s+del\s+ano|este\s+ano)\b/.test(q) ||
+    /(今年至今|年初至今|今年)/.test(query)
+  ) {
+    return { start: `${yearNow}-01-01`, end: today, label: `${yearNow} YTD` };
+  }
+
+  // Last month (EN/ES/ZH)
+  if (/\blast month\b/.test(q) || /\b(el\s+)?mes\s+pasado\b/.test(q) || /(上个月|上月)/.test(query)) {
     const y = now.getMonth() === 0 ? yearNow - 1 : yearNow;
     const m = now.getMonth() === 0 ? 12 : now.getMonth();
     return monthRange(y, m);
   }
-  if (/\bthis month\b/.test(q)) return monthRange(yearNow, now.getMonth() + 1);
-  if (/\blast year\b/.test(q)) return yearRange(yearNow - 1);
+
+  // This month (EN/ES/ZH)
+  if (/\bthis month\b/.test(q) || /\beste\s+mes\b/.test(q) || /(这个月|本月)/.test(query)) return monthRange(yearNow, now.getMonth() + 1);
+
+  // Last year (EN/ES/ZH)
+  if (/\blast year\b/.test(q) || /\b(el\s+)?ano\s+pasado\b/.test(q) || /去年/.test(query)) return yearRange(yearNow - 1);
+
+  // Chinese explicit year/month: 2026年1月
+  const zhMonth = query.match(/(20\d{2})\s*年\s*(\d{1,2})\s*月/);
+  if (zhMonth) {
+    const y = Number(zhMonth[1]);
+    const m = Number(zhMonth[2]);
+    if (y >= 2000 && y <= 2100 && m >= 1 && m <= 12) return monthRange(y, m);
+  }
+
   const explicitMonth = q.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(20\d{2})\b/);
   if (explicitMonth) {
     const m = MONTHS[explicitMonth[1]];
     const y = Number(explicitMonth[2]);
+    if (m && y) return monthRange(y, m);
+  }
+
+  // Spanish explicit month/year: "enero 2026" / "enero de 2026"
+  const explicitMonthEs = q.match(/\b(ene(?:ro)?|feb(?:rero)?|mar(?:zo)?|abr(?:il)?|may(?:o)?|jun(?:io)?|jul(?:io)?|ago(?:sto)?|sep(?:t|tiembre)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?)\s+(?:de\s+)?(20\d{2})\b/);
+  if (explicitMonthEs) {
+    const m = MONTHS_ES[explicitMonthEs[1]];
+    const y = Number(explicitMonthEs[2]);
     if (m && y) return monthRange(y, m);
   }
   const monthShortYear = q.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+'?(\d{2})\b/);

@@ -20,7 +20,7 @@ import { DownloadIcon } from "@/components/ui/Icons";
 
 export default function Insights() {
   const { data } = useStoreContext();
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const searchInputRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -71,6 +71,7 @@ export default function Insights() {
     students,
     locale,
     timezone,
+    language: lang,
   });
 
   const [queryText, setQueryText] = useState("");
@@ -83,7 +84,7 @@ export default function Insights() {
     onTranscript(text) {
       const trimmed = text.trim();
       if (!trimmed) {
-        setVoiceEmptyError("Try again");
+        setVoiceEmptyError(t("insights.tryAgain"));
         return;
       }
       setVoiceEmptyError(null);
@@ -229,13 +230,13 @@ export default function Insights() {
     <div className="insights-page" style={{ width: "100%", maxWidth: 640, margin: "0 auto", padding: "0 20px 32px" }}>
       {/* Page title */}
       <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: "0 0 28px", color: "var(--text)" }}>
-        Insights
+        {t("insights.title")}
       </h1>
 
       {/* Ask about: dropdown (design-system aligned) + sub-questions panel */}
       <div style={{ marginBottom: 28 }}>
         <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em", fontFamily: "var(--font-sans)" }}>
-          Ask about
+          {t("insights.askAbout")}
         </label>
         <div className="insights-dropdown-wrap" style={{ position: "relative", width: "100%" }}>
           <select
@@ -258,10 +259,10 @@ export default function Insights() {
             }}
             aria-label="Ask about category"
           >
-            <option value="">Select a category…</option>
+            <option value="">{t("insights.selectCategoryPlaceholder")}</option>
             {INSIGHTS_CATEGORIES.map((cat) => (
-              <option key={cat.label} value={cat.label}>
-                {cat.label}
+              <option key={cat.id} value={cat.id}>
+                {t(cat.labelKey)}
               </option>
             ))}
           </select>
@@ -271,7 +272,7 @@ export default function Insights() {
         </div>
         {selectedCategory && (
           <ul className="insights-category-list" style={{ listStyle: "none", margin: "12px 0 0", padding: 0, border: "1px solid var(--border)", borderRadius: 18, overflow: "hidden", background: "var(--card)", boxShadow: "var(--shadow-card)" }}>
-            {INSIGHTS_CATEGORIES.find((c) => c.label === selectedCategory)?.questions.map((q, i, arr) => (
+            {INSIGHTS_CATEGORIES.find((c) => c.id === selectedCategory)?.questions.map((q, i, arr) => (
               <li key={q} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border)" : "none" }}>
                 <Button
                   type="button"
@@ -323,7 +324,7 @@ export default function Insights() {
                   onSubmit();
                 }
               }}
-              placeholder="Ask about your students and earnings…"
+              placeholder={t("insights.inputPlaceholder")}
               aria-label="Ask a question"
               rows={1}
               style={{
@@ -372,7 +373,7 @@ export default function Insights() {
 
       {voice.phase === "recording" && (
         <p style={{ textAlign: "center", fontSize: 13, color: "var(--text-muted)", margin: "4px 0 8px" }}>
-          Listening…
+          {t("insights.listening")}
         </p>
       )}
       {(voice.error || voiceEmptyError) && (
@@ -382,7 +383,7 @@ export default function Insights() {
       {/* Ask button + New chat: side by side, centered */}
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 24 }}>
         <Button type="button" variant="primary" size="sm" onClick={onSubmit} disabled={isLoading} loading={isLoading}>
-          Ask
+          {t("insights.askBtn")}
         </Button>
         <Button
           type="button"
@@ -394,24 +395,24 @@ export default function Insights() {
             searchInputRef.current?.focus();
           }}
         >
-          Clear
+          {t("insights.clearBtn")}
         </Button>
         <Button type="button" variant="secondary" size="sm" onClick={clear}>
-          New chat
+          {t("insights.newChatBtn")}
         </Button>
       </div>
 
       {/* Dev-only: Insights test harness */}
       {import.meta.env.DEV && (
         <div style={{ marginBottom: 24, padding: 16, background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--radius-card)", fontSize: 13 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--text-muted)" }}>Diagnostics</div>
+          <div style={{ fontWeight: 600, marginBottom: 8, color: "var(--text-muted)" }}>{t("insights.diagnostics")}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
             <Button type="button" variant="secondary" size="sm" onClick={runInsightsTests} disabled={testRunning} loading={testRunning}>
-              {testRunning ? "Running…" : "Run Insights Tests"}
+              {testRunning ? t("insights.running") : t("insights.runInsightsTests")}
             </Button>
             {testResults && testResults.length > 0 && (
               <Button type="button" variant="secondary" size="sm" onClick={downloadTestResults} leftIcon={<DownloadIcon size={7} />}>
-                Download results
+                {t("insights.downloadResults")}
               </Button>
             )}
           </div>

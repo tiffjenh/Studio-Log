@@ -1,8 +1,24 @@
-/** Categories and suggested questions for the Insights page. Matches mock: 7 categories. */
+/** Categories and suggested questions for the Insights page. */
 
-export const INSIGHTS_CATEGORIES = [
+export type InsightsCategoryId =
+  | "revenueForecasting"
+  | "pricingRateOptimization"
+  | "studentLevelInsights"
+  | "cashFlowStability"
+  | "operationalMetrics"
+  | "taxFinancialPlanning"
+  | "whatIfModeling";
+
+export const INSIGHTS_CATEGORIES: Array<{
+  id: InsightsCategoryId;
+  /** i18n key for the label. */
+  labelKey: `insights.categories.${InsightsCategoryId}`;
+  /** Seed questions (kept in English; engine supports ES/ZH typed questions too). */
+  questions: string[];
+}> = [
   {
-    label: "Revenue & Forecasting",
+    id: "revenueForecasting",
+    labelKey: "insights.categories.revenueForecasting",
     questions: [
       "Am I on track for $80k this year?",
       "What was my total revenue last month?",
@@ -12,7 +28,8 @@ export const INSIGHTS_CATEGORIES = [
     ],
   },
   {
-    label: "Pricing & Rate Optimization",
+    id: "pricingRateOptimization",
+    labelKey: "insights.categories.pricingRateOptimization",
     questions: [
       "Who pays the most per hour?",
       "What is my average hourly rate?",
@@ -21,7 +38,8 @@ export const INSIGHTS_CATEGORIES = [
     ],
   },
   {
-    label: "Student-Level Insights",
+    id: "studentLevelInsights",
+    labelKey: "insights.categories.studentLevelInsights",
     questions: [
       "Who pays the most?",
       "Which student earned me the most?",
@@ -31,7 +49,8 @@ export const INSIGHTS_CATEGORIES = [
     ],
   },
   {
-    label: "Cash Flow & Stability",
+    id: "cashFlowStability",
+    labelKey: "insights.categories.cashFlowStability",
     questions: [
       "Is my income stable or volatile?",
       "What's my cash flow trend?",
@@ -39,7 +58,8 @@ export const INSIGHTS_CATEGORIES = [
     ],
   },
   {
-    label: "Operational Metrics",
+    id: "operationalMetrics",
+    labelKey: "insights.categories.operationalMetrics",
     questions: [
       "How many lessons did I teach last month?",
       "What's my revenue per lesson?",
@@ -48,7 +68,8 @@ export const INSIGHTS_CATEGORIES = [
     ],
   },
   {
-    label: "Tax & Financial Planning",
+    id: "taxFinancialPlanning",
+    labelKey: "insights.categories.taxFinancialPlanning",
     questions: [
       "How much should I set aside for taxes?",
       "Estimated tax on my income this year?",
@@ -56,7 +77,8 @@ export const INSIGHTS_CATEGORIES = [
     ],
   },
   {
-    label: "What-If Modeling",
+    id: "whatIfModeling",
+    labelKey: "insights.categories.whatIfModeling",
     questions: [
       "If I add 3 new students, what's my new income?",
       "If I take 2 weeks off, how does that affect my yearly earnings?",

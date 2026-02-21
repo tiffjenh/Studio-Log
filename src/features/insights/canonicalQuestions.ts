@@ -8,7 +8,7 @@ export type CanonicalInsightQuestion = {
 export function getCanonicalInsightsQuestions(): CanonicalInsightQuestion[] {
   return INSIGHTS_CATEGORIES.flatMap((cat) =>
     cat.questions.map((question) => ({
-      category: cat.label,
+      category: cat.id,
       question,
     }))
   );

@@ -54,6 +54,9 @@ function hasAmbiguousTimeframe(normalized: string): boolean {
 function routeStructuredIntent(normalized: string): StructuredIntent | null {
   if (/\bwho\b.*\b(absent)\b.*\bmost\b|\b(absent)\b.*\bmost\b/.test(normalized)) return "ATTENDANCE_RANK_MISSED";
   if (/\bwho\b.*\b(attended|completed)\b.*\bmost\b|\b(attended|completed)\b.*\bmost\b/.test(normalized)) return "ATTENDANCE_RANK_COMPLETED";
+  // Earnings (ES/ZH): treat as total earnings in period (time parsing handles mes pasado / 上个月 / 2026年1月).
+  if (/\b(cuánto|cuanto)\b/.test(normalized) && /\b(gan(e|é)|ganar|ingresos?|dinero)\b/.test(normalized)) return "TOTAL_EARNINGS_PERIOD";
+  if (/多少/.test(normalized) && /(赚|收入)/.test(normalized)) return "TOTAL_EARNINGS_PERIOD";
   if (
     /\b(on track|on track for)\b.*\b(this year)?\s*\$?\s*\d+(?:,\d{3})*(?:\s*k)?\b/i.test(normalized) ||
     /\b(am i|are i)\s+on track\b/i.test(normalized) ||
@@ -106,15 +109,19 @@ function routeStructuredIntent(normalized: string): StructuredIntent | null {
 }
 
 export function normalizeInsightsQuery(raw: string): string {
-  return applySynonymNormalization(
-    raw
+  const deaccented = raw
     .toLowerCase()
-    .trim()
-    .replace(/[?!.,;:()]+/g, " ")
-    .replace(/\bhrs?\b/g, "hour")
-    .replace(/\bh\b/g, "hour")
-    .replace(/\bmins?\b/g, "minutes")
-    .replace(/\s+/g, " ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // strip accents (e.g. cuánto → cuanto, gané → gane)
+    .replace(/[¿¡]/g, " ")
+    .trim();
+  return applySynonymNormalization(
+    deaccented
+      .replace(/[?!.,;:()]+/g, " ")
+      .replace(/\bhrs?\b/g, "hour")
+      .replace(/\bh\b/g, "hour")
+      .replace(/\bmins?\b/g, "minutes")
+      .replace(/\s+/g, " ")
   );
 }
 
@@ -269,6 +276,9 @@ function deriveTruthKey(intent: InsightIntent): string {
 }
 
 function routeIntent(normalized: string): InsightIntent {
+  // Earnings (ES/ZH)
+  if (/\b(cuánto|cuanto)\b/.test(normalized) && /\b(gan(e|é)|ganar|ingresos?|dinero)\b/.test(normalized)) return "earnings_in_period";
+  if (/多少/.test(normalized) && /(赚|收入)/.test(normalized)) return "earnings_in_period";
   if (/^how many lessons did i teach last month$/.test(normalized)) return "lessons_count_in_period";
   if (/^what s my revenue per lesson$/.test(normalized) || /^what is my revenue per lesson$/.test(normalized)) return "revenue_per_lesson_in_period";
   if (/^what day of the week do i earn the most$/.test(normalized)) return "day_of_week_earnings_max";
@@ -310,7 +320,7 @@ function routeIntent(normalized: string): InsightIntent {
   if (/\bforecast yearly|projected yearly|forecast this year|yearly projection|will i earn this year\b/.test(normalized)) return "forecast_yearly";
   if (/%|percent|percentage/.test(normalized) && /\b(20\d{2}).*(20\d{2})\b/.test(normalized)) return "percent_change_yoy";
   if (/\b(on track|on track for)\b.*\b\$?\s*\d+(?:\s*k)?\b/i.test(normalized) || /\bam i\s+on track\b/i.test(normalized) || /\b\$?\s*\d+k?\s+this year\b.*\b(track|on track)\b/i.test(normalized)) return "on_track_goal";
-  if (/\bhow much\b.*\b(money\s+)?(did i\s+)?(earn|make)\b|\bhow much\s+(money\s+)?did i earn\b/i.test(normalized)) return "earnings_in_period";
+  if (/\bhow much\b.*\b(money\s+)?(did i\s+)?(earn|make|earned)\b|\bhow much\s+(money\s+)?did i earn\b/i.test(normalized)) return "earnings_in_period";
   if (/\b(earn|earned|earnings|revenue|income|money)\b/.test(normalized) && /\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+20\d{2}\b/.test(normalized)) return "earnings_in_period";
   if (/\bhow much did i earn|earnings|revenue|income\b/.test(normalized)) return "earnings_in_period";
   if (/\bhow much in\s+(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+20\d{2}\b/.test(normalized)) return "earnings_in_period";
