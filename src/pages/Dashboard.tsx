@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Button, IconButton } from "@/components/ui/Button";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import LogoIcon from "@/components/LogoIcon";
 import {
   formatCurrency,
   earnedThisWeek,
@@ -50,7 +49,7 @@ function LessonRow({
   const rateText = duration >= 60 ? `${duration / 60} hour` : `${duration} mins`;
   const displayTime = lesson?.timeOfDay ?? getEffectiveSchedule(student, dateKey).timeOfDay;
   return (
-    <div className="float-card" style={{ display: "flex", alignItems: "center", marginBottom: 12, cursor: "pointer", gap: 16 }} onClick={onEdit}>
+    <div className="float-card cardInteractive" style={{ display: "flex", alignItems: "center", marginBottom: 12, cursor: "pointer", gap: 16 }} onClick={onEdit}>
       <StudentAvatar student={student} size={48} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontFamily: "var(--font-sans)" }}>{student.firstName} {student.lastName}</div>
@@ -171,10 +170,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
-        <div className="logo-circle" style={{ width: 52, height: 52, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <LogoIcon />
-        </div>
+      <div style={{ marginBottom: 28 }}>
         <h2 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0, color: "var(--text)" }}>{dashboardTitle}</h2>
       </div>
       <div className="hero-card" style={{ marginBottom: 28 }}>

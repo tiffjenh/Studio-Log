@@ -208,4 +208,38 @@ describe("Insights pipeline", () => {
     const rows = (res.computedResult?.outputs as { rows?: unknown[] } | undefined)?.rows ?? [];
     expect(rows.length).toBe(3);
   });
+
+  it("does not trigger earnings-vs-attendance clarification for normalized children count", async () => {
+    const res = await askInsights("How many children did I teach in April 2024?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("unique_student_count_in_period");
+    expect(res.trace?.queryPlan.sql_truth_query_key).toBe("UNIQUE_STUDENT_COUNT");
+    expect(typeof (res.computedResult?.outputs as { student_count?: number } | undefined)?.student_count).toBe("number");
+  });
+
+  it("routes attendance missed questions without fallback clarification", async () => {
+    const res = await askInsights("Which student missed the most lessons in 2025?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("student_missed_most_lessons_in_year");
+    expect(res.trace?.queryPlan.sql_truth_query_key).toBe("ATTENDANCE_RANK_MISSED");
+    expect(typeof (res.computedResult?.outputs as { missed_count?: number } | undefined)?.missed_count).toBe("number");
+  });
+
+  it("routes earnings minimum rank without generic earnings/attendance fallback", async () => {
+    const res = await askInsights("Which student did I earn the least from in 2025?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.queryPlan.intent).toBe("revenue_per_student_in_period");
+    expect(res.trace?.queryPlan.sql_truth_query_key).toBe("EARNINGS_RANK_MIN");
+    const rows = (res.computedResult?.outputs as { rows?: Array<{ total_dollars: number }> } | undefined)?.rows ?? [];
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it("returns structured trace fields for deterministic routing", async () => {
+    const res = await askInsights("Who pays the most?", ctx);
+    expect(res.needsClarification).toBe(false);
+    expect(res.trace?.normalized_query).toContain("earned");
+    expect(res.trace?.queryPlan.sql_truth_query_key).toBe("EARNINGS_RANK_MAX");
+    expect(res.trace?.sqlQueryKey).toBe("EARNINGS_RANK_MAX");
+    expect(res.trace?.sqlResultSummary).toBeTruthy();
+  });
 });

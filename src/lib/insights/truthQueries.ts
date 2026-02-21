@@ -14,6 +14,66 @@ import {
 import type { Lesson, Student } from "@/types";
 
 export const SQL_TRUTH_QUERIES: Record<string, string> = {
+  EARNINGS_RANK_MAX: `
+SELECT s.id, s.first_name, s.last_name, COALESCE(SUM(l.amount_cents),0)::bigint AS total_cents
+FROM public.lessons l
+JOIN public.students s ON s.id = l.student_id
+WHERE l.user_id = $1 AND l.completed = true AND l.lesson_date BETWEEN $2 AND $3
+GROUP BY s.id, s.first_name, s.last_name
+ORDER BY total_cents DESC
+LIMIT 1;
+`,
+  EARNINGS_RANK_MIN: `
+SELECT s.id, s.first_name, s.last_name, COALESCE(SUM(l.amount_cents),0)::bigint AS total_cents
+FROM public.lessons l
+JOIN public.students s ON s.id = l.student_id
+WHERE l.user_id = $1 AND l.completed = true AND l.lesson_date BETWEEN $2 AND $3
+GROUP BY s.id, s.first_name, s.last_name
+ORDER BY total_cents ASC
+LIMIT 1;
+`,
+  ATTENDANCE_RANK_MISSED: `
+SELECT s.id, s.first_name, s.last_name, COUNT(*)::int AS missed_count
+FROM public.lessons l
+JOIN public.students s ON s.id = l.student_id
+WHERE l.user_id = $1 AND l.completed = false AND l.lesson_date BETWEEN $2 AND $3
+GROUP BY s.id, s.first_name, s.last_name
+ORDER BY missed_count DESC
+LIMIT 1;
+`,
+  ATTENDANCE_RANK_COMPLETED: `
+SELECT s.id, s.first_name, s.last_name, COUNT(*)::int AS completed_count
+FROM public.lessons l
+JOIN public.students s ON s.id = l.student_id
+WHERE l.user_id = $1 AND l.completed = true AND l.lesson_date BETWEEN $2 AND $3
+GROUP BY s.id, s.first_name, s.last_name
+ORDER BY completed_count DESC
+LIMIT 1;
+`,
+  UNIQUE_STUDENT_COUNT: `
+SELECT COUNT(DISTINCT student_id)::int AS student_count
+FROM public.lessons
+WHERE user_id = $1 AND completed = true AND lesson_date BETWEEN $2 AND $3;
+`,
+  TOTAL_EARNINGS_PERIOD: `
+SELECT COALESCE(SUM(amount_cents),0)::bigint AS total_cents
+FROM public.lessons
+WHERE user_id = $1 AND completed = true AND lesson_date BETWEEN $2 AND $3;
+`,
+  REVENUE_DELTA_SIMULATION: `
+SELECT
+  COALESCE(SUM(duration_minutes),0)::bigint AS total_minutes,
+  COALESCE(SUM(amount_cents),0)::bigint AS total_cents
+FROM public.lessons
+WHERE user_id = $1 AND completed = true AND lesson_date BETWEEN $2 AND $3;
+`,
+  REVENUE_TARGET_PROJECTION: `
+SELECT
+  COUNT(DISTINCT student_id)::int AS active_students,
+  COALESCE(SUM(duration_minutes),0)::bigint AS total_minutes
+FROM public.lessons
+WHERE user_id = $1 AND completed = true AND lesson_date BETWEEN $2 AND $3;
+`,
   student_highest_hourly_rate: `
 SELECT s.id, s.first_name, s.last_name,
        (SUM(l.amount_cents)::numeric / NULLIF(SUM(l.duration_minutes), 0)) * 60 AS effective_hourly_cents
@@ -64,8 +124,24 @@ GROUP BY s.id, s.first_name, s.last_name
 ORDER BY missed_count DESC
 LIMIT 1;
 `,
+  student_completed_most_lessons_in_year: `
+SELECT s.id, s.first_name, s.last_name, COUNT(*)::int AS completed_count
+FROM public.lessons l
+JOIN public.students s ON s.id = l.student_id
+WHERE l.user_id = $1
+  AND l.lesson_date BETWEEN $2 AND $3
+  AND l.completed = true
+GROUP BY s.id, s.first_name, s.last_name
+ORDER BY completed_count DESC
+LIMIT 1;
+`,
   earnings_in_period: `
 SELECT COALESCE(SUM(amount_cents),0)::bigint AS total_cents
+FROM public.lessons
+WHERE user_id = $1 AND completed = true AND lesson_date BETWEEN $2 AND $3;
+`,
+  unique_student_count_in_period: `
+SELECT COUNT(DISTINCT student_id)::int AS student_count
 FROM public.lessons
 WHERE user_id = $1 AND completed = true AND lesson_date BETWEEN $2 AND $3;
 `,
@@ -290,31 +366,49 @@ export async function runTruthQuery(
   ctx: TruthDataContext,
   params: Record<string, unknown>
 ): Promise<TruthResult> {
+  const alias: Record<string, string> = {
+    EARNINGS_RANK_MAX: "revenue_per_student_in_period",
+    EARNINGS_RANK_MIN: "revenue_per_student_in_period",
+    ATTENDANCE_RANK_MISSED: "student_missed_most_lessons_in_year",
+    ATTENDANCE_RANK_COMPLETED: "student_completed_most_lessons_in_year",
+    UNIQUE_STUDENT_COUNT: "unique_student_count_in_period",
+    TOTAL_EARNINGS_PERIOD: "earnings_in_period",
+    REVENUE_DELTA_SIMULATION: "what_if_rate_change",
+    REVENUE_TARGET_PROJECTION: "students_needed_for_target_income",
+  };
+  const resolvedKey = alias[key] ?? key;
+  const resolvedParams =
+    key === "EARNINGS_RANK_MAX"
+      ? { ...params, rank_order: "desc", top_n: 1 }
+      : key === "EARNINGS_RANK_MIN"
+        ? { ...params, rank_order: "asc", top_n: 1 }
+        : params;
   const debug = isInsightsDebugEnabled();
   const data = await loadData(ctx);
-  const start = String(params.start_date ?? "");
-  const end = String(params.end_date ?? "");
+  const start = String(resolvedParams.start_date ?? "");
+  const end = String(resolvedParams.end_date ?? "");
   const lessons = data.lessons.filter((l) => !start || !end || dateInRange(l.date, start, end));
   const completedLessons = normalizeCompletedLessons(lessons);
   const studentsById = new Map(data.students.map((s) => [s.id, s]));
   if (debug) {
     console.log("[Insights][truthQuery]", {
       key,
+      resolved_key: resolvedKey,
       filters: {
         user_id: ctx.user_id ?? null,
         start_date: start || null,
         end_date: end || null,
         completed_only_intent:
-          key === "earnings_in_period" ||
-          key === "revenue_per_student_in_period" ||
-          key === "average_hourly_rate_in_period" ||
-          key === "day_of_week_earnings_max" ||
-          key === "lessons_count_in_period" ||
-          key === "revenue_per_lesson_in_period" ||
-          key === "avg_weekly_revenue" ||
-          key === "cash_flow_trend" ||
-          key === "income_stability",
-        student_name: (params.student_name as string | undefined) ?? null,
+          resolvedKey === "earnings_in_period" ||
+          resolvedKey === "revenue_per_student_in_period" ||
+          resolvedKey === "average_hourly_rate_in_period" ||
+          resolvedKey === "day_of_week_earnings_max" ||
+          resolvedKey === "lessons_count_in_period" ||
+          resolvedKey === "revenue_per_lesson_in_period" ||
+          resolvedKey === "avg_weekly_revenue" ||
+          resolvedKey === "cash_flow_trend" ||
+          resolvedKey === "income_stability",
+        student_name: (resolvedParams.student_name as string | undefined) ?? null,
       },
       source: data.source,
       rows_in_range: lessons.length,
@@ -329,7 +423,7 @@ export async function runTruthQuery(
     });
   }
 
-  switch (key) {
+  switch (resolvedKey) {
     case "earnings_in_period": {
       const totalCents = completedLessons.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
       const zero_cause =
@@ -345,6 +439,20 @@ export async function runTruthQuery(
         total_cents: totalCents,
         total_dollars: centsToDollars(totalCents),
         zero_cause,
+        data_source: data.source,
+      };
+    }
+    case "unique_student_count_in_period": {
+      const unique = new Set(completedLessons.map((l) => l.studentId));
+      return {
+        student_count: unique.size,
+        lesson_count: completedLessons.length,
+        zero_cause:
+          completedLessons.length === 0
+            ? lessons.length === 0
+              ? "no_rows_in_range"
+              : "no_completed_lessons_in_range"
+            : null,
         data_source: data.source,
       };
     }
@@ -423,14 +531,29 @@ export async function runTruthQuery(
     }
     case "revenue_per_student_in_period": {
       const topN =
-        typeof params.top_n === "number"
-          ? params.top_n
-          : typeof params.top_n === "string"
-            ? Number(params.top_n)
+        typeof resolvedParams.top_n === "number"
+          ? resolvedParams.top_n
+          : typeof resolvedParams.top_n === "string"
+            ? Number(resolvedParams.top_n)
             : undefined;
-      const mapped = completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) }));
-      const { rows, available_count } = topStudentsByRevenue(mapped, studentsById, Number.isFinite(topN) ? topN : undefined);
-      return { rows, available_count, requested_top_n: topN ?? null, data_source: data.source };
+      const rankOrder = resolvedParams.rank_order === "asc" ? "asc" : "desc";
+      const totalsByStudent = new Map<string, number>();
+      for (const lesson of completedLessons) {
+        const cents = effectiveCents(lesson, studentsById);
+        totalsByStudent.set(lesson.studentId, (totalsByStudent.get(lesson.studentId) ?? 0) + cents);
+      }
+      const allRows = [...totalsByStudent.entries()].map(([studentId, totalCents]) => ({
+        student_id: studentId,
+        student_name: studentsById.get(studentId) ? toName(studentsById.get(studentId)!) : "Unknown",
+        total_cents: totalCents,
+        total_dollars: centsToDollars(totalCents),
+      }));
+      allRows.sort((a, b) => (
+        rankOrder === "asc" ? a.total_dollars - b.total_dollars : b.total_dollars - a.total_dollars
+      ));
+      const requested = Number.isFinite(topN) ? Number(topN) : undefined;
+      const rows = requested ? allRows.slice(0, requested) : allRows;
+      return { rows, available_count: allRows.length, requested_top_n: requested ?? null, rank_order: rankOrder, data_source: data.source };
     }
     case "avg_weekly_revenue": {
       if (!start || !end) return { error: "missing_range", data_source: data.source };
@@ -489,7 +612,7 @@ export async function runTruthQuery(
     }
     case "earnings_ytd_for_student": {
       const studentId =
-        typeof params.student_id === "string" ? params.student_id : matchStudentIdByName(data.students, params.student_name as string | undefined);
+        typeof resolvedParams.student_id === "string" ? resolvedParams.student_id : matchStudentIdByName(data.students, resolvedParams.student_name as string | undefined);
       if (!studentId) return { error: "student_not_resolved", zero_cause: "student_not_resolved", data_source: data.source };
       const studentRows = lessons.filter((l) => l.studentId === studentId);
       const completedRows = studentRows.filter((l) => l.completed);
@@ -586,9 +709,25 @@ export async function runTruthQuery(
         data_source: data.source,
       };
     }
+    case "student_completed_most_lessons_in_year": {
+      const byStudent = new Map<string, number>();
+      for (const l of lessons) {
+        if (!l.completed) continue;
+        byStudent.set(l.studentId, (byStudent.get(l.studentId) ?? 0) + 1);
+      }
+      const ranked = [...byStudent.entries()].sort((a, b) => b[1] - a[1]);
+      if (!ranked[0]) return { row: null, data_source: data.source };
+      const [studentId, completedCount] = ranked[0];
+      return {
+        student_id: studentId,
+        student_name: studentsById.get(studentId) ? toName(studentsById.get(studentId)!) : "Unknown",
+        completed_count: completedCount,
+        data_source: data.source,
+      };
+    }
     case "student_attendance_summary": {
       const studentId =
-        typeof params.student_id === "string" ? params.student_id : matchStudentIdByName(data.students, params.student_name as string | undefined);
+        typeof resolvedParams.student_id === "string" ? resolvedParams.student_id : matchStudentIdByName(data.students, resolvedParams.student_name as string | undefined);
       if (!studentId) return { error: "student_not_resolved", data_source: data.source };
       const rows = lessons.filter((l) => l.studentId === studentId);
       const total = rows.length;
@@ -627,8 +766,8 @@ export async function runTruthQuery(
       };
     }
     case "percent_change_yoy": {
-      const yearA = Number(params.year_a);
-      const yearB = Number(params.year_b);
+      const yearA = Number(resolvedParams.year_a);
+      const yearB = Number(resolvedParams.year_b);
       const inYearA = data.lessons.filter((l) => l.completed && l.date >= `${yearA}-01-01` && l.date <= `${yearA}-12-31`);
       const inYearB = data.lessons.filter((l) => l.completed && l.date >= `${yearB}-01-01` && l.date <= `${yearB}-12-31`);
       const totalA = inYearA.reduce((a, l) => a + effectiveCents(l, studentsById), 0);
@@ -645,10 +784,10 @@ export async function runTruthQuery(
       };
     }
     case "what_if_rate_change": {
-      const delta = typeof params.rate_delta_dollars_per_hour === "number"
-        ? params.rate_delta_dollars_per_hour
-        : typeof params.rate_delta_dollars_per_hour === "string"
-          ? Number(params.rate_delta_dollars_per_hour)
+      const delta = typeof resolvedParams.rate_delta_dollars_per_hour === "number"
+        ? resolvedParams.rate_delta_dollars_per_hour
+        : typeof resolvedParams.rate_delta_dollars_per_hour === "string"
+          ? Number(resolvedParams.rate_delta_dollars_per_hour)
           : null;
       if (delta == null || !Number.isFinite(delta)) {
         return { error: "missing_rate_delta", data_source: data.source };
@@ -670,10 +809,10 @@ export async function runTruthQuery(
     }
     case "what_if_add_students": {
       const n =
-        typeof params.new_students === "number"
-          ? params.new_students
-          : typeof params.new_students === "string"
-            ? Number(params.new_students)
+        typeof resolvedParams.new_students === "number"
+          ? resolvedParams.new_students
+          : typeof resolvedParams.new_students === "string"
+            ? Number(resolvedParams.new_students)
             : null;
       if (n == null || !Number.isFinite(n) || n <= 0) return { error: "missing_new_students", data_source: data.source };
       if (!start || !end) return { error: "missing_range", data_source: data.source };
@@ -698,10 +837,10 @@ export async function runTruthQuery(
     }
     case "what_if_take_time_off": {
       const weeksOff =
-        typeof params.weeks_off === "number"
-          ? params.weeks_off
-          : typeof params.weeks_off === "string"
-            ? Number(params.weeks_off)
+        typeof resolvedParams.weeks_off === "number"
+          ? resolvedParams.weeks_off
+          : typeof resolvedParams.weeks_off === "string"
+            ? Number(resolvedParams.weeks_off)
             : null;
       if (weeksOff == null || !Number.isFinite(weeksOff) || weeksOff <= 0) return { error: "missing_weeks_off", data_source: data.source };
       if (!start || !end) return { error: "missing_range", data_source: data.source };
@@ -721,10 +860,10 @@ export async function runTruthQuery(
     }
     case "what_if_lose_top_students": {
       const topN =
-        typeof params.top_n === "number"
-          ? params.top_n
-          : typeof params.top_n === "string"
-            ? Number(params.top_n)
+        typeof resolvedParams.top_n === "number"
+          ? resolvedParams.top_n
+          : typeof resolvedParams.top_n === "string"
+            ? Number(resolvedParams.top_n)
             : null;
       if (topN == null || !Number.isFinite(topN) || topN <= 0) return { error: "missing_top_n", data_source: data.source };
       const mapped = completedLessons.map((l) => ({ ...l, amountCents: effectiveCents(l, studentsById) }));
@@ -744,16 +883,16 @@ export async function runTruthQuery(
     }
     case "students_needed_for_target_income": {
       const target =
-        typeof params.target_income_dollars === "number"
-          ? params.target_income_dollars
-          : typeof params.target_income_dollars === "string"
-            ? Number(params.target_income_dollars)
+        typeof resolvedParams.target_income_dollars === "number"
+          ? resolvedParams.target_income_dollars
+          : typeof resolvedParams.target_income_dollars === "string"
+            ? Number(resolvedParams.target_income_dollars)
             : null;
       const rate =
-        typeof params.rate_dollars_per_hour === "number"
-          ? params.rate_dollars_per_hour
-          : typeof params.rate_dollars_per_hour === "string"
-            ? Number(params.rate_dollars_per_hour)
+        typeof resolvedParams.rate_dollars_per_hour === "number"
+          ? resolvedParams.rate_dollars_per_hour
+          : typeof resolvedParams.rate_dollars_per_hour === "string"
+            ? Number(resolvedParams.rate_dollars_per_hour)
             : null;
       if (target == null || !Number.isFinite(target) || target <= 0) return { error: "missing_target_income", data_source: data.source };
       if (rate == null || !Number.isFinite(rate) || rate <= 0) return { error: "missing_rate", data_source: data.source };

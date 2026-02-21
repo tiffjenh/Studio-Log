@@ -4,7 +4,6 @@ import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
 import { signInSupabase, signUpSupabase, resendConfirmationSupabase } from "@/store/supabaseSync";
-import LogoIcon from "@/components/LogoIcon";
 import { Button } from "@/components/ui/Button";
 
 export default function Landing() {
@@ -122,11 +121,8 @@ export default function Landing() {
     <div className="landing landing--motion">
       <div className="landing__inner">
         <div className="landing__card">
-          {/* Logo + app name */}
+          {/* App name only (no logo) */}
           <div className="landing__brand">
-            <div className="landing__logo" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <LogoIcon />
-            </div>
             <div className="landing__brand-text">
               <h1 className="landing__title">{t("landing.title")}</h1>
               <p className="landing__tagline">{t("landing.tagline")}</p>

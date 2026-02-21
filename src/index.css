@@ -187,11 +187,11 @@ input, select, textarea {
   border: 1px solid rgba(200, 190, 200, 0.15);
 }
 
-/* Section and page titles – clean sans to match ref */
+/* Section and page titles – editorial serif */
 .headline-serif {
-  font-family: var(--font-sans);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.02em;
 }
 
 .pill {
@@ -230,6 +230,26 @@ input, select, textarea {
 }
 .card-list-item:last-child {
   border-bottom: none;
+}
+
+/* Notes textarea: italic input text, normal placeholder */
+.notesTextarea {
+  font-family: inherit;
+  font-style: italic;
+}
+.notesTextarea::placeholder {
+  font-style: normal;
+}
+
+/* Segmented tab row (Earnings, StudentDetail lesson years) */
+.tabs-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tabs-row .btn {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 /* Buttons */
@@ -392,6 +412,7 @@ input, select, textarea {
   display: flex;
   flex-direction: row;
   align-items: center;
+  justify-content: flex-start;
   gap: 14px;
   margin-bottom: 28px;
 }
@@ -419,12 +440,13 @@ input, select, textarea {
 }
 
 .landing__title {
-  font-family: var(--font-sans);
+  font-family: var(--font-serif);
   font-size: 28px;
-  font-weight: 700;
-  color: var(--text);
+  font-weight: 400;
+  color: #000;
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
 }
 
 .landing__tagline {
@@ -617,6 +639,122 @@ input, select, textarea {
 /* Insights: muted placeholder */
 .insights-page textarea::placeholder {
   color: var(--text-muted);
+}
+
+/* ---- Micro-interactions (subtle, editorial) ---- */
+
+/* 1) Global page transition */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.pageTransition {
+  animation: fadeInUp 320ms ease-out;
+}
+
+/* 2) Button micro-interactions */
+.btn,
+.ui-button,
+button.btn {
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
+}
+.btn:hover,
+.ui-button:hover,
+button.btn:hover {
+  transform: translateY(-1px);
+}
+.btn:active,
+.ui-button:active,
+button.btn:active {
+  transform: translateY(0);
+}
+.btn-primary:hover,
+.ui-button[data-variant="primary"]:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+/* 3) Segmented tab buttons */
+.tabButton {
+  transition: background-color 200ms ease, color 200ms ease, box-shadow 200ms ease;
+}
+
+/* 4) Interactive cards (lesson rows, month rows) */
+.cardInteractive {
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.cardInteractive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.04);
+}
+
+/* 5) Expand/collapse (lesson logs) */
+.collapsible {
+  overflow: hidden;
+  transition: max-height 260ms ease, opacity 200ms ease;
+}
+.collapsible.closed {
+  max-height: 0;
+  opacity: 0;
+}
+.collapsible.open {
+  max-height: 600px;
+  opacity: 1;
+}
+
+/* 6) Bar chart bar grow */
+@keyframes barGrow {
+  from {
+    transform: scaleY(0.85);
+    opacity: 0.7;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+.chart-bar {
+  animation: barGrow 400ms ease-out;
+  transform-origin: bottom;
+}
+
+/* 7) Input/textarea focus */
+input:focus,
+textarea:focus {
+  outline: none;
+  transition: box-shadow 160ms ease;
+  box-shadow: 0 0 0 3px rgba(120,120,120,0.08);
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .pageTransition {
+    animation: none;
+  }
+  .btn,
+  .ui-button,
+  button.btn,
+  .tabButton,
+  .cardInteractive {
+    transition: none;
+  }
+  .btn:hover,
+  .ui-button:hover,
+  button.btn:hover,
+  .cardInteractive:hover {
+    transform: none;
+  }
+  .collapsible {
+    transition: none;
+  }
+  .chart-bar {
+    animation: none;
+  }
 }
 
 /* iPad and up: optional sidebar or wider content */

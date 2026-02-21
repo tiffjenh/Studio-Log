@@ -9,8 +9,8 @@ const srcRoot = path.resolve(__dirname, "src");
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5174,
-    strictPort: false, // use next available port if 5174 is in use
+    port: 5188,
+    strictPort: true, // always use 5188; fail if in use so you can stop the other process
     headers: { "Cache-Control": "no-store" },
   },
   resolve: {

@@ -166,6 +166,7 @@ function BarChart({
                 >
                   <span style={labelStyle}>{compactBarLabels ? formatBarLabelCompact(v) : formatBarLabel(v)}</span>
                   <div
+                    className="chart-bar"
                     title={formatCurrency(v)}
                     style={{
                       width: `${barWidthPct}%`,
@@ -585,6 +586,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
             size="sm"
             active={activeTab === tab}
             onClick={() => setActiveTab(tab)}
+            className="tabButton"
             style={{ flex: "1 1 0", minWidth: 0 }}
           >
             {t(TAB_KEYS[tab])}
@@ -900,14 +902,11 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
 
       {activeTab === "Daily" && (
         <>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-            <div className="hero-card" style={{ flex: "0 0 auto", width: "fit-content", padding: "12px 16px" }}>
-              <div style={{ fontSize: 14, color: "var(--text)", marginBottom: 4 }}>{dailyRangeStart} – {dailyRangeEnd} week total</div>
-              <div className="headline-serif" style={{ fontSize: 26, fontWeight: 400 }}>{formatCurrency(dailyWeekTotal)}</div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, paddingBottom: 2 }}>
+          <div className="hero-card" style={{ marginBottom: 20, padding: "16px 20px" }}>
+            <div className="headline-serif" style={{ fontSize: 26, fontWeight: 400, marginBottom: 12 }}>{formatCurrency(dailyWeekTotal)}</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
               <IconButton type="button" variant="secondary" size="sm" onClick={() => setDailyWeekOffset((o) => o - 1)} aria-label="Previous week"><ChevronLeftIcon /></IconButton>
-              <span style={{ fontSize: 15, color: "var(--text)" }}>{dailyRangeStart} – {dailyRangeEnd}</span>
+              <span style={{ fontSize: 15, color: "var(--text)", minWidth: 100, textAlign: "center" }}>{dailyRangeStart} – {dailyRangeEnd}</span>
               <IconButton type="button" variant="secondary" size="sm" onClick={() => setDailyWeekOffset((o) => o + 1)} aria-label="Next week"><ChevronRightIcon /></IconButton>
             </div>
           </div>

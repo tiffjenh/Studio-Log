@@ -55,6 +55,18 @@ export function formatMissedMost(out: { student_name?: string; missed_count?: nu
   return `**${name}** — ${n} missed lessons${suffix}`;
 }
 
+export function formatCompletedMost(out: { student_name?: string; completed_count?: number }, yearLabel?: string): string {
+  const name = out.student_name ?? "—";
+  const n = (out.completed_count as number) ?? 0;
+  const suffix = yearLabel ? ` (${yearLabel})` : "";
+  return `**${name}** — ${n} completed lessons${suffix}`;
+}
+
+export function formatUniqueStudentCount(out: { student_count?: number }): string {
+  const n = (out.student_count as number | undefined) ?? 0;
+  return `${n} unique student${n === 1 ? "" : "s"} taught.`;
+}
+
 export function formatAttendanceSummary(out: {
   student_name?: string;
   attended_lessons?: number;

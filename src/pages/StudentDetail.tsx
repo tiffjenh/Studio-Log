@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -191,6 +191,15 @@ export default function StudentDetail() {
 
   const [editing, setEditing] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
+  const [selectedLessonYear, setSelectedLessonYear] = useState<number>(() => new Date().getFullYear());
+  const lessonLogYears = useMemo(() => {
+    const currentYear = now.getFullYear();
+    const yearsWithLessons = [...new Set(studentLessons.map((l) => l.date.slice(0, 4)))];
+    return [...new Set([String(currentYear), ...yearsWithLessons])].map(Number).sort((a, b) => b - a);
+  }, [studentLessons]);
+  useEffect(() => {
+    if (lessonLogYears.length > 0 && !lessonLogYears.includes(selectedLessonYear)) setSelectedLessonYear(lessonLogYears[0]);
+  }, [lessonLogYears, selectedLessonYear]);
   const [error, setError] = useState("");
   const [firstName, setFirstName] = useState(student?.firstName ?? "");
   const [lastName, setLastName] = useState(student?.lastName ?? "");
@@ -899,111 +908,115 @@ export default function StudentDetail() {
 
       {!editing && student && (
         <>
-          {(() => {
-            const now = new Date();
+          {lessonLogYears.length > 0 && (() => {
             const currentYear = now.getFullYear();
             const currentMonth = now.getMonth() + 1;
-            const yearsWithLessons = [...new Set(studentLessons.map((l) => l.date.slice(0, 4)))];
-            const years = [...new Set([String(currentYear), ...yearsWithLessons])].map(Number).sort((a, b) => b - a);
-
-            return years.map((year) => {
-              const monthRows: { monthKey: string; monthName: string; scheduledDateKeys: string[]; completedCount: number; totalEarned: number }[] = [];
-              const monthEnd = year === currentYear ? currentMonth : 12;
-              for (let month = 1; month <= monthEnd; month++) {
-                const scheduledDateKeys = getScheduledDateKeysInMonth(student, year, month);
-                if (scheduledDateKeys.length === 0) continue;
-                let completedCount = 0;
-                let totalEarned = 0;
-                for (const dateKey of scheduledDateKeys) {
-                  const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
-                  if (lesson?.completed) {
-                    completedCount++;
-                    totalEarned += lesson.amountCents;
-                  }
+            const effectiveYear = lessonLogYears.includes(selectedLessonYear) ? selectedLessonYear : lessonLogYears[0]!;
+            const monthRows: { monthKey: string; monthName: string; scheduledDateKeys: string[]; completedCount: number; totalEarned: number }[] = [];
+            const monthEnd = effectiveYear === currentYear ? currentMonth : 12;
+            for (let month = 1; month <= monthEnd; month++) {
+              const scheduledDateKeys = getScheduledDateKeysInMonth(student, effectiveYear, month);
+              if (scheduledDateKeys.length === 0) continue;
+              let completedCount = 0;
+              let totalEarned = 0;
+              for (const dateKey of scheduledDateKeys) {
+                const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
+                if (lesson?.completed) {
+                  completedCount++;
+                  totalEarned += lesson.amountCents;
                 }
-                const first = new Date(year, month - 1, 1);
-                const monthName = first.toLocaleDateString("en-US", { month: "long" });
-                const monthKey = `${year}-${String(month).padStart(2, "0")}`;
-                monthRows.push({ monthKey, monthName, scheduledDateKeys: scheduledDateKeys.sort((a, b) => b.localeCompare(a)), completedCount, totalEarned });
               }
-              if (monthRows.length === 0) return null;
-
-              return (
-                <div key={year} style={{ marginBottom: 28 }}>
-                  <h3 className="headline-serif" style={{ fontSize: 20, fontWeight: 400, marginBottom: 14 }}>{t("studentDetail.lessonsLogged")} {year}</h3>
-                  <div className="float-card" style={{ overflow: "hidden", padding: 0 }}>
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      {monthRows.map(({ monthKey, monthName, scheduledDateKeys, completedCount, totalEarned }) => (
-                        <Fragment key={monthKey}>
-                          <div
-                            onClick={() => setExpandedMonth((prev) => (prev === monthKey ? null : monthKey))}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              padding: "14px 20px",
-                              cursor: "pointer",
-                              background: expandedMonth === monthKey ? "var(--hero-gradient-subtle)" : undefined,
-                              borderBottom: "1px solid rgba(201, 123, 148, 0.08)",
-                            }}
-                          >
-                            <span style={{ fontWeight: 500 }}>{expandedMonth === monthKey ? "▼ " : "▶ "}{monthName}</span>
-                            <span style={{ fontSize: 14, color: "var(--text-muted)" }}>{completedCount}/{scheduledDateKeys.length} · {formatCurrency(totalEarned)}</span>
-                          </div>
-                          {expandedMonth === monthKey && (
-                            <div style={{ padding: "12px 20px 16px", background: "var(--hero-gradient-subtle)" }}>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                {scheduledDateKeys.map((dateKey) => {
-                                  const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
-                                  const attended = lesson?.completed ?? false;
-                                  const handleToggle = async () => {
-                                    if (attended) {
-                                      if (lesson) await updateLesson(lesson.id, { completed: false });
-                                    } else {
-                                      const duration = getEffectiveDurationMinutes(student, dateKey);
-                                      const amount = getEffectiveRateCents(student, dateKey);
-                                      if (lesson) {
-                                        await updateLesson(lesson.id, { completed: true, durationMinutes: duration, amountCents: amount });
+              const first = new Date(effectiveYear, month - 1, 1);
+              const monthName = first.toLocaleDateString("en-US", { month: "long" });
+              const monthKey = `${effectiveYear}-${String(month).padStart(2, "0")}`;
+              monthRows.push({ monthKey, monthName, scheduledDateKeys: scheduledDateKeys.sort((a, b) => b.localeCompare(a)), completedCount, totalEarned });
+            }
+            return (
+              <>
+                <div className="tabs-row" style={{ marginBottom: 16 }}>
+                  {lessonLogYears.map((y) => (
+                    <Button key={y} type="button" variant="tab" size="sm" className="tabButton" active={effectiveYear === y} onClick={() => setSelectedLessonYear(y)}>{y}</Button>
+                  ))}
+                </div>
+                <div style={{ marginBottom: 28 }}>
+                  {monthRows.length === 0 ? (
+                    <p style={{ color: "var(--text-muted)", margin: 0 }}>{t("studentDetail.lessonsLogged")} {effectiveYear} — no lessons</p>
+                  ) : (
+                    <div className="float-card" style={{ overflow: "hidden", padding: 0 }}>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        {monthRows.map(({ monthKey, monthName, scheduledDateKeys, completedCount, totalEarned }) => (
+                          <Fragment key={monthKey}>
+                            <div
+                              className="cardInteractive"
+                              onClick={() => setExpandedMonth((prev) => (prev === monthKey ? null : monthKey))}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                padding: "14px 20px",
+                                cursor: "pointer",
+                                background: expandedMonth === monthKey ? "var(--hero-gradient-subtle)" : undefined,
+                                borderBottom: "1px solid rgba(201, 123, 148, 0.08)",
+                              }}
+                            >
+                              <span style={{ fontWeight: 500 }}>{expandedMonth === monthKey ? "▼ " : "▶ "}{monthName}</span>
+                              <span style={{ fontSize: 14, color: "var(--text-muted)" }}>{completedCount}/{scheduledDateKeys.length} · {formatCurrency(totalEarned)}</span>
+                            </div>
+                            <div className={`collapsible ${expandedMonth === monthKey ? "open" : "closed"}`}>
+                              <div style={{ padding: "12px 20px 16px", background: "var(--hero-gradient-subtle)" }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                  {scheduledDateKeys.map((dateKey) => {
+                                    const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
+                                    const attended = lesson?.completed ?? false;
+                                    const handleToggle = async () => {
+                                      if (attended) {
+                                        if (lesson) await updateLesson(lesson.id, { completed: false });
                                       } else {
-                                        await addLesson({ studentId: student.id, date: dateKey, durationMinutes: duration, amountCents: amount, completed: true });
+                                        const duration = getEffectiveDurationMinutes(student, dateKey);
+                                        const amount = getEffectiveRateCents(student, dateKey);
+                                        if (lesson) {
+                                          await updateLesson(lesson.id, { completed: true, durationMinutes: duration, amountCents: amount });
+                                        } else {
+                                          await addLesson({ studentId: student.id, date: dateKey, durationMinutes: duration, amountCents: amount, completed: true });
+                                        }
                                       }
-                                    }
-                                  };
-                                  return (
-                                    <Button
-                                      key={dateKey}
-                                      type="button"
-                                      variant={attended ? "secondary" : "tab"}
-                                      size="sm"
-                                      fullWidth
-                                      onClick={handleToggle}
-                                      style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        margin: 0,
-                                        borderRadius: 12,
-                                        background: attended ? "var(--card)" : "rgba(0,0,0,0.06)",
-                                        color: attended ? "var(--text)" : "var(--text-muted)",
-                                        border: attended ? "1px solid var(--border)" : "1px solid transparent",
-                                        boxShadow: "none",
-                                      }}
-                                    >
-                                      <span style={{ fontSize: 14 }}>{dateKey}</span>
-                                      <span style={{ fontWeight: 600 }}>{attended ? formatCurrency(computeLessonAmountCents(student, lesson!, dateKey)) : "—"}</span>
-                                    </Button>
-                                  );
-                                })}
+                                    };
+                                    return (
+                                      <Button
+                                        key={dateKey}
+                                        type="button"
+                                        variant={attended ? "secondary" : "tab"}
+                                        size="sm"
+                                        fullWidth
+                                        onClick={handleToggle}
+                                        style={{
+                                          display: "flex",
+                                          justifyContent: "space-between",
+                                          alignItems: "center",
+                                          margin: 0,
+                                          borderRadius: 12,
+                                          background: attended ? "var(--card)" : "rgba(0,0,0,0.06)",
+                                          color: attended ? "var(--text)" : "var(--text-muted)",
+                                          border: attended ? "1px solid var(--border)" : "1px solid transparent",
+                                          boxShadow: "none",
+                                        }}
+                                      >
+                                        <span style={{ fontSize: 14 }}>{dateKey}</span>
+                                        <span style={{ fontWeight: 600 }}>{attended ? formatCurrency(computeLessonAmountCents(student, lesson!, dateKey)) : "—"}</span>
+                                      </Button>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             </div>
-                          )}
-                        </Fragment>
-                      ))}
+                          </Fragment>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
-              );
-            });
+              </>
+            );
           })()}
         </>
       )}

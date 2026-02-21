@@ -11,7 +11,9 @@ import {
   formatBelowAverage,
   formatDayOfWeekMax,
   formatMissedMost,
+  formatCompletedMost,
   formatAttendanceSummary,
+  formatUniqueStudentCount,
   formatRevenuePerStudent,
   formatAvgWeeklyRevenue,
   formatCashFlowTrend,
@@ -59,8 +61,12 @@ export function resultToAnswer(computed: ComputedResult): string {
       return formatDayOfWeekMax(out);
     case "student_missed_most_lessons_in_year":
       return formatMissedMost(out);
+    case "student_completed_most_lessons_in_year":
+      return formatCompletedMost(out);
     case "student_attendance_summary":
       return formatAttendanceSummary(out);
+    case "unique_student_count_in_period":
+      return formatUniqueStudentCount(out);
     case "revenue_per_student_in_period":
       return formatRevenuePerStudent(out);
     case "avg_weekly_revenue":

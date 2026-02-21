@@ -2,7 +2,7 @@ import type { EarningsRow, StudentSummary } from "@/lib/forecasts/types";
 import type { Lesson, Student } from "@/types";
 import { parseToQueryPlan } from "./parse";
 import { computeFromPlan } from "./compute";
-import { runInsightsSupabaseSanityCheck } from "./truthQueries";
+import { runInsightsSupabaseSanityCheck, SQL_TRUTH_QUERIES } from "./truthQueries";
 import { resultToAnswer } from "./respond";
 import { runInsightsVerifier } from "./verifier";
 import { type ComputedResult, type InsightsTrace, type QueryPlan } from "./schema";
@@ -113,8 +113,12 @@ function sqlTruthKeyForIntent(intent: QueryPlan["intent"]): string {
       return "earnings_ytd_for_student";
     case "student_missed_most_lessons_in_year":
       return "student_missed_most_lessons_in_year";
+    case "student_completed_most_lessons_in_year":
+      return "student_completed_most_lessons_in_year";
     case "student_attendance_summary":
       return "student_attendance_summary";
+    case "unique_student_count_in_period":
+      return "unique_student_count_in_period";
     case "revenue_per_student_in_period":
       return "revenue_per_student_in_period";
     case "avg_weekly_revenue":
@@ -218,7 +222,9 @@ function extractMetadata(
     revenue_per_lesson_in_period: { type: "ratio", formula: "sum(amount_dollars) / count(completed_lessons)" },
     earnings_ytd_for_student: { type: "sum", formula: "sum(amount_dollars where student=target)" },
     student_missed_most_lessons_in_year: { type: "argmax", formula: "max(missed_lessons_count)" },
+    student_completed_most_lessons_in_year: { type: "argmax", formula: "max(completed_lessons_count)" },
     student_attendance_summary: { type: "ratio", formula: "attended_lessons / scheduled_lessons" },
+    unique_student_count_in_period: { type: "count_distinct", formula: "count(distinct student_id)" },
     revenue_per_student_in_period: { type: "group_by", formula: "sum(amount_dollars) by student" },
     avg_weekly_revenue: { type: "ratio", formula: "sum(amount_dollars) / week_count" },
     cash_flow_trend: { type: "timeseries", formula: "weekly sum(amount_dollars) + direction" },
@@ -348,6 +354,8 @@ export async function askInsights(questionText: string, context: AskInsightsCont
       typeof out.total_hours === "number" ||
       typeof out.hourly_dollars === "number" ||
       typeof out.student_name === "string" ||
+      typeof out.student_count === "number" ||
+      typeof out.completed_count === "number" ||
       typeof out.dow_label === "string" ||
       Array.isArray(out.rows) ||
       out.percent_change != null ||
@@ -384,6 +392,7 @@ export async function askInsights(questionText: string, context: AskInsightsCont
       missing_params: plan.required_missing_params ?? [],
       entities: { student_filter: plan.student_filter, time_range: plan.time_range },
       sql_truth_query_key: plan.sql_truth_query_key,
+      sql_executed: SQL_TRUTH_QUERIES[plan.sql_truth_query_key] ?? null,
       sql_params: trace.sqlParams,
       zero_cause: trace.zeroCause,
       sql_result_summary: trace.sqlResultSummary,

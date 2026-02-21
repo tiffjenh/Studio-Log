@@ -18,6 +18,8 @@ function confidenceFromOutputs(plan: QueryPlan, outputs: Record<string, unknown>
     outputs.rows != null ||
     outputs.student_name != null ||
     outputs.missed_count != null ||
+    outputs.completed_count != null ||
+    outputs.student_count != null ||
     outputs.hourly_dollars != null ||
     outputs.percent_change != null ||
     outputs.projected_monthly_dollars != null ||

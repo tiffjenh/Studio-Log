@@ -1,5 +1,6 @@
 import { queryPlanSchema, type InsightIntent, type QueryPlan, type TimeRange } from "./schema";
-import { normalizeDateRange, defaultRangeForIntent } from "./metrics/dateNormalize";
+import { normalizeDateRange, defaultRangeForIntent, yearRange } from "./metrics/dateNormalize";
+import { getDeterministicIntentSpec, type DeterministicIntent } from "./metrics/deterministicIntentRegistry";
 
 export type InsightsPriorContext = {
   intent: InsightIntent;
@@ -8,15 +9,104 @@ export type InsightsPriorContext = {
   slots?: Record<string, unknown>;
 };
 
+type StructuredIntent = DeterministicIntent;
+
+const SYNONYM_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bchildren\b/g, "students"],
+  [/\bkids\b/g, "students"],
+  [/\bmade\b/g, "earned"],
+  [/\bpay\b/g, "earned"],
+  [/\bpays\b/g, "earned"],
+  [/\bpaid\b/g, "earned"],
+  [/\bmissed\b/g, "absent"],
+  [/\bskipped\b/g, "absent"],
+];
+
+function applySynonymNormalization(value: string): string {
+  let out = value;
+  for (const [pattern, replacement] of SYNONYM_REPLACEMENTS) {
+    out = out.replace(pattern, replacement);
+  }
+  return out;
+}
+
+function isEarningsAttendanceClarificationCase(normalized: string): boolean {
+  const hasFinancial = /\b(earn|earned|earnings|revenue|income|paid)\b/.test(normalized);
+  const hasAttendance = /\b(attendance|absent|completed|lesson|lessons)\b/.test(normalized);
+  return hasFinancial && hasAttendance;
+}
+
+function hasAmbiguousTimeframe(normalized: string): boolean {
+  const years = new Set((normalized.match(/\b20\d{2}\b/g) ?? []).map((y) => Number(y)));
+  if (years.size > 1) return true;
+  const relativeHits = [
+    /\bthis year\b/,
+    /\blast year\b/,
+    /\bytd\b/,
+    /\blast month\b/,
+    /\bthis month\b/,
+    /\blast 7 days\b/,
+    /\blast 30 days\b/,
+  ].filter((p) => p.test(normalized)).length;
+  return relativeHits > 1;
+}
+
+function routeStructuredIntent(normalized: string): StructuredIntent | null {
+  if (/\bwho\b.*\b(absent)\b.*\bmost\b|\b(absent)\b.*\bmost\b/.test(normalized)) return "ATTENDANCE_RANK_MISSED";
+  if (/\bwho\b.*\b(attended|completed)\b.*\bmost\b|\b(attended|completed)\b.*\bmost\b/.test(normalized)) return "ATTENDANCE_RANK_COMPLETED";
+  if (
+    /\bhow many students\b.*\b(need|needed)\b.*\b(reach|hit|target)\b/.test(normalized) ||
+    /\breach\s+\$?\s*\d+(?:,\d{3})*(?:\s*k)?\b.*\b(at|per)\b.*\b(hour|hr)\b/.test(normalized)
+  ) {
+    return "REVENUE_TARGET_PROJECTION";
+  }
+  if (
+    /\bhow many\s+students\b.*\b(taught|teach)\b/.test(normalized) ||
+    /\bstudents?\s+count\b/.test(normalized) ||
+    /\bcount\s+students\b/.test(normalized)
+  ) {
+    return "UNIQUE_STUDENT_COUNT";
+  }
+  const isHourlyQuestion = /\b(per\s*hour|\/\s*hour|\/\s*hr|hourly)\b/.test(normalized);
+  if (
+    !isHourlyQuestion &&
+    (/\bwho\b.*\bearn(?:ed)?\b.*\bleast\b/.test(normalized) ||
+      /\bwhich student\b.*\bearn(?:ed)?\b.*\bleast\b/.test(normalized) ||
+      /\blowest\b.*\b(earnings|revenue)\b/.test(normalized))
+  ) {
+    return "EARNINGS_RANK_MIN";
+  }
+  if (
+    !isHourlyQuestion &&
+    (/\bwho\b.*\bearn(?:ed)?\b.*\bmost\b/.test(normalized) ||
+      /\bwhich student\b.*\bearn(?:ed)?\b.*\bmost\b/.test(normalized) ||
+      /\bhighest\b.*\b(earnings|revenue)\b/.test(normalized))
+  ) {
+    return "EARNINGS_RANK_MAX";
+  }
+  if (
+    /\b(what if|if i)\b.*\b(raise|increase|decrease)\b.*\b(rate|rates)\b/.test(normalized) ||
+    /\bby\s+\$?\d+(?:\.\d+)?\s*(?:\/\s*hour|per\s*hour|hour|hr)\b/.test(normalized)
+  ) {
+    return "REVENUE_DELTA_SIMULATION";
+  }
+  if (/\bhow much\b.*\b(earned|earnings|revenue|income)\b|\btotal earnings\b/.test(normalized)) {
+    return "TOTAL_EARNINGS_PERIOD";
+  }
+  return null;
+}
+
 export function normalizeInsightsQuery(raw: string): string {
-  return raw
+  return applySynonymNormalization(
+    raw
     .toLowerCase()
     .trim()
     .replace(/[?!.,;:()]+/g, " ")
     .replace(/\bhrs?\b/g, "hour")
     .replace(/\bh\b/g, "hour")
     .replace(/\bmins?\b/g, "minutes")
-    .replace(/\s+/g, " ");
+    .replace(/\s+/g, " ")
+  );
 }
 
 function toTimeRange(nr: { start: string; end: string; label?: string }, type: TimeRange["type"] = "custom"): TimeRange {
@@ -81,7 +171,9 @@ function inferMissingParams(
   normalized: string,
   studentName?: string
 ): string[] {
-  if (routedIntent === "general_fallback") return ["intent"];
+  if (routedIntent === "general_fallback") {
+    return isEarningsAttendanceClarificationCase(normalized) ? ["intent"] : [];
+  }
   if (routedIntent === "what_if_rate_change" && !/\b(\$?\d+(?:\.\d+)?)\s*(?:\/\s*hour|per\s*hour|an?\s*hour|hour)\b/.test(normalized) && !/\bby\s+\$?\d+(?:\.\d+)?\b/.test(normalized)) {
     return ["rate_delta"];
   }
@@ -133,7 +225,9 @@ function deriveTruthKey(intent: InsightIntent): string {
     revenue_per_lesson_in_period: "revenue_per_lesson_in_period",
     earnings_ytd_for_student: "earnings_ytd_for_student",
     student_missed_most_lessons_in_year: "student_missed_most_lessons_in_year",
+    student_completed_most_lessons_in_year: "student_completed_most_lessons_in_year",
     student_attendance_summary: "student_attendance_summary",
+    unique_student_count_in_period: "unique_student_count_in_period",
     revenue_per_student_in_period: "revenue_per_student_in_period",
     avg_weekly_revenue: "avg_weekly_revenue",
     cash_flow_trend: "cash_flow_trend",
@@ -177,8 +271,8 @@ function routeIntent(normalized: string): InsightIntent {
   if (/\bwho missed the most|missed most lessons|most missed lessons|most absences\b/.test(normalized)) return "student_missed_most_lessons_in_year";
   if (/\bhow many lessons\b|\blesson count\b|\bcount lessons\b|\bnumber of lessons\b/.test(normalized)) return "lessons_count_in_period";
   if (/\brevenue per lesson\b|\baverage revenue per lesson\b|\bavg revenue per lesson\b/.test(normalized)) return "revenue_per_lesson_in_period";
-  if (/\bhighest hourly rate|highest hourly student|pays the most per hour|highest paying student|highest paying per hour\b/.test(normalized)) return "student_highest_hourly_rate";
-  if (/\blowest hourly rate|lowest hourly student|least hourly rate student|who pays the least per hour|who is lowest per hour\b/.test(normalized)) return "student_lowest_hourly_rate";
+  if (/\bhighest hourly rate|highest hourly student|pays the most per hour|highest paying student|highest paying per hour|who earned the most per hour|which student earned the most per hour\b/.test(normalized)) return "student_highest_hourly_rate";
+  if (/\blowest hourly rate|lowest hourly student|least hourly rate student|who pays the least per hour|who earned the least per hour|which student earned the least per hour|who is lowest per hour\b/.test(normalized)) return "student_lowest_hourly_rate";
   if (/\bwho pays the most\b|\bwhich student pays the most\b|\btop paying student\b/.test(normalized)) return "revenue_per_student_in_period";
   if (/\bwho pays the least\b|\bwhich student pays the least\b/.test(normalized)) return "revenue_per_student_in_period";
   if (/\bbelow my average rate|below my average hourly rate|below average hourly rate|below average hourly|students below average|students below my average|under average rate\b/.test(normalized)) return "students_below_average_rate";
@@ -203,8 +297,82 @@ function routeIntent(normalized: string): InsightIntent {
 
 export function parseToQueryPlan(query: string, priorContext?: InsightsPriorContext): QueryPlan {
   const normalized = normalizeInsightsQuery(query || "");
+  const structuredIntent = routeStructuredIntent(normalized);
   const routedIntent = routeIntent(normalized);
   const todayISO = new Date().toISOString().slice(0, 10);
+  if (structuredIntent) {
+    const deterministic = getDeterministicIntentSpec(structuredIntent);
+    const requestedMetric: NonNullable<QueryPlan["requested_metric"]> =
+      structuredIntent === "UNIQUE_STUDENT_COUNT" || structuredIntent === "REVENUE_TARGET_PROJECTION"
+        ? "count"
+        : structuredIntent === "EARNINGS_RANK_MAX" || structuredIntent === "EARNINGS_RANK_MIN" || structuredIntent.startsWith("ATTENDANCE_RANK")
+          ? "who"
+          : "dollars";
+    const student_name = extractStudentName(normalized);
+    const explicit = extractDateRange(normalized, todayISO);
+    const ambiguousTimeframe = hasAmbiguousTimeframe(normalized);
+    const defaultYear = yearRange(new Date(todayISO + "T12:00:00").getFullYear());
+    const resolvedRange = explicit ?? toTimeRange(defaultYear, "year");
+    const slots: Record<string, unknown> = {};
+    const years = normalized.match(/\b(20\d{2})\b/g)?.map((y) => Number(y)) ?? [];
+    if (years.length > 0) slots.year = years[0];
+    if (structuredIntent === "EARNINGS_RANK_MAX") {
+      slots.top_n = 1;
+      slots.rank_order = "desc";
+    }
+    if (structuredIntent === "EARNINGS_RANK_MIN") {
+      slots.top_n = 1;
+      slots.rank_order = "asc";
+    }
+    if (structuredIntent === "REVENUE_DELTA_SIMULATION") {
+      const perHour = normalized.match(/\b(\$?\d+(?:\.\d+)?)\s*(?:\/\s*hour|per\s*hour|an?\s*hour|hour)\b/);
+      const by = normalized.match(/\bby\s+\$?\s*(\d+(?:\.\d+)?)\b/);
+      const val = perHour ? Number(perHour[1].replace("$", "")) : by ? Number(by[1]) : null;
+      if (val != null && Number.isFinite(val)) slots.rate_delta_dollars_per_hour = val;
+    }
+    if (structuredIntent === "REVENUE_TARGET_PROJECTION") {
+      const target = normalized.match(/\breach\s+\$?\s*(\d+(?:,\d{3})*|\d+)\s*k\b/i);
+      const target2 = normalized.match(/\breach\s+\$?\s*(\d+(?:,\d{3})*)\b/i);
+      const raw = target ? target[1].replace(/,/g, "") : target2 ? target2[1].replace(/,/g, "") : null;
+      const val = raw ? Number(raw) : null;
+      if (val != null && Number.isFinite(val)) slots.target_income_dollars = target ? val * 1000 : val;
+      const rate = normalized.match(/\bat\s+\$?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*hr|\/\s*hour|per\s*hour|hr|hour)\b/i);
+      if (rate) slots.rate_dollars_per_hour = Number(rate[1]);
+    }
+    const missingParams = inferMissingParams(deterministic.planIntent, normalized, student_name).filter((p) => {
+      if (
+        p === "year" &&
+        (structuredIntent === "ATTENDANCE_RANK_MISSED" || structuredIntent === "ATTENDANCE_RANK_COMPLETED")
+      ) {
+        return false;
+      }
+      return true;
+    });
+    const needsClarification = ambiguousTimeframe || missingParams.length > 0;
+    const clarifying_question = ambiguousTimeframe
+      ? "I found multiple possible timeframes. Which timeframe should I use?"
+      : missingParams.length > 0
+        ? (deterministic.planIntent === "what_if_rate_change"
+          ? "How much should I change the rate by (e.g. $10/hour)?"
+          : deterministic.planIntent === "students_needed_for_target_income"
+            ? "What target income and hourly rate should I use (e.g. “reach $100k at $70/hr”)?"
+            : "Could you clarify your question?")
+        : null;
+    const plan: QueryPlan = {
+      intent: needsClarification ? "clarification" : deterministic.planIntent,
+      normalized_query: normalized,
+      time_range: resolvedRange,
+      student_filter: student_name ? { student_name } : undefined,
+      requested_metric: requestedMetric,
+      needs_clarification: needsClarification,
+      clarifying_question,
+      required_missing_params: missingParams,
+      sql_truth_query_key: needsClarification ? "clarification" : deterministic.sqlKey,
+      slots: Object.keys(slots).length ? slots : undefined,
+    };
+    const parsed = queryPlanSchema.safeParse(plan);
+    return parsed.success ? parsed.data : plan;
+  }
   let time_range = extractDateRange(normalized, todayISO) ?? priorContext?.time_range;
   // Default date range for intents that support it (e.g. day of week earn most -> YTD)
   if (!time_range && routedIntent === "day_of_week_earnings_max") {

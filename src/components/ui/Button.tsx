@@ -51,7 +51,6 @@ function getVariantStyles(
     border: "none",
     cursor: disabled ? "default" : "pointer",
     borderRadius: T.buttonRadius,
-    transition: "background 0.2s, box-shadow 0.2s, opacity 0.2s",
     opacity: disabled ? 0.65 : 1,
     boxShadow: disabled ? "none" : T.shadow.subtle,
   };

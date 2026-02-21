@@ -94,7 +94,9 @@ export default function Layout() {
           </div>
         )}
         <ImportBanner />
-        <Outlet />
+        <div className="pageTransition">
+          <Outlet />
+        </div>
       </main>
       {createPortal(
         <nav className="bottom-nav" aria-label="Main">

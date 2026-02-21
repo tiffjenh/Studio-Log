@@ -181,6 +181,7 @@ export default function EditLesson() {
         </div>
         <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>Notes</label>
         <textarea
+          className="notesTextarea"
           placeholder="e.g. Updated today's lesson to 1 hr 30 mins for $105."
           value={note}
           onChange={(e) => setNote(e.target.value)}

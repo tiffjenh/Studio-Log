@@ -55,3 +55,42 @@ describe("parseToQueryPlan dropdown routing", () => {
   });
 });
 
+describe("parseToQueryPlan deterministic routing harness", () => {
+  it("normalizes children synonym and resolves April 2024 unique student count", () => {
+    const plan = parseToQueryPlan("How many children did I teach in April 2024?");
+    expect(plan.normalized_query).toContain("students");
+    expect(plan.intent).toBe("unique_student_count_in_period");
+    expect(plan.sql_truth_query_key).toBe("UNIQUE_STUDENT_COUNT");
+    expect(plan.time_range?.start).toBe("2024-04-01");
+    expect(plan.time_range?.end).toBe("2024-04-30");
+    expect(plan.needs_clarification).toBe(false);
+  });
+
+  it("routes attendance-missed ranking deterministically", () => {
+    const plan = parseToQueryPlan("Which student missed the most lessons in 2025?");
+    expect(plan.intent).toBe("student_missed_most_lessons_in_year");
+    expect(plan.sql_truth_query_key).toBe("ATTENDANCE_RANK_MISSED");
+    expect(plan.time_range?.start).toBe("2025-01-01");
+    expect(plan.time_range?.end).toBe("2025-12-31");
+    expect(plan.needs_clarification).toBe(false);
+  });
+
+  it("routes earnings-min ranking deterministically", () => {
+    const plan = parseToQueryPlan("Which student did I earn the least from in 2025?");
+    expect(plan.intent).toBe("revenue_per_student_in_period");
+    expect(plan.sql_truth_query_key).toBe("EARNINGS_RANK_MIN");
+    expect(plan.slots?.rank_order).toBe("asc");
+    expect(plan.needs_clarification).toBe(false);
+  });
+
+  it("defaults missing timeframe to current year for rank questions", () => {
+    const currentYear = new Date().getFullYear();
+    const plan = parseToQueryPlan("Who pays the most?");
+    expect(plan.intent).toBe("revenue_per_student_in_period");
+    expect(plan.sql_truth_query_key).toBe("EARNINGS_RANK_MAX");
+    expect(plan.time_range?.start).toBe(`${currentYear}-01-01`);
+    expect(plan.time_range?.end).toBe(`${currentYear}-12-31`);
+    expect(plan.needs_clarification).toBe(false);
+  });
+});
+

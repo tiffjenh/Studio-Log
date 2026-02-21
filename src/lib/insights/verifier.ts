@@ -11,7 +11,8 @@ function hasValidResult(out: Record<string, unknown>): boolean {
   if (typeof out.total_dollars === "number") return true;
   if (typeof out.total_hours === "number") return true;
   if (typeof out.hourly_dollars === "number") return true;
-  if (typeof out.student_name === "string" && (out.missed_count != null || out.total_cents != null)) return true;
+  if (typeof out.student_name === "string" && (out.missed_count != null || out.completed_count != null || out.total_cents != null)) return true;
+  if (typeof out.student_count === "number") return true;
   if (typeof out.dow_label === "string" && typeof out.total_dollars === "number") return true;
   if (Array.isArray(out.rows) && out.rows.length >= 0) return true;
   if (typeof out.percent_change === "number" || (out.percent_change == null && out.year_a != null)) return true;
