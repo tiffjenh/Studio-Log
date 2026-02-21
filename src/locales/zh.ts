@@ -67,6 +67,7 @@ export default {
     noStudentsYet: "尚無學生，點 + 新增。",
     noHistoricalStudents: "尚無歷史學生。",
     deleteAllStudents: "刪除所有學生",
+    downloadStudentLessons: "下載學生課程",
     deleteAllConfirmTitle: "確定嗎？",
     deleteAllConfirmMessage: "將刪除所有學生與所有收入紀錄，且無法復原。",
     deleteAllCancel: "取消",

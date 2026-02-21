@@ -32,6 +32,7 @@ function confidenceFromOutputs(plan: QueryPlan, outputs: Record<string, unknown>
     outputs.stability_label != null ||
     outputs.weekly_series != null ||
     outputs.projected_total_dollars != null ||
+    outputs.delta_to_goal_dollars != null ||
     outputs.projected_weekly_dollars != null ||
     outputs.expected_lost_dollars != null ||
     outputs.students_needed != null ||

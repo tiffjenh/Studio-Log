@@ -82,7 +82,7 @@ function mapRouterIntentToPlanIntent(raw: string): QueryPlan["intent"] {
   if (x === "total_hours") return "hours_total_in_period";
   if (x === "avg_lessons_per_week") return "avg_lessons_per_week_in_period";
   if (x === "tax_estimate") return "tax_guidance";
-  if (x === "on_track") return "general_fallback";
+  if (x === "on_track" || x === "on_track_goal") return "on_track_goal";
   if (x === "what_if_add_students") return "what_if_add_students";
   if (x === "what_if_take_time_off") return "what_if_take_time_off";
   if (x === "what_if_lose_top_students") return "what_if_lose_top_students";
@@ -137,6 +137,8 @@ function sqlTruthKeyForIntent(intent: QueryPlan["intent"]): string {
       return "what_if_lose_top_students";
     case "students_needed_for_target_income":
       return "students_needed_for_target_income";
+    case "on_track_goal":
+      return "on_track_goal";
     case "tax_guidance":
       return "tax_guidance";
     case "forecast_monthly":
@@ -362,6 +364,8 @@ export async function askInsights(questionText: string, context: AskInsightsCont
       out.projected_monthly_dollars != null ||
       out.projected_yearly_dollars != null ||
       out.projected_total_dollars != null ||
+      out.delta_to_goal_dollars != null ||
+      out.ytd_dollars != null ||
       out.projected_weekly_dollars != null ||
       out.attended_lessons != null ||
       out.avg_weekly_dollars != null ||
@@ -371,10 +375,14 @@ export async function askInsights(questionText: string, context: AskInsightsCont
       out.suggested_set_aside_low_dollars != null ||
       Array.isArray(out.weekly_series) ||
       out.stability_label != null);
+  const hasMoneySignal = /\b(earn|earned|earnings|money|revenue|income|\$|dollars?)\b/.test(plan.normalized_query ?? "");
   if (!hasValidMetric && (!verifier.passed || verifier.confidence === "low")) {
     finalAnswerText =
       plan.clarifying_question ??
       "I’m not sure I have enough confidence to answer that. Did you mean earnings, attendance, rate, or forecast?";
+  }
+  if (!hasValidMetric && !plan.clarifying_question && hasMoneySignal) {
+    finalAnswerText = "Could you specify the timeframe (e.g. July 2024 or this year)?";
   }
   const finalNeedsClarification =
     !hasValidMetric && (!verifier.passed || verifier.confidence === "low");

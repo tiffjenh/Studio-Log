@@ -16,7 +16,7 @@ import {
 } from "@/utils/earnings";
 import type { Lesson } from "@/types";
 import { Button, IconButton } from "@/components/ui/Button";
-import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon } from "@/components/ui/Icons";
+import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, TrendDownIcon, TrendUpIcon } from "@/components/ui/Icons";
 
 const TABS = ["Daily", "Weekly", "Monthly", "Yearly", "Students"] as const;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -96,21 +96,23 @@ function BarChart({
   const labelTopPadding = staggerValueLabels ? 28 : 0;
   const gridLineColor = whitePlotBackground ? "rgba(0,0,0,0.08)" : "var(--border)";
   const plotBorderColor = whitePlotBackground ? "rgba(180, 160, 180, 0.25)" : "var(--border)";
+  const fitLabelsInPlot = staggerValueLabels && whitePlotBackground;
+  const plotHeight = fitLabelsInPlot ? CHART_HEIGHT + labelTopPadding : CHART_HEIGHT;
 
   const formatAxis = yAxisStepCents != null ? formatCurrencyWithCommas : formatCurrency;
   return (
     <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingRight: 8, minWidth: 40, fontSize: 11, color: "var(--text-muted)", textAlign: "right", height: CHART_HEIGHT }}>
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingRight: 8, minWidth: 40, fontSize: 11, color: "var(--text-muted)", textAlign: "right", height: plotHeight }}>
         {[...ticks].reverse().map((t) => (
           <span key={t}>{formatAxis(t)}</span>
         ))}
       </div>
       <div style={{ flex: 1, position: "relative" }}>
-        {labelTopPadding > 0 && <div style={{ height: labelTopPadding, flexShrink: 0 }} aria-hidden="true" />}
+        {!fitLabelsInPlot && labelTopPadding > 0 && <div style={{ height: labelTopPadding, flexShrink: 0 }} aria-hidden="true" />}
         <div
           style={{
             position: "relative",
-            height: CHART_HEIGHT,
+            height: plotHeight,
             borderBottom: `1px solid ${plotBorderColor}`,
             ...(whitePlotBackground
               ? {
@@ -129,7 +131,7 @@ function BarChart({
                 position: "absolute",
                 left: 0,
                 right: 0,
-                bottom: `${(t / chartMax) * 100}%`,
+                bottom: fitLabelsInPlot ? `${(t / chartMax) * 100 * (CHART_HEIGHT / plotHeight)}%` : `${(t / chartMax) * 100}%`,
                 height: 1,
                 background: gridLineColor,
               }}
@@ -232,6 +234,107 @@ function BarChart({
   );
 }
 
+/** Format date key (YYYY-MM-DD) to "Feb 15" for period display. */
+function formatPeriodDay(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/** Format week range for hero: "Feb 15 – Feb 21". */
+function formatWeekPeriodRange(startDateKey: string, endDateKey: string): string {
+  return `${formatPeriodDay(startDateKey)} – ${formatPeriodDay(endDateKey)}`;
+}
+
+/** Format dollar delta for hero: +$100, -$50, or — when zero/null. */
+function formatDollarDelta(cents: number | null | undefined): string {
+  if (cents == null || !Number.isFinite(cents)) return "—";
+  if (cents === 0) return "—";
+  const d = Math.abs(cents) / 100;
+  const s = d >= 1 ? d.toLocaleString("en-US", { maximumFractionDigits: 0, minimumFractionDigits: 0 }) : d.toFixed(2);
+  return cents > 0 ? `+$${s}` : `-$${s}`;
+}
+
+function EarningsHero({
+  amount,
+  periodText,
+  onPrev,
+  onNext,
+  pctChange,
+  dollarDeltaCents,
+  disablePrev = false,
+  disableNext = false,
+}: {
+  amount: string;
+  periodText: string;
+  onPrev: () => void;
+  onNext: () => void;
+  pctChange?: number | null;
+  /** Current period total minus previous period total (cents). Shown below the % chip. */
+  dollarDeltaCents?: number | null;
+  disablePrev?: boolean;
+  disableNext?: boolean;
+}) {
+  // Chip: vs previous period. Negative → up to 2 decimals; flat → grey "—"; positive → up to 2 decimals. Cap at ±99.99%.
+  const rawPct = pctChange != null && typeof pctChange === "number" && Number.isFinite(pctChange) ? pctChange : null;
+  const pctForDisplay =
+    rawPct == null
+      ? null
+      : rawPct === 0
+        ? 0
+        : Math.max(-99.99, Math.min(99.99, rawPct * 100));
+  const chipContent =
+    pctForDisplay == null || pctForDisplay === 0
+      ? { text: "—", mod: "neutral" as const, Icon: null }
+      : pctForDisplay > 0
+        ? { text: `+${pctForDisplay.toFixed(2)}%`, mod: "pos" as const, Icon: TrendUpIcon }
+        : { text: `${pctForDisplay.toFixed(2)}%`, mod: "neg" as const, Icon: TrendDownIcon };
+
+  const deltaCents = dollarDeltaCents != null && Number.isFinite(dollarDeltaCents) ? dollarDeltaCents : null;
+  const deltaText = formatDollarDelta(deltaCents);
+  const deltaMod = deltaCents == null || deltaCents === 0 ? "neutral" : deltaCents > 0 ? "pos" : "neg";
+
+  return (
+    <div className="earnings-hero">
+      <div
+        className="earnings-hero__header"
+        style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", marginBottom: 2, minHeight: 38 }}
+      >
+        <div className="earnings-hero__selector" style={{ gap: 6, alignItems: "center" }}>
+          <button
+            type="button"
+            className="earnings-hero__arrowBtn"
+            onClick={onPrev}
+            disabled={disablePrev}
+            aria-label="Previous period"
+          >
+            <ChevronLeftIcon size={10} />
+          </button>
+          <span className="earnings-hero__periodText" style={{ fontSize: 13, minWidth: 72 }}>{periodText}</span>
+          <button
+            type="button"
+            className="earnings-hero__arrowBtn"
+            onClick={onNext}
+            disabled={disableNext}
+            aria-label="Next period"
+          >
+            <ChevronRightIcon size={10} />
+          </button>
+        </div>
+        <div className="earnings-hero__chip-block">
+          <span className={`earnings-hero__chip earnings-hero__chip--${chipContent.mod}`}>
+            {chipContent.Icon ? (() => { const Icon = chipContent.Icon; return <Icon size={12} />; })() : null}
+            {chipContent.text}
+          </span>
+          <span className={`earnings-hero__delta earnings-hero__delta--${deltaMod}`}>
+            {deltaText}
+          </span>
+        </div>
+      </div>
+      <div className="earnings-hero__amount" style={{ marginTop: 0 }}>{amount}</div>
+    </div>
+  );
+}
+
 const TAB_KEYS: Record<(typeof TABS)[number], string> = {
   Daily: "earnings.daily",
   Weekly: "earnings.weekly",
@@ -250,6 +353,7 @@ export default function Earnings() {
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [weeklyMonthOffset, setWeeklyMonthOffset] = useState(0);
   const [monthlyYearOffset, setMonthlyYearOffset] = useState(0);
+  const [yearlyYearOffset, setYearlyYearOffset] = useState(0);
   const [studentsYearOffset, setStudentsYearOffset] = useState(0);
   const [selectedYearKey, setSelectedYearKey] = useState<string | null>(null);
   const [studentsSearch, setStudentsSearch] = useState("");
@@ -323,8 +427,50 @@ export default function Earnings() {
 
   const dailyData = getDailyTotalsForWeek(completedLessons, now, dailyWeekOffset);
   const dailyWeekTotal = dailyData.reduce((s, d) => s + d.total, 0);
-  const dailyRangeStart = dailyData[0]?.label ?? "";
-  const dailyRangeEnd = dailyData[6]?.label ?? "";
+  const dailyStartKey = dailyData[0]?.dateKey ?? "";
+  const dailyEndKey = dailyData[6]?.dateKey ?? "";
+  const dailyPeriodText = dailyStartKey && dailyEndKey ? formatWeekPeriodRange(dailyStartKey, dailyEndKey) : "";
+  const prevWeekData = getDailyTotalsForWeek(completedLessons, now, dailyWeekOffset - 1);
+  const dailyPrevWeekTotal = prevWeekData.reduce((s, d) => s + d.total, 0);
+  const dailyPctChange =
+    dailyPrevWeekTotal > 0 ? (dailyWeekTotal - dailyPrevWeekTotal) / dailyPrevWeekTotal : null; // displayed week vs previous week
+
+  const weeklyFirstWeek = weeklyData[0];
+  const weeklyHeroTotal = weeklyFirstWeek?.total ?? 0;
+  const weeklyHeroPeriodText = weeklyFirstWeek
+    ? formatWeekPeriodRange(weeklyFirstWeek.startKey, weeklyFirstWeek.endKey)
+    : weeklyMonthTitle;
+  const prevMonthDate = new Date(weeklyYear, weeklyMonth - 1, 1);
+  const prevMonthWeeks = getWeeksInMonth(completedLessons, prevMonthDate.getFullYear(), prevMonthDate.getMonth());
+  const weeklyPrevTotal = prevMonthWeeks[0]?.total ?? 0;
+  const weeklyPctChange = weeklyPrevTotal > 0 ? (weeklyHeroTotal - weeklyPrevTotal) / weeklyPrevTotal : null; // first week this month vs first week last month
+
+  const monthlyHeroTotal = displayYear === thisYear ? earningsYTD : earningsForDisplayYear;
+  const prevYearTotal =
+    displayYear > Math.min(...allYears)
+      ? completedLessons
+          .filter((l) => l.date.startsWith(String(displayYear - 1)))
+          .reduce((s, l) => s + l.amountCents, 0)
+      : 0;
+  const monthlyPctChange = prevYearTotal > 0 ? (monthlyHeroTotal - prevYearTotal) / prevYearTotal : null; // YTD or full year vs previous year
+
+  const yearlyHeroYear = thisYear + yearlyYearOffset;
+  const yearlyHeroIndex = allYears.indexOf(yearlyHeroYear);
+  const yearlyHeroTotal =
+    yearlyHeroIndex >= 0
+      ? (yearlyTotals[yearlyHeroIndex] ?? 0)
+      : completedLessons
+          .filter((l) => l.date.startsWith(String(yearlyHeroYear)))
+          .reduce((s, l) => s + l.amountCents, 0);
+  const prevYearForHero = yearlyHeroYear - 1;
+  const yearlyPrevIndex = allYears.indexOf(prevYearForHero);
+  const yearlyPrevTotal =
+    yearlyPrevIndex >= 0
+      ? (yearlyTotals[yearlyPrevIndex] ?? 0)
+      : completedLessons
+          .filter((l) => l.date.startsWith(String(prevYearForHero)))
+          .reduce((s, l) => s + l.amountCents, 0);
+  const yearlyPctChange = yearlyPrevTotal > 0 ? (yearlyHeroTotal - yearlyPrevTotal) / yearlyPrevTotal : null; // selected year vs previous year
 
   const maxMonthly = Math.max(...visibleMonthlyTotals, 1);
   const maxWeekly = Math.max(...weeklyData.map((w) => w.total), 1);
@@ -596,11 +742,14 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
 
       {activeTab === "Weekly" && (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-            <IconButton type="button" variant="secondary" size="sm" onClick={() => { setWeeklyMonthOffset((o) => o - 1); setSelectedWeekStartKey(null); }} aria-label="Previous month"><ChevronLeftIcon /></IconButton>
-            <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{weeklyMonthTitle}</div>
-            <IconButton type="button" variant="secondary" size="sm" onClick={() => { setWeeklyMonthOffset((o) => o + 1); setSelectedWeekStartKey(null); }} aria-label="Next month"><ChevronRightIcon /></IconButton>
-          </div>
+          <EarningsHero
+            amount={formatCurrency(weeklyHeroTotal)}
+            periodText={weeklyHeroPeriodText}
+            onPrev={() => { setWeeklyMonthOffset((o) => o - 1); setSelectedWeekStartKey(null); }}
+            onNext={() => { setWeeklyMonthOffset((o) => o + 1); setSelectedWeekStartKey(null); }}
+            pctChange={weeklyPctChange}
+            dollarDeltaCents={weeklyHeroTotal - weeklyPrevTotal}
+          />
           <div className="float-card" style={{ marginBottom: 24 }}>
             {weeklyData.length > 0 ? (
               <BarChart
@@ -671,22 +820,14 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
 
       {activeTab === "Monthly" && (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-            <IconButton type="button" variant="secondary" size="sm" onClick={() => { setMonthlyYearOffset((o) => o - 1); setSelectedMonthKey(null); }} aria-label="Previous year"><ChevronLeftIcon /></IconButton>
-            <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{monthlyTitle}</div>
-            <IconButton type="button" variant="secondary" size="sm" onClick={() => { setMonthlyYearOffset((o) => o + 1); setSelectedMonthKey(null); }} aria-label="Next year"><ChevronRightIcon /></IconButton>
-          </div>
-          <div className="hero-card" style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 16 }}>{t("earnings.overview")}</div>
-            <div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
-                {displayYear === thisYear ? t("earnings.earningsYTD") : `${t("earnings.earningsYear")} ${displayYear}`}
-              </div>
-              <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>
-                {formatCurrency(displayYear === thisYear ? earningsYTD : earningsForDisplayYear)}
-              </div>
-            </div>
-          </div>
+          <EarningsHero
+            amount={formatCurrency(monthlyHeroTotal)}
+            periodText={monthlyTitle}
+            onPrev={() => { setMonthlyYearOffset((o) => o - 1); setSelectedMonthKey(null); }}
+            onNext={() => { setMonthlyYearOffset((o) => o + 1); setSelectedMonthKey(null); }}
+            pctChange={monthlyPctChange}
+            dollarDeltaCents={monthlyHeroTotal - prevYearTotal}
+          />
           {monthsToShow > 0 && (
             <>
               <div style={{ marginBottom: 24 }}>
@@ -791,13 +932,16 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
 
       {activeTab === "Yearly" && (
         <>
-          <div className="hero-card" style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 16 }}>{t("earnings.overview")}</div>
-            <div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>All-time earnings</div>
-              <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(yearlyGrandTotal)}</div>
-            </div>
-          </div>
+          <EarningsHero
+            amount={formatCurrency(yearlyHeroTotal)}
+            periodText={String(yearlyHeroYear)}
+            onPrev={() => setYearlyYearOffset((o) => o - 1)}
+            onNext={() => setYearlyYearOffset((o) => o + 1)}
+            pctChange={yearlyPctChange}
+            dollarDeltaCents={yearlyHeroTotal - yearlyPrevTotal}
+            disablePrev={yearlyHeroYear <= Math.min(...allYears.map(Number))}
+            disableNext={yearlyHeroYear >= thisYear}
+          />
           {yearlyLabels.length > 0 && (
             <>
               <div className="float-card" style={{ marginBottom: 24 }}>
@@ -902,14 +1046,14 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
 
       {activeTab === "Daily" && (
         <>
-          <div className="hero-card" style={{ marginBottom: 20, padding: "16px 20px" }}>
-            <div className="headline-serif" style={{ fontSize: 26, fontWeight: 400, marginBottom: 12 }}>{formatCurrency(dailyWeekTotal)}</div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
-              <IconButton type="button" variant="secondary" size="sm" onClick={() => setDailyWeekOffset((o) => o - 1)} aria-label="Previous week"><ChevronLeftIcon /></IconButton>
-              <span style={{ fontSize: 15, color: "var(--text)", minWidth: 100, textAlign: "center" }}>{dailyRangeStart} – {dailyRangeEnd}</span>
-              <IconButton type="button" variant="secondary" size="sm" onClick={() => setDailyWeekOffset((o) => o + 1)} aria-label="Next week"><ChevronRightIcon /></IconButton>
-            </div>
-          </div>
+          <EarningsHero
+            amount={formatCurrency(dailyWeekTotal)}
+            periodText={dailyPeriodText}
+            onPrev={() => setDailyWeekOffset((o) => o - 1)}
+            onNext={() => setDailyWeekOffset((o) => o + 1)}
+            pctChange={dailyPctChange}
+            dollarDeltaCents={dailyWeekTotal - dailyPrevWeekTotal}
+          />
           <div className="float-card" style={{ marginBottom: 24 }}>
             <BarChart
               data={dailyData.map((d) => d.total)}
@@ -1012,14 +1156,41 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
         const isEmptyInactive = studentsStatusFilter === "inactive" && sorted.length === 0;
         return (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-              <IconButton type="button" variant="secondary" size="sm" onClick={() => setStudentsYearOffset((o) => o - 1)} aria-label="Previous year"><ChevronLeftIcon /></IconButton>
-              <h2 className="headline-serif" style={{ fontSize: 20, fontWeight: 400, margin: 0 }}>
-                {studentsDisplayYear} earnings{studentsDisplayYear === thisYear ? " YTD" : ""}
-              </h2>
-              <IconButton type="button" variant="secondary" size="sm" onClick={() => setStudentsYearOffset((o) => o + 1)} aria-label="Next year"><ChevronRightIcon /></IconButton>
+            {/* Students hero: date switcher at top, then active/inactive counts */}
+            <div className="earnings-hero" style={{ marginBottom: 20 }}>
+              <div className="earnings-hero__selector" style={{ gap: 6, alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                <button
+                  type="button"
+                  className="earnings-hero__arrowBtn"
+                  onClick={() => setStudentsYearOffset((o) => o - 1)}
+                  aria-label="Previous year"
+                >
+                  <ChevronLeftIcon size={10} />
+                </button>
+                <span className="earnings-hero__periodText" style={{ fontSize: 13, minWidth: 72 }}>
+                  {studentsDisplayYear}
+                </span>
+                <button
+                  type="button"
+                  className="earnings-hero__arrowBtn"
+                  onClick={() => setStudentsYearOffset((o) => o + 1)}
+                  aria-label="Next year"
+                >
+                  <ChevronRightIcon size={10} />
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.activeStudents")}</div>
+                  <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{activeCount}</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.inactiveStudents")}</div>
+                  <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{inactiveCount}</div>
+                </div>
+              </div>
             </div>
-            {/* Search + Sort on one line */}
+            {/* Search + Sort */}
             <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
               <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
@@ -1043,21 +1214,6 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                 <option value="high">High–Low</option>
                 <option value="low">Low–High</option>
               </select>
-            </div>
-            <div className="hero-card" style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 12 }}>
-                {studentsDisplayYear === thisYear ? `${studentsDisplayYear} ${t("earnings.earningsYTD")}` : `${t("earnings.earningsYear")} ${studentsDisplayYear}`}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.activeStudents")}</div>
-                  <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{activeCount}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.inactiveStudents")}</div>
-                  <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{inactiveCount}</div>
-                </div>
-              </div>
             </div>
             {/* Active / Inactive segmented toggle */}
             <div style={{ display: "flex", gap: 0, marginBottom: 20, borderRadius: "var(--radius-pill)", padding: 4, background: "rgba(180, 160, 180, 0.08)", border: "1px solid var(--border)", width: "fit-content" }}>

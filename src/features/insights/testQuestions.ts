@@ -20,6 +20,10 @@ const base: TestQuestion[] = [
   { question: "projected yearly earnings", expectedIntent: "forecast_yearly", expectedMetric: "projected_yearly_dollars", expectedClarificationNeeded: false, notes: "forecast yearly" },
   { question: "what day of the week do i earn the most?", expectedIntent: "day_of_week_earnings_max", expectedMetric: "dow_label+total_dollars", expectedClarificationNeeded: false, notes: "dropdown day-of-week" },
   { question: "mark attendance things maybe", expectedIntent: "clarification", expectedMetric: "clarify", expectedClarificationNeeded: true, notes: "ambiguous fallback" },
+  // Repro: must not fall back to "earnings or attendance"
+  { question: "How much money did I earn July 2024", expectedIntent: "earnings_in_period", expectedMetric: "total_dollars", expectedClarificationNeeded: false, notes: "earnings by month" },
+  { question: "Am I on track for $80k this year?", expectedIntent: "on_track_goal", expectedMetric: "projected_total_dollars", expectedClarificationNeeded: false, notes: "on track goal" },
+  { question: "How many more students would I need to make 70000 if I teach each student for one hour at $80 an hour?", expectedIntent: "students_needed_for_target_income", expectedMetric: "students_needed", expectedClarificationNeeded: false, notes: "students needed for goal" },
 ];
 
 const paraphrases = [

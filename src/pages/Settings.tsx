@@ -14,7 +14,7 @@ import { Button, IconButton } from "@/components/ui/Button";
 import { ChevronLeftIcon, DownloadIcon } from "@/components/ui/Icons";
 
 export default function Settings() {
-  const { data, setUser, updateUserProfile, addLessonsBulk, updateLesson, clearAllLessons, reload } = useStoreContext();
+  const { data, setUser, updateUserProfile, addStudentsBulk, addLessonsBulk, updateLesson, clearAllLessons, reload } = useStoreContext();
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -106,16 +106,17 @@ export default function Settings() {
     setEditing(null);
   };
 
-  function matchStudentByName(name: string): Student | undefined {
+  function matchStudentByName(name: string, studentList?: Student[]): Student | undefined {
+    const list = studentList ?? data.students;
     const parts = name.trim().split(/\s+/).filter(Boolean);
     if (parts.length === 0) return undefined;
 
-    const exact = data.students.find((s) => `${s.firstName} ${s.lastName}`.toLowerCase() === name.toLowerCase());
+    const exact = list.find((s) => `${s.firstName} ${s.lastName}`.toLowerCase() === name.toLowerCase());
     if (exact) return exact;
 
     const first = parts[0] ?? "";
     const last = parts.slice(1).join(" ") || first;
-    const match = data.students.find(
+    const match = list.find(
       (s) =>
         s.firstName.toLowerCase() === first.toLowerCase() &&
         s.lastName.toLowerCase() === last.toLowerCase()
@@ -123,8 +124,8 @@ export default function Settings() {
     if (match) return match;
 
     if (parts.length >= 2) {
-      const lastAlt = parts[1]; // "Dylan Chun Chun" -> try first=Dylan, last=Chun
-      return data.students.find(
+      const lastAlt = parts[1];
+      return list.find(
         (s) =>
           s.firstName.toLowerCase() === first.toLowerCase() &&
           s.lastName.toLowerCase() === lastAlt.toLowerCase()
@@ -160,6 +161,27 @@ export default function Settings() {
       const toUpdate: { id: string; date: string; updates: { completed: boolean; amountCents: number; durationMinutes: number } }[] = [];
       const errors: string[] = [];
 
+      let studentListForMatch = data.students;
+      const uniqueNames = [...new Set(parsed.studentNames)];
+      const missingNames = uniqueNames.filter((n) => !matchStudentByName(n, studentListForMatch));
+      if (missingNames.length > 0) {
+        const toCreate: Omit<Student, "id">[] = missingNames.map((name) => {
+          const parts = name.trim().split(/\s+/).filter(Boolean);
+          const firstName = parts[0] ?? "";
+          const lastName = parts.slice(1).join(" ") || "";
+          return {
+            firstName,
+            lastName,
+            durationMinutes: 60,
+            rateCents: 0,
+            dayOfWeek: 1,
+            timeOfDay: "9:00 AM",
+          };
+        });
+        const { created } = await addStudentsBulk(toCreate);
+        studentListForMatch = [...data.students, ...created];
+      }
+
       const PROGRESS_BATCH = 150;
       for (let idx = 0; idx < parsed.attendance.length; idx++) {
         if (idx % PROGRESS_BATCH === 0 || idx === parsed.attendance.length - 1) {
@@ -168,7 +190,7 @@ export default function Settings() {
         }
         const { date, studentIndex } = parsed.attendance[idx];
         const name = parsed.studentNames[studentIndex];
-        const student = name ? matchStudentByName(name) : undefined;
+        const student = name ? matchStudentByName(name, studentListForMatch) : undefined;
         if (!student) {
           if (!errors.some((x) => x.includes(name ?? ""))) errors.push(`No student named "${name}"`);
           continue;

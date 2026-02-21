@@ -25,6 +25,7 @@ import {
   formatWhatIfTakeTimeOff,
   formatWhatIfLoseTopStudents,
   formatStudentsNeededForTargetIncome,
+  formatOnTrackGoal,
   formatTaxGuidance,
 } from "./formatAnswer";
 
@@ -85,6 +86,8 @@ export function resultToAnswer(computed: ComputedResult): string {
       return formatWhatIfLoseTopStudents(out);
     case "students_needed_for_target_income":
       return formatStudentsNeededForTargetIncome(out);
+    case "on_track_goal":
+      return formatOnTrackGoal(out);
     case "tax_guidance":
       return formatTaxGuidance(out);
     case "forecast_monthly":

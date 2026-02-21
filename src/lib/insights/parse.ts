@@ -55,7 +55,16 @@ function routeStructuredIntent(normalized: string): StructuredIntent | null {
   if (/\bwho\b.*\b(absent)\b.*\bmost\b|\b(absent)\b.*\bmost\b/.test(normalized)) return "ATTENDANCE_RANK_MISSED";
   if (/\bwho\b.*\b(attended|completed)\b.*\bmost\b|\b(attended|completed)\b.*\bmost\b/.test(normalized)) return "ATTENDANCE_RANK_COMPLETED";
   if (
-    /\bhow many students\b.*\b(need|needed)\b.*\b(reach|hit|target)\b/.test(normalized) ||
+    /\b(on track|on track for)\b.*\b(this year)?\s*\$?\s*\d+(?:,\d{3})*(?:\s*k)?\b/i.test(normalized) ||
+    /\b(am i|are i)\s+on track\b/i.test(normalized) ||
+    /\b\$?\s*\d+(?:,\d{3})*(?:\s*k)?\s*(this year|for the year)\b.*\b(on track|track)\b/i.test(normalized)
+  ) {
+    return "ON_TRACK_GOAL";
+  }
+  if (
+    /\bhow many\s+(more\s+)?students\b.*\b(need|needed)\b/i.test(normalized) ||
+    /\bhow many students\b.*\b(need|needed)\b.*\b(reach|hit|target|make)\b/.test(normalized) ||
+    /\b(need|needed)\b.*\bstudents?\b.*\b(make|reach|earn)\s+\$?\s*\d+/.test(normalized) ||
     /\breach\s+\$?\s*\d+(?:,\d{3})*(?:\s*k)?\b.*\b(at|per)\b.*\b(hour|hr)\b/.test(normalized)
   ) {
     return "REVENUE_TARGET_PROJECTION";
@@ -166,13 +175,17 @@ function parseTopN(normalized: string): number | undefined {
   return undefined;
 }
 
+function hasStrongEarningsOrMoneySignal(normalized: string): boolean {
+  return /\b(earn|earned|earnings|money|revenue|income|\$|dollars?|k\b)\b/.test(normalized);
+}
+
 function inferMissingParams(
   routedIntent: InsightIntent,
   normalized: string,
   studentName?: string
 ): string[] {
   if (routedIntent === "general_fallback") {
-    return isEarningsAttendanceClarificationCase(normalized) ? ["intent"] : [];
+    return isEarningsAttendanceClarificationCase(normalized) && !hasStrongEarningsOrMoneySignal(normalized) ? ["intent"] : [];
   }
   if (routedIntent === "what_if_rate_change" && !/\b(\$?\d+(?:\.\d+)?)\s*(?:\/\s*hour|per\s*hour|an?\s*hour|hour)\b/.test(normalized) && !/\bby\s+\$?\d+(?:\.\d+)?\b/.test(normalized)) {
     return ["rate_delta"];
@@ -187,15 +200,20 @@ function inferMissingParams(
     return ["top_n"];
   }
   if (routedIntent === "students_needed_for_target_income") {
-    const hasTarget = /\b\$\s*\d+|\b\d+\s*k\b/i.test(normalized);
+    const hasTarget = /\b\$\s*\d+|\b\d+\s*k\b|(?:make|reach|hit|earn)\s+\$?\s*\d+/i.test(normalized);
     const hasRate =
-      /\bat\s+\$?\s*\d+(?:\.\d+)?\s*(?:per\s*hour|hr|hour)\b/i.test(normalized) ||
-      /\b\$\s*\d+(?:\.\d+)?\s*(?:\/\s*hr|\/\s*hour|per\s*hour|hr|hour)\b/i.test(normalized) ||
-      /\b\d+(?:\.\d+)?\s*(?:\/\s*hr|\/\s*hour|per\s*hour)\b/i.test(normalized);
+      /\b(?:at|@)\s+\$?\s*\d+(?:\.\d+)?\s*(?:per\s*hour|an?\s*hour|hr|hour)\b/i.test(normalized) ||
+      /\b\$\s*\d+(?:\.\d+)?\s*(?:\/\s*hr|\/\s*hour|per\s*hour|an?\s*hour|hr|hour)\b/i.test(normalized) ||
+      /\b\d+(?:\.\d+)?\s*(?:\/\s*hr|\/\s*hour|per\s*hour|an?\s*hour)\b/i.test(normalized);
     const missing: string[] = [];
     if (!hasTarget) missing.push("target_income");
     if (!hasRate) missing.push("rate");
     return missing;
+  }
+  if (routedIntent === "on_track_goal") {
+    const hasGoal = /\b\$?\s*\d+(?:,\d+)*(?:\s*k)?\b.*\b(this year|year)\b|\b(on track|track)\b.*\b\$?\s*\d+/i.test(normalized);
+    if (!hasGoal) return ["annual_goal"];
+    return [];
   }
   if (
     (routedIntent === "earnings_ytd_for_student" ||
@@ -243,6 +261,7 @@ function deriveTruthKey(intent: InsightIntent): string {
     percent_change_yoy: "percent_change_yoy",
     average_hourly_rate_in_period: "average_hourly_rate_in_period",
     day_of_week_earnings_max: "day_of_week_earnings_max",
+    on_track_goal: "on_track_goal",
     general_fallback: "general_fallback",
     clarification: "clarification",
   };
@@ -290,6 +309,9 @@ function routeIntent(normalized: string): InsightIntent {
   if (/\bforecast monthly|projected monthly|forecast this month|monthly projection|will i earn this month\b/.test(normalized)) return "forecast_monthly";
   if (/\bforecast yearly|projected yearly|forecast this year|yearly projection|will i earn this year\b/.test(normalized)) return "forecast_yearly";
   if (/%|percent|percentage/.test(normalized) && /\b(20\d{2}).*(20\d{2})\b/.test(normalized)) return "percent_change_yoy";
+  if (/\b(on track|on track for)\b.*\b\$?\s*\d+(?:\s*k)?\b/i.test(normalized) || /\bam i\s+on track\b/i.test(normalized) || /\b\$?\s*\d+k?\s+this year\b.*\b(track|on track)\b/i.test(normalized)) return "on_track_goal";
+  if (/\bhow much\b.*\b(money\s+)?(did i\s+)?(earn|make)\b|\bhow much\s+(money\s+)?did i earn\b/i.test(normalized)) return "earnings_in_period";
+  if (/\b(earn|earned|earnings|revenue|income|money)\b/.test(normalized) && /\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+20\d{2}\b/.test(normalized)) return "earnings_in_period";
   if (/\bhow much did i earn|earnings|revenue|income\b/.test(normalized)) return "earnings_in_period";
   if (/\bhow much in\s+(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+20\d{2}\b/.test(normalized)) return "earnings_in_period";
   return "general_fallback";
@@ -314,6 +336,14 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
     const defaultYear = yearRange(new Date(todayISO + "T12:00:00").getFullYear());
     const resolvedRange = explicit ?? toTimeRange(defaultYear, "year");
     const slots: Record<string, unknown> = {};
+    if (structuredIntent === "ON_TRACK_GOAL") {
+      const targetK = normalized.match(/\b\$?\s*(\d+(?:,\d{3})*)\s*k\b/i);
+      const targetNum = normalized.match(/\b\$?\s*(\d+(?:,\d{3})*)\s*(?:k|000)\b/i);
+      const targetPlain = normalized.match(/\b(?:for|hit|reach|to)\s+\$?\s*(\d+(?:,\d{3})*)\b/);
+      const raw = targetK ? targetK[1].replace(/,/g, "") : targetNum ? targetNum[1].replace(/,/g, "") : targetPlain ? targetPlain[1].replace(/,/g, "") : null;
+      const val = raw ? Number(raw) : null;
+      if (val != null && Number.isFinite(val)) slots.annual_goal_dollars = targetK ? val * 1000 : val >= 1000 ? val : val * 1000;
+    }
     const years = normalized.match(/\b(20\d{2})\b/g)?.map((y) => Number(y)) ?? [];
     if (years.length > 0) slots.year = years[0];
     if (structuredIntent === "EARNINGS_RANK_MAX") {
@@ -331,13 +361,17 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
       if (val != null && Number.isFinite(val)) slots.rate_delta_dollars_per_hour = val;
     }
     if (structuredIntent === "REVENUE_TARGET_PROJECTION") {
-      const target = normalized.match(/\breach\s+\$?\s*(\d+(?:,\d{3})*|\d+)\s*k\b/i);
-      const target2 = normalized.match(/\breach\s+\$?\s*(\d+(?:,\d{3})*)\b/i);
-      const raw = target ? target[1].replace(/,/g, "") : target2 ? target2[1].replace(/,/g, "") : null;
+      const targetK = normalized.match(/\b(?:make|reach|hit|earn)\s+\$?\s*(\d+(?:,\d{3})*|\d+)\s*k\b/i);
+      const targetNum = normalized.match(/\b(?:make|reach|hit|earn)\s+\$?\s*(\d+(?:,\d{3})*)\b/i);
+      const reach = normalized.match(/\breach\s+\$?\s*(\d+(?:,\d{3})*|\d+)\s*k\b/i);
+      const reach2 = normalized.match(/\breach\s+\$?\s*(\d+(?:,\d{3})*)\b/i);
+      const raw = targetK ? targetK[1].replace(/,/g, "") : targetNum ? targetNum[1].replace(/,/g, "") : reach ? reach[1].replace(/,/g, "") : reach2 ? reach2[1].replace(/,/g, "") : null;
       const val = raw ? Number(raw) : null;
-      if (val != null && Number.isFinite(val)) slots.target_income_dollars = target ? val * 1000 : val;
-      const rate = normalized.match(/\bat\s+\$?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*hr|\/\s*hour|per\s*hour|hr|hour)\b/i);
+      if (val != null && Number.isFinite(val)) slots.target_income_dollars = (targetK || reach) ? val * 1000 : val;
+      const rate = normalized.match(/\b(?:at|@)\s+\$?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*hr|\/\s*hour|per\s*hour|an?\s*hour|hr|hour)\b/i);
       if (rate) slots.rate_dollars_per_hour = Number(rate[1]);
+      const oneHour = /\b(?:1|one)\s+hour\s+(?:per\s+)?(?:student|week)\b|\beach\s+student\s+(?:for\s+)?(?:1|one)\s+hour\b/i.test(normalized);
+      slots.hours_per_student_per_week = oneHour ? 1 : undefined;
     }
     const missingParams = inferMissingParams(deterministic.planIntent, normalized, student_name).filter((p) => {
       if (
@@ -356,7 +390,9 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
           ? "How much should I change the rate by (e.g. $10/hour)?"
           : deterministic.planIntent === "students_needed_for_target_income"
             ? "What target income and hourly rate should I use (e.g. “reach $100k at $70/hr”)?"
-            : "Could you clarify your question?")
+            : deterministic.planIntent === "on_track_goal"
+              ? "What annual goal should I use (e.g. $80,000)?"
+              : "Could you clarify your question?")
         : null;
     const plan: QueryPlan = {
       intent: needsClarification ? "clarification" : deterministic.planIntent,
@@ -379,7 +415,7 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
     const def = defaultRangeForIntent("day_of_week_earnings_max", todayISO);
     time_range = toTimeRange(def, "ytd");
   }
-  if (!time_range && (routedIntent === "earnings_in_period" || routedIntent === "average_hourly_rate_in_period" || routedIntent === "revenue_per_student_in_period" || routedIntent === "lessons_count_in_period" || routedIntent === "hours_total_in_period" || routedIntent === "avg_lessons_per_week_in_period" || routedIntent === "revenue_per_lesson_in_period" || routedIntent === "avg_weekly_revenue" || routedIntent === "cash_flow_trend" || routedIntent === "income_stability" || routedIntent === "what_if_rate_change" || routedIntent === "what_if_add_students" || routedIntent === "what_if_take_time_off" || routedIntent === "what_if_lose_top_students" || routedIntent === "students_needed_for_target_income" || routedIntent === "tax_guidance")) {
+  if (!time_range && (routedIntent === "on_track_goal" || routedIntent === "earnings_in_period" || routedIntent === "average_hourly_rate_in_period" || routedIntent === "revenue_per_student_in_period" || routedIntent === "lessons_count_in_period" || routedIntent === "hours_total_in_period" || routedIntent === "avg_lessons_per_week_in_period" || routedIntent === "revenue_per_lesson_in_period" || routedIntent === "avg_weekly_revenue" || routedIntent === "cash_flow_trend" || routedIntent === "income_stability" || routedIntent === "what_if_rate_change" || routedIntent === "what_if_add_students" || routedIntent === "what_if_take_time_off" || routedIntent === "what_if_lose_top_students" || routedIntent === "students_needed_for_target_income" || routedIntent === "tax_guidance")) {
     const def = defaultRangeForIntent(routedIntent, todayISO);
     time_range = toTimeRange(def, def.label?.includes("YTD") ? "ytd" : "rolling_days");
   }
@@ -403,7 +439,11 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
                   ? "How many top students should I remove (e.g. “lose my top 2 students”) and what time range should I use?"
                   : routedIntent === "students_needed_for_target_income"
                     ? "What target income and hourly rate should I use (e.g. “reach $100k at $70/hr”)?"
-        : "Did you mean earnings or attendance?"
+                  : routedIntent === "on_track_goal"
+                    ? "What annual goal should I use (e.g. $80,000)?"
+        : hasStrongEarningsOrMoneySignal(normalized)
+          ? "Could you specify the timeframe (e.g. July 2024 or this year)?"
+          : "Did you mean earnings or attendance?"
     : null;
 
   const intent: InsightIntent = needsClarification ? "clarification" : routedIntent;
@@ -439,6 +479,14 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
     const m = normalized.match(/\btop\s+(\d+)\s+students?\b/);
     if (m) slots.top_n = Number(m[1]);
   }
+  if (routedIntent === "on_track_goal") {
+    const kMatch = normalized.match(/\$?\s*(\d+(?:,\d{3})*)\s*k\b/i);
+    const fullMatch = normalized.match(/\b(?:for|to|hit|reach)\s+\$?\s*(\d+(?:,\d{3})*)\s*k?\b/i);
+    const rawMatch = normalized.match(/\b(\d{5,})\b/);
+    const raw = kMatch ? kMatch[1].replace(/,/g, "") : fullMatch ? fullMatch[1].replace(/,/g, "") : rawMatch ? rawMatch[1].replace(/,/g, "") : null;
+    const val = raw ? Number(raw) : null;
+    if (val != null && Number.isFinite(val)) slots.annual_goal_dollars = (kMatch || (fullMatch && /\d+\s*k\b/i.test(normalized))) ? val * 1000 : val;
+  }
   if (routedIntent === "students_needed_for_target_income") {
     const target = normalized.match(/\breach\s+\$?\s*(\d+(?:,\d{3})*|\d+)\s*k\b/i);
     const target2 = normalized.match(/\breach\s+\$?\s*(\d+(?:,\d{3})*)\b/i);
@@ -447,7 +495,7 @@ export function parseToQueryPlan(query: string, priorContext?: InsightsPriorCont
     if (val != null && Number.isFinite(val)) {
       slots.target_income_dollars = target ? val * 1000 : val;
     }
-    const rate = normalized.match(/\bat\s+\$?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*hr|\/\s*hour|per\s*hour|hr|hour)\b/i);
+    const rate = normalized.match(/\b(?:at|@)\s+\$?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*hr|\/\s*hour|per\s*hour|an?\s*hour|hr|hour)\b/i);
     if (rate) slots.rate_dollars_per_hour = Number(rate[1]);
   }
 

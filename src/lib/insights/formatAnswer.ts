@@ -250,6 +250,36 @@ export function formatWhatIfLoseTopStudents(out: {
   return `If you lose your top **${n}** student${n === 1 ? "" : "s"} in this period:\n${bullets}\n\nLost: **${fmt(lost)}**\nCurrent: ${fmt(current)}\nProjected: ${fmt(projected)}`;
 }
 
+export function formatOnTrackGoal(out: {
+  ytd_dollars?: number;
+  annual_goal_dollars?: number;
+  projected_total_dollars?: number;
+  delta_to_goal_dollars?: number;
+  required_per_week_dollars?: number | null;
+  required_per_month_dollars?: number | null;
+  lesson_count?: number;
+}): string {
+  const ytd = (out.ytd_dollars as number | undefined) ?? 0;
+  const goal = (out.annual_goal_dollars as number | undefined) ?? 0;
+  const projected = (out.projected_total_dollars as number | undefined) ?? 0;
+  const delta = (out.delta_to_goal_dollars as number | undefined) ?? 0;
+  const perWeek = out.required_per_week_dollars;
+  const perMonth = out.required_per_month_dollars;
+  const lessons = (out.lesson_count as number | undefined) ?? 0;
+
+  if (lessons === 0) return "No completed lessons yet this year, so I can't project annual earnings.";
+  if (!goal) return "What annual goal should I use (e.g. $80,000)?";
+
+  if (delta >= 0) {
+    const line = `YTD you've earned **${fmt(ytd)}**. At this run rate you're on track for **${fmt(projected)}** this year — **${fmt(delta)}** above your **${fmt(goal)}** goal.`;
+    return line;
+  }
+  const need = Math.abs(delta);
+  const weekLine = perWeek != null && perWeek > 0 ? ` About **${fmt(perWeek)}/week** for the rest of the year would close the gap.` : "";
+  const monthLine = perMonth != null && perMonth > 0 && (perWeek == null || perWeek <= 0) ? ` About **${fmt(perMonth)}/month** for the rest of the year would close the gap.` : "";
+  return `YTD you've earned **${fmt(ytd)}**. At this run rate you're projected at **${fmt(projected)}** — **${fmt(need)}** short of your **${fmt(goal)}** goal.${weekLine}${monthLine}`;
+}
+
 export function formatStudentsNeededForTargetIncome(out: {
   target_income_dollars?: number;
   rate_dollars_per_hour?: number;

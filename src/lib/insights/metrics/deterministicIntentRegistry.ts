@@ -8,7 +8,8 @@ export type DeterministicIntent =
   | "UNIQUE_STUDENT_COUNT"
   | "TOTAL_EARNINGS_PERIOD"
   | "REVENUE_DELTA_SIMULATION"
-  | "REVENUE_TARGET_PROJECTION";
+  | "REVENUE_TARGET_PROJECTION"
+  | "ON_TRACK_GOAL";
 
 export type DeterministicIntentSpec = {
   planIntent: InsightIntent;
@@ -104,6 +105,14 @@ AND lesson_date BETWEEN :start AND :end;`,
 FROM lessons
 WHERE completed = true
 AND lesson_date BETWEEN :start AND :end;`,
+    defaultTimeframe: "CURRENT_YEAR",
+  },
+  ON_TRACK_GOAL: {
+    planIntent: "on_track_goal",
+    sqlKey: "on_track_goal",
+    sql: `SELECT COALESCE(SUM(amount_cents),0)::bigint AS total_cents
+FROM public.lessons
+WHERE user_id = $1 AND completed = true AND lesson_date >= $2 AND lesson_date <= $3;`,
     defaultTimeframe: "CURRENT_YEAR",
   },
 };

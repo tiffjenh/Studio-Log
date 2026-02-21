@@ -20,7 +20,7 @@ function hasValidResult(out: Record<string, unknown>): boolean {
   if (out.attended_lessons != null || out.attendance_rate_percent != null) return true;
   if (out.avg_weekly_dollars != null) return true;
   if (out.avg_lessons_per_week != null) return true;
-  if (out.projected_total_dollars != null || out.delta_dollars != null) return true;
+  if (out.projected_total_dollars != null || out.delta_dollars != null || out.delta_to_goal_dollars != null) return true;
   if (out.projected_weekly_dollars != null || out.delta_weekly_dollars != null) return true;
   if (out.expected_lost_dollars != null) return true;
   if (out.students_needed != null || out.projected_income_per_student_year_dollars != null) return true;

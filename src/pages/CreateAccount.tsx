@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { Button } from "@/components/ui/Button";
+import logo from "@/assets/wwweekly-logo.png";
 
 export default function CreateAccount() {
   const { setUser } = useStoreContext();
@@ -33,6 +34,9 @@ export default function CreateAccount() {
       <Link to="/login" style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 32, color: "var(--text)", textDecoration: "none" }}>
         ← Back
       </Link>
+      <div className="authLogoWrapper">
+        <img src={logo} alt="WWEEKLY" className="authLogo" />
+      </div>
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 32 }}>Create an Account</h1>
       <form onSubmit={handleSignUp} style={{ maxWidth: 400 }}>
         <input type="text" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />

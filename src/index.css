@@ -179,6 +179,143 @@ input, select, textarea {
   border: 1px solid rgba(200, 190, 200, 0.2);
 }
 
+/* Earnings hero summary card: compact, label + amount + selector */
+.earnings-hero {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px 16px 14px;
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgba(200, 190, 200, 0.2);
+  margin-bottom: 20px;
+  max-width: 420px;
+}
+.earnings-hero__header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 4px;
+  min-height: 38px;
+}
+.earnings-hero__label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #5a5055;
+  font-family: var(--font-sans);
+}
+.earnings-hero__chip-block {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: max-content;
+}
+.earnings-hero__chip-block .earnings-hero__delta {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+.earnings-hero__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+}
+.earnings-hero__chip--pos {
+  background: rgba(34, 139, 34, 0.12);
+  color: #1a6b1a;
+}
+.earnings-hero__chip--neg {
+  background: rgba(180, 60, 60, 0.12);
+  color: #a03030;
+}
+.earnings-hero__chip--neutral {
+  background: rgba(120, 120, 120, 0.1);
+  color: var(--text-muted);
+}
+.earnings-hero__delta {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+}
+.earnings-hero__delta--pos {
+  color: #1a6b1a;
+}
+.earnings-hero__delta--neg {
+  color: #a03030;
+}
+.earnings-hero__delta--neutral {
+  color: var(--text-muted);
+}
+.earnings-hero__amount {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(20px, 5vw, 26px);
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 0;
+}
+.earnings-hero__selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.earnings-hero__periodText {
+  font-size: 13px;
+  color: var(--text);
+  font-family: var(--font-sans);
+  min-width: 72px;
+  text-align: center;
+}
+.earnings-hero__arrowBtn {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
+}
+.earnings-hero__arrowBtn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+.earnings-hero__arrowBtn:active:not(:disabled) {
+  transform: translateY(0);
+}
+.earnings-hero__arrowBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+@media (prefers-reduced-motion: reduce) {
+  .earnings-hero__arrowBtn {
+    transition: none;
+  }
+  .earnings-hero__arrowBtn:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
 .float-card {
   background: #ffffff;
   border-radius: var(--radius-card);
@@ -408,53 +545,17 @@ input, select, textarea {
   padding: 32px 24px;
 }
 
-.landing__brand {
+.authLogoWrapper {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 14px;
-  margin-bottom: 28px;
-}
-
-.landing__logo {
-  width: 52px;
-  height: 52px;
-  min-width: 52px;
-  border-radius: 50%;
-  background: #ffffff;
-  color: var(--text);
-  display: flex;
-  align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  box-shadow: var(--shadow-soft);
-  overflow: hidden;
+  margin-bottom: 32px;
 }
 
-.landing__brand-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-}
-
-.landing__title {
-  font-family: var(--font-serif);
-  font-size: 28px;
-  font-weight: 400;
-  color: #000;
-  margin: 0;
-  letter-spacing: -0.02em;
-  text-transform: uppercase;
-}
-
-.landing__tagline {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  color: var(--text-muted);
-  margin: 0;
-  font-weight: 400;
+.authLogo {
+  width: clamp(220px, 60vw, 420px);
+  height: auto;
+  display: block;
+  mix-blend-mode: multiply;
 }
 
 .landing__tabs {

@@ -5,6 +5,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
 import { signInSupabase, signUpSupabase, resendConfirmationSupabase } from "@/store/supabaseSync";
 import { Button } from "@/components/ui/Button";
+import logo from "@/assets/wwweekly-logo.png";
 
 export default function Landing() {
   const { setUser } = useStoreContext();
@@ -121,12 +122,8 @@ export default function Landing() {
     <div className="landing landing--motion">
       <div className="landing__inner">
         <div className="landing__card">
-          {/* App name only (no logo) */}
-          <div className="landing__brand">
-            <div className="landing__brand-text">
-              <h1 className="landing__title">{t("landing.title")}</h1>
-              <p className="landing__tagline">{t("landing.tagline")}</p>
-            </div>
+          <div className="authLogoWrapper">
+            <img src={logo} alt="WWEEKLY" className="authLogo" />
           </div>
 
           {/* Tabs: Log in | Sign up – active tab clearly selected (filled bg, bold, underline) */}

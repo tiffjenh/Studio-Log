@@ -7,7 +7,8 @@ import { formatCurrency, getAllScheduledDays, toDateKey, isStudentActive, isStud
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Student } from "@/types";
 import { Button } from "@/components/ui/Button";
-import { ChevronRightIcon } from "@/components/ui/Icons";
+import { ChevronRightIcon, DownloadIcon } from "@/components/ui/Icons";
+import { downloadCsv, getStudentLessonsMatrixCsv, getStudentLessonsMatrixFilename } from "@/utils/importTemplates";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
@@ -276,15 +277,30 @@ export default function Students() {
           ))}
         </div>
       )}
-      <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "center" }}>
+      <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "center", flexWrap: "wrap", alignItems: "stretch", gap: 12 }}>
         <Button
           type="button"
           variant="danger"
           size="md"
           onClick={() => setDeleteAllConfirmOpen(true)}
           disabled={totalCount === 0}
+          style={{ minHeight: 40 }}
         >
           {t("students.deleteAllStudents")}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          onClick={() => {
+            const csv = getStudentLessonsMatrixCsv(data.students, data.lessons);
+            downloadCsv(getStudentLessonsMatrixFilename(), csv);
+          }}
+          disabled={data.students.length === 0}
+          leftIcon={<DownloadIcon size={18} />}
+          style={{ minHeight: 40 }}
+        >
+          {t("students.downloadStudentLessons")}
         </Button>
       </div>
       {deleteAllConfirmOpen && (

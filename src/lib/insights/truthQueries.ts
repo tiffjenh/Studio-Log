@@ -407,7 +407,8 @@ export async function runTruthQuery(
           resolvedKey === "revenue_per_lesson_in_period" ||
           resolvedKey === "avg_weekly_revenue" ||
           resolvedKey === "cash_flow_trend" ||
-          resolvedKey === "income_stability",
+          resolvedKey === "income_stability" ||
+          resolvedKey === "on_track_goal",
         student_name: (resolvedParams.student_name as string | undefined) ?? null,
       },
       source: data.source,
@@ -881,6 +882,41 @@ export async function runTruthQuery(
         data_source: data.source,
       };
     }
+    case "on_track_goal": {
+      const goal =
+        typeof resolvedParams.annual_goal_dollars === "number"
+          ? resolvedParams.annual_goal_dollars
+          : typeof resolvedParams.annual_goal_dollars === "string"
+            ? Number(resolvedParams.annual_goal_dollars)
+            : null;
+      if (goal == null || !Number.isFinite(goal) || goal <= 0) return { error: "missing_annual_goal", data_source: data.source };
+      if (!start || !end) return { error: "missing_range", data_source: data.source };
+
+      const ytdCents = completedLessons.reduce((acc, l) => acc + effectiveCents(l, studentsById), 0);
+      const ytdDollars = Math.round(centsToDollars(ytdCents) * 100) / 100;
+      const startDate = new Date(start + "T12:00:00");
+      const endDate = new Date(end + "T12:00:00");
+      const daysElapsed = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1);
+      const daysInYear = 365;
+      const projectedTotalDollars = daysElapsed > 0 ? Math.round((ytdDollars * daysInYear / daysElapsed) * 100) / 100 : 0;
+      const deltaToGoalDollars = Math.round((goal - projectedTotalDollars) * 100) / 100;
+      const remainingDays = Math.max(0, daysInYear - daysElapsed);
+      const remainingWeeks = remainingDays / 7;
+      const remainingMonths = remainingDays / 30;
+      const requiredPerWeek = remainingWeeks > 0 && deltaToGoalDollars > 0 ? Math.round((deltaToGoalDollars / remainingWeeks) * 100) / 100 : null;
+      const requiredPerMonth = remainingMonths > 0 && deltaToGoalDollars > 0 ? Math.round((deltaToGoalDollars / remainingMonths) * 100) / 100 : null;
+
+      return {
+        lesson_count: completedLessons.length,
+        ytd_dollars: ytdDollars,
+        annual_goal_dollars: goal,
+        projected_total_dollars: projectedTotalDollars,
+        delta_to_goal_dollars: deltaToGoalDollars,
+        required_per_week_dollars: requiredPerWeek ?? undefined,
+        required_per_month_dollars: requiredPerMonth ?? undefined,
+        data_source: data.source,
+      };
+    }
     case "students_needed_for_target_income": {
       const target =
         typeof resolvedParams.target_income_dollars === "number"
@@ -904,7 +940,18 @@ export async function runTruthQuery(
       const totalMins = mapped.reduce((s, l) => s + (l.durationMinutes ?? 0), 0);
       const totalHours = totalMins / 60;
       const weeks = series.length;
-      const hoursPerStudentPerWeek = weeks > 0 && activeStudents.size > 0 ? totalHours / weeks / activeStudents.size : 0;
+      const explicitHours =
+        typeof resolvedParams.hours_per_student_per_week === "number"
+          ? resolvedParams.hours_per_student_per_week
+          : typeof resolvedParams.hours_per_student_per_week === "string"
+            ? Number(resolvedParams.hours_per_student_per_week)
+            : null;
+      const hoursPerStudentPerWeek =
+        explicitHours != null && Number.isFinite(explicitHours) && explicitHours > 0
+          ? explicitHours
+          : weeks > 0 && activeStudents.size > 0
+            ? totalHours / weeks / activeStudents.size
+            : 0;
       if (hoursPerStudentPerWeek <= 0) return { error: "insufficient_history", data_source: data.source };
       const incomePerStudentYear = hoursPerStudentPerWeek * rate * 52;
       const needed = Math.ceil(target / incomePerStudentYear);

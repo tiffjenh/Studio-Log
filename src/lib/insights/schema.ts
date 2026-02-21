@@ -42,6 +42,7 @@ export const insightIntentEnum = z.enum([
   "what_if_take_time_off",
   "what_if_lose_top_students",
   "students_needed_for_target_income",
+  "on_track_goal",
   "tax_guidance",
   "forecast_monthly",
   "forecast_yearly",

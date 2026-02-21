@@ -65,6 +65,8 @@ function truthMetricValue(truth: Record<string, unknown> | null): string {
   if (typeof truth.student_name === "string") return truth.student_name;
   if (typeof truth.dow_label === "string") return `${truth.dow_label}:${truth.total_dollars ?? 0}`;
   if (typeof truth.missed_count === "number") return `${truth.student_name ?? ""}:${truth.missed_count}`;
+  if (typeof truth.projected_total_dollars === "number") return String(truth.projected_total_dollars);
+  if (typeof truth.students_needed === "number") return String(truth.students_needed);
   if (Array.isArray(truth.rows)) return `rows:${truth.rows.length}`;
   return JSON.stringify(truth);
 }

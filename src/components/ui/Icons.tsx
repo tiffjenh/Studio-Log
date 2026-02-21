@@ -75,6 +75,26 @@ export function ChevronRightIcon({ size = defaultSize }: { size?: number }) {
   );
 }
 
+/** Small trend up for percent-change chip (e.g. +15%). */
+export function TrendUpIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: "block", flexShrink: 0 }}>
+      <path d="M7 17l10-10" />
+      <path d="M17 17V7H7" />
+    </svg>
+  );
+}
+
+/** Small trend down for percent-change chip (e.g. -7%). */
+export function TrendDownIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: "block", flexShrink: 0 }}>
+      <path d="M7 7l10 10" />
+      <path d="M17 7v10H7" />
+    </svg>
+  );
+}
+
 export function CalendarIcon({ size = defaultSize }: { size?: number }) {
   return (
     <svg
