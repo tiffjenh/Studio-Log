@@ -67,7 +67,7 @@ export default {
     noStudentsYet: "Aún no hay estudiantes. Toca + para añadir uno.",
     noHistoricalStudents: "No hay estudiantes históricos.",
     deleteAllStudents: "Eliminar todos los estudiantes",
-    downloadStudentLessons: "Descargar clases de estudiantes",
+    downloadStudentLessons: "Clases",
     deleteAllConfirmTitle: "¿Estás seguro?",
     deleteAllConfirmMessage: "Se eliminarán todos los estudiantes y todos los ingresos. Esta acción no se puede deshacer.",
     deleteAllCancel: "Cancelar",

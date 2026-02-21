@@ -544,7 +544,7 @@ export default function Settings() {
                 variant="secondary"
                 size="sm"
                 onClick={() => downloadCsv("lessons-matrix-template.csv", getMatrixTemplateCsv())}
-                leftIcon={<DownloadIcon size={10} />}
+                leftIcon={<DownloadIcon size={7} />}
               >
                 Template
               </Button>
@@ -601,7 +601,7 @@ export default function Settings() {
           <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
             Icon buttons: <Button variant="primary" size="md" iconOnly aria-label="Example">+</Button>
             <Button variant="secondary" size="md" iconOnly aria-label="Back" style={{ marginLeft: 8 }}><ChevronLeftIcon /></Button>
-            <Button variant="ghost" size="md" iconOnly aria-label="Download" style={{ marginLeft: 8 }}><DownloadIcon /></Button>
+            <Button variant="ghost" size="md" iconOnly aria-label="Download" style={{ marginLeft: 8 }}><DownloadIcon size={7} /></Button>
           </div>
         </div>
       )}

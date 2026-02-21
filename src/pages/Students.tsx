@@ -297,7 +297,7 @@ export default function Students() {
             downloadCsv(getStudentLessonsMatrixFilename(), csv);
           }}
           disabled={data.students.length === 0}
-          leftIcon={<DownloadIcon size={18} />}
+          leftIcon={<DownloadIcon size={7} />}
           style={{ minHeight: 40 }}
         >
           {t("students.downloadStudentLessons")}

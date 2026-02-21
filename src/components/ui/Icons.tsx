@@ -10,8 +10,11 @@ const arrowStroke = buttonTokens.icon.arrowStrokeWidth;
 /** Light stroke matches other button icons (chevrons, calendar) for consistent visual weight. */
 const iconStrokeWidth = buttonTokens.icon.arrowStrokeWidth;
 
+/** Smaller than text for subtle inline use: ~50% of text height. */
+const downloadIconDefaultSize = 7;
+
 export function DownloadIcon({
-  size = defaultSize,
+  size = downloadIconDefaultSize,
   strokeWidth = iconStrokeWidth,
 }: {
   size?: number;

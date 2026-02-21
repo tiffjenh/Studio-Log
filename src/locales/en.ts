@@ -67,7 +67,7 @@ export default {
     noStudentsYet: "No students yet. Tap + to add one.",
     noHistoricalStudents: "No historical students.",
     deleteAllStudents: "Delete all students",
-    downloadStudentLessons: "Download student lessons",
+    downloadStudentLessons: "Lessons",
     deleteAllConfirmTitle: "Are you sure?",
     deleteAllConfirmMessage: "This will delete all students and all earnings. This cannot be undone.",
     deleteAllCancel: "Cancel",

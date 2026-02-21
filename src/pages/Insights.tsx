@@ -410,7 +410,7 @@ export default function Insights() {
               {testRunning ? "Running…" : "Run Insights Tests"}
             </Button>
             {testResults && testResults.length > 0 && (
-              <Button type="button" variant="secondary" size="sm" onClick={downloadTestResults} leftIcon={<DownloadIcon size={10} />}>
+              <Button type="button" variant="secondary" size="sm" onClick={downloadTestResults} leftIcon={<DownloadIcon size={7} />}>
                 Download results
               </Button>
             )}

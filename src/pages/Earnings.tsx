@@ -597,7 +597,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
           onClick={openDownloadModal}
           aria-label="Download earnings"
         >
-          <DownloadIcon />
+          <DownloadIcon size={7} />
         </IconButton>
       </div>
 
@@ -679,7 +679,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                     textAlign: "left",
                     justifyContent: "flex-start",
                   }}
-                  leftIcon={<DownloadIcon size={18} />}
+                  leftIcon={<DownloadIcon size={7} />}
                 >
                   Download to device
                 </Button>
