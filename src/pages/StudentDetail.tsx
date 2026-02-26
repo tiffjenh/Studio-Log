@@ -530,8 +530,6 @@ export default function StudentDetail() {
   };
 
   const fontStyle = { fontFamily: "var(--font-sans)" };
-  const inputStyle: React.CSSProperties = { width: "100%", padding: 16, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, fontSize: 16, ...fontStyle };
-  const labelStyle: React.CSSProperties = { display: "block", marginBottom: 8, fontWeight: 600, ...fontStyle };
   // (schedule change rate/time modals are handled via openSchedChangeRateModal / openSchedChangeTimePicker above)
 
   return (

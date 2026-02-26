@@ -15,7 +15,7 @@ import {
   isStudentHistorical,
 } from "@/utils/earnings";
 import type { Lesson } from "@/types";
-import { Button, IconButton } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, TrendDownIcon, TrendUpIcon } from "@/components/ui/Icons";
 import "./earnings.mock.css";
 
@@ -110,7 +110,6 @@ function BarChart({
   const isClickable = Boolean(dateKeys?.length && onBarClick && dateKeys.length === data.length);
 
   const labelTopPadding = staggerValueLabels ? 28 : 0;
-  const gridLineColor = whitePlotBackground ? "rgba(0,0,0,0.08)" : "var(--border)";
   const plotBorderColor = whitePlotBackground ? "rgba(180, 160, 180, 0.25)" : "var(--border)";
   const fitLabelsInPlot = staggerValueLabels && whitePlotBackground;
   const plotHeight = fitLabelsInPlot ? CHART_HEIGHT + labelTopPadding : CHART_HEIGHT;
@@ -406,7 +405,6 @@ export default function Earnings() {
   const [selectedMonthKey, setSelectedMonthKey] = useState<string | null>(null);
   const [weeklyMonthOffset, setWeeklyMonthOffset] = useState(0);
   const [monthlyYearOffset, setMonthlyYearOffset] = useState(0);
-  const [yearlyYearOffset, setYearlyYearOffset] = useState(0);
   const [studentsYearOffset, setStudentsYearOffset] = useState(0);
   const [selectedYearKey, setSelectedYearKey] = useState<string | null>(null);
   const [studentsSearch, setStudentsSearch] = useState("");
@@ -508,24 +506,6 @@ export default function Earnings() {
           .reduce((s, l) => s + l.amountCents, 0)
       : 0;
   const monthlyPctChange = prevYearTotal > 0 ? (monthlyHeroTotal - prevYearTotal) / prevYearTotal : null; // YTD or full year vs previous year
-
-  const yearlyHeroYear = thisYear + yearlyYearOffset;
-  const yearlyHeroIndex = allYears.indexOf(yearlyHeroYear);
-  const yearlyHeroTotal =
-    yearlyHeroIndex >= 0
-      ? (yearlyTotals[yearlyHeroIndex] ?? 0)
-      : completedLessons
-          .filter((l) => l.date.startsWith(String(yearlyHeroYear)))
-          .reduce((s, l) => s + l.amountCents, 0);
-  const prevYearForHero = yearlyHeroYear - 1;
-  const yearlyPrevIndex = allYears.indexOf(prevYearForHero);
-  const yearlyPrevTotal =
-    yearlyPrevIndex >= 0
-      ? (yearlyTotals[yearlyPrevIndex] ?? 0)
-      : completedLessons
-          .filter((l) => l.date.startsWith(String(prevYearForHero)))
-          .reduce((s, l) => s + l.amountCents, 0);
-  const yearlyPctChange = yearlyPrevTotal > 0 ? (yearlyHeroTotal - yearlyPrevTotal) / yearlyPrevTotal : null; // selected year vs previous year
 
   const maxMonthly = Math.max(...visibleMonthlyTotals, 1);
   const maxWeekly = Math.max(...weeklyData.map((w) => w.total), 1);
@@ -767,7 +747,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                   <div>
                     <h3 className="earnings-list-card__title">{startFormatted} – {endFormatted}</h3>
                     <p className="earnings-list-card__meta">
-                      {weekLessons.length} lessons · {totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)} hrs · <span className="earnings-amount--green">{formatCurrency(week.total)}</span>
+                      {numStudents} lessons · {totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)} hrs · <span className="earnings-amount--green">{formatCurrency(week.total)}</span>
                     </p>
                   </div>
                   <button
@@ -1166,7 +1146,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                   aria-expanded={studentsYearDropdownOpen}
                 >
                   {studentsDisplayYear} YTD
-                  <ChevronRightIcon size={12} style={{ transform: "rotate(90deg)" }} />
+                  <span style={{ display: "inline-flex", transform: "rotate(90deg)" }}><ChevronRightIcon size={12} /></span>
                 </button>
                 {studentsYearDropdownOpen && (
                   <>

@@ -7,7 +7,7 @@ import { parseStudentCSV, rowToStudentWithError } from "@/utils/csvImport";
 import { downloadCsv, getStudentTemplateCsv } from "@/utils/importTemplates";
 import { getCurrencyByCode, getStoredCurrencyCode } from "@/utils/currencies";
 import type { DaySchedule, Student } from "@/types";
-import { Button, IconButton } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { DownloadIcon } from "@/components/ui/Icons";
 import "./add-student.mock.css";
 import "./add-student.modals.css";

@@ -4,7 +4,7 @@
  * UI matches mocks: header, ASK ABOUT dropdown, chat bubbles + assistant cards with modules, chips, composer.
  */
 
-import { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { dedupeLessons, getEffectiveRateCents } from "@/utils/earnings";
@@ -14,7 +14,6 @@ import { useInsightsConversation } from "./insights/useInsightsConversation";
 import { useVoiceInput } from "./insights/useVoiceInput";
 import "./Insights.css";
 
-const INSIGHTS_TEAL = "#005F6E";
 const LIGHTBULB_SVG = (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
@@ -200,18 +199,18 @@ export default function Insights() {
     if (rows && rows.length > 0) {
       const hasHourlyRate = (rows as Array<Record<string, unknown>>).some((r) => r.hourly_dollars != null || r.hourly_cents != null);
       if (hasHourlyRate) {
-        const rateCounts = (rows as Array<Record<string, unknown>>).reduce((acc, r) => {
+        const rateCounts = (rows as Array<Record<string, unknown>>).reduce<Record<string, number>>((acc, r) => {
           const rate = r.hourly_dollars != null ? Number(r.hourly_dollars) : (r.hourly_cents != null ? Number(r.hourly_cents) / 100 : 0);
           const key = rate.toFixed(0);
           acc[key] = (acc[key] ?? 0) + 1;
           return acc;
-        }, {} as Record<string, number>);
+        }, {});
         const maxCount = Math.max(...Object.values(rateCounts), 1);
         return (
           <>
             {summaryEl}
             <div className="insights-module">
-              {Object.entries(rateCounts)
+              {(Object.entries(rateCounts) as [string, number][])
                 .sort(([a], [b]) => Number(b) - Number(a))
                 .map(([rate, count]) => (
                   <div key={rate} className="insights-rateRow">

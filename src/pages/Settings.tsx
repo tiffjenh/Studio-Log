@@ -5,10 +5,8 @@ import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { updatePasswordSupabase, initiateEmailChange } from "@/store/supabaseSync";
-import { downloadCsv } from "@/utils/importTemplates";
 import { SEED_STUDENTS, getSeedLessons } from "@/data/seedData";
 import { filterCurrencies, getCurrencyByCode, getStoredCurrencyCode, setStoredCurrencyCode } from "@/utils/currencies";
-import type { Student } from "@/types";
 import { Button, IconButton } from "@/components/ui/Button";
 import { ChevronLeftIcon, DownloadIcon } from "@/components/ui/Icons";
 import "./settings.css";
@@ -18,8 +16,7 @@ export default function Settings() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
+  const [, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const user = data.user;
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
@@ -44,8 +41,8 @@ export default function Settings() {
   }, [searchParams, user?.email]);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [loadingDemoData, setLoadingDemoData] = useState(false);
-  const [demoDataResult, setDemoDataResult] = useState<{ students: number; lessons: number } | null>(null);
+  const [, setLoadingDemoData] = useState(false);
+  const [, setDemoDataResult] = useState<{ students: number; lessons: number } | null>(null);
   const [defaultCurrencyCode, setDefaultCurrencyCode] = useState(() => getStoredCurrencyCode());
   const [currencyModalOpen, setCurrencyModalOpen] = useState(false);
   const [currencySearch, setCurrencySearch] = useState("");
@@ -280,9 +277,11 @@ export default function Settings() {
         <Button type="button" variant="secondary" size="md" onClick={handleLogOut}>{t("settings.logOut")}</Button>
       </div>
 
-      {/* Dev-only: Button Showcase for visual consistency check */}
+      {/* Dev-only: Load demo data + Button Showcase */}
       {import.meta.env.DEV && (
         <div className="float-card" style={{ marginTop: 32, padding: 24 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Dev</h2>
+          <Button type="button" variant="secondary" size="sm" onClick={handleLoadDemoData} style={{ marginBottom: 16 }}>Load demo data</Button>
           <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Button Showcase</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
             <Button variant="primary" size="sm">Primary sm</Button>
