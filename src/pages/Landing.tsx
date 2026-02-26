@@ -135,7 +135,7 @@ export default function Landing() {
               type="button"
               className="landingMock__autologin"
               onClick={() => {
-                setEmail("tiffhtest+01@gmail.com");
+                setEmail("tiffhtest@gmail.com");
                 setPassword("Testing2026!");
                 setError("");
                 requestAnimationFrame(() => loginPasswordInputRef.current?.focus());
