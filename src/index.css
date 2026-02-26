@@ -119,6 +119,8 @@ input, select, textarea {
   background: var(--app-gradient);
   height: var(--app-layout-height, 100dvh);
   max-height: var(--app-layout-height, 100dvh);
+  border: none;
+  outline: none;
 }
 
 .app-shell {
@@ -128,6 +130,8 @@ input, select, textarea {
   overflow-x: hidden;
   background: transparent;
   box-sizing: border-box;
+  border: none;
+  outline: none;
 }
 
 /* Bottom nav — white bar so page gradient shows through behind it; no purple strip.
@@ -145,6 +149,7 @@ input, select, textarea {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 20px 20px 0 0;
+  border: none;
   border-top: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
   display: flex;

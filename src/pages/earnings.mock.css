@@ -66,42 +66,44 @@
   background: #f8faf9;
 }
 
-/* Segmented tab bar: single white pill, no wrap */
+/* Segmented tab bar: single white pill, all tabs on one line (no scroll) */
 .earnings-page__tabsWrap {
   display: flex;
   margin-bottom: 20px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-
-.earnings-page__tabsWrap::-webkit-scrollbar {
-  display: none;
+  overflow: visible;
+  width: 100%;
 }
 
 .earnings-page__tabs {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0;
+  justify-content: space-between;
+  gap: 2px;
   padding: 4px;
   background: #fff;
   border-radius: 999px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   border: 1px solid rgba(0, 0, 0, 0.06);
-  min-width: min-content;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .earnings-page__tab {
-  padding: 10px 14px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 4px;
   border-radius: 999px;
   border: none;
   background: transparent;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   font-family: var(--font-sans);
   color: var(--earnings-muted);
   cursor: pointer;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: background 0.2s, color 0.2s;
 }
 
@@ -188,13 +190,13 @@
   cursor: not-allowed;
 }
 
-/* Center: period + amount, perfectly centered in middle column */
+/* Center: period + amount, left-aligned in middle column */
 .earnings-page .earnings-hero__center {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  text-align: center;
+  text-align: left;
   min-width: 0;
   padding: 0 8px;
 }
@@ -247,7 +249,7 @@
   font-weight: 700;
   color: var(--earnings-teal);
   font-family: var(--font-sans);
-  text-align: center;
+  text-align: left;
   margin-top: 6px;
 }
 

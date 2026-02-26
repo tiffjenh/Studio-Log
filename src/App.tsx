@@ -19,18 +19,21 @@ import Calendar from "./pages/Calendar";
 import EditLesson, { EditLessonModalContext } from "./pages/EditLesson";
 import VoiceDebugPage from "./pages/VoiceDebug";
 
-/** When route is edit-lesson/:id, show Dashboard as background and Edit Lesson as modal (portal). */
+/** When route is edit-lesson/:id, show Dashboard as background and Edit Lesson as modal (portal).
+ * Portal into #phone-portal when present (desktop simulator) so the modal appears inside the phone frame. */
 function EditLessonRoute() {
   const { id } = useParams();
+  const portalTarget = document.getElementById("phone-portal") ?? document.body;
   return (
     <>
       <Dashboard />
       {id &&
+        portalTarget &&
         createPortal(
           <EditLessonModalContext.Provider value={true}>
             <EditLesson />
           </EditLessonModalContext.Provider>,
-          document.body
+          portalTarget
         )}
     </>
   );
