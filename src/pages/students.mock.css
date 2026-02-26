@@ -23,6 +23,11 @@
   align-items: center;
   margin-bottom: 20px;
   flex-wrap: wrap;
+}
+
+/* Import lessons progress and result at top (same placement as Add Student import) */
+.studentsPage__importStatus {
+  margin-bottom: 16px;
   gap: 12px;
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useStoreContext } from "./context/StoreContext";
 import { useLanguage } from "./context/LanguageContext";
 import { supabase, hasSupabase, isAuthCallbackUrl, clearAuthCallbackHash } from "./lib/supabase";
@@ -15,8 +16,25 @@ import Earnings from "./pages/Earnings";
 import Insights from "./pages/Insights";
 import Settings from "./pages/Settings";
 import Calendar from "./pages/Calendar";
-import EditLesson from "./pages/EditLesson";
+import EditLesson, { EditLessonModalContext } from "./pages/EditLesson";
 import VoiceDebugPage from "./pages/VoiceDebug";
+
+/** When route is edit-lesson/:id, show Dashboard as background and Edit Lesson as modal (portal). */
+function EditLessonRoute() {
+  const { id } = useParams();
+  return (
+    <>
+      <Dashboard />
+      {id &&
+        createPortal(
+          <EditLessonModalContext.Provider value={true}>
+            <EditLesson />
+          </EditLessonModalContext.Provider>,
+          document.body
+        )}
+    </>
+  );
+}
 
 /** Toggle body class so login/forgot-password pages don't reserve space for the bottom nav (removes purple bar). */
 function BodyNavClass() {
@@ -121,7 +139,7 @@ export default function App() {
         <Route path="insights" element={<Insights />} />
         <Route path="settings" element={<Settings />} />
         <Route path="calendar" element={<Calendar />} />
-        <Route path="edit-lesson/:id" element={<EditLesson />} />
+        <Route path="edit-lesson/:id" element={<EditLessonRoute />} />
         {import.meta.env.DEV && <Route path="dev/voice" element={<VoiceDebugPage />} />}
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

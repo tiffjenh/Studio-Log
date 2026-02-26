@@ -4,12 +4,10 @@ import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatCurrency, getStudentsForDay, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, getStudentIdsWithLessonOnDate, toDateKey, dedupeLessonsById, getWeekBounds, getSuppressedGeneratedSlotIds, computeLessonAmountCents, isStudentActive } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
+import MonthCalendarGrid from "@/components/MonthCalendarGrid";
+import { ChevronLeftIcon } from "@/components/ui/Icons";
 import type { Lesson, Student } from "@/types";
-import { IconButton } from "@/components/ui/Button";
-import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/Icons";
 import "./calendar.css";
-
-const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 function addDays(d: Date, n: number): Date {
   const x = new Date(d);
@@ -88,17 +86,6 @@ export default function Calendar() {
     if (id) navigate(`/edit-lesson/${id}`);
   };
 
-  const gridYear = monthPickerView.getFullYear();
-  const gridMonth = monthPickerView.getMonth();
-  const gridFirst = new Date(gridYear, gridMonth, 1);
-  const gridStart = new Date(gridFirst);
-  gridStart.setDate(1 - gridFirst.getDay());
-  const gridCells: { date: Date; isCurrentMonth: boolean }[] = [];
-  for (let i = 0; i < 28; i++) {
-    const d = addDays(gridStart, i);
-    gridCells.push({ date: d, isCurrentMonth: d.getMonth() === gridMonth });
-  }
-
   return (
     <div className="calendar-page">
       <header className="calendar-page__header">
@@ -121,53 +108,16 @@ export default function Calendar() {
         </button>
       </div>
 
-      <div className="calendar-page__grid-card">
-        <div className="calendar-page__grid-header">
-          <IconButton
-            type="button"
-            onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth(), 1), -1))}
-            variant="ghost"
-            size="sm"
-            aria-label="Previous month"
-          >
-            <ChevronLeftIcon />
-          </IconButton>
-          <span className="calendar-page__grid-month">{monthPickerView.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
-          <IconButton
-            type="button"
-            onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 1))}
-            variant="ghost"
-            size="sm"
-            aria-label="Next month"
-          >
-            <ChevronRightIcon />
-          </IconButton>
-        </div>
-        <div className="calendar-page__weekdays">
-          {DAYS_SHORT.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
-        </div>
-        <div className="calendar-page__dates">
-          {gridCells.map(({ date, isCurrentMonth }) => {
-            const key = toDateKey(date);
-            const isSelected = key === dateKey;
-            return (
-              <button
-                key={key}
-                type="button"
-                className={`calendar-page__date-cell ${!isCurrentMonth ? "calendar-page__date-cell--other-month" : ""} ${isSelected ? "calendar-page__date-cell--selected" : ""}`}
-                onClick={() => {
-                  setSelectedDate(date);
-                  setMonthPickerView(new Date(date.getFullYear(), date.getMonth(), 1));
-                }}
-              >
-                {date.getDate()}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <MonthCalendarGrid
+        month={new Date(monthPickerView.getFullYear(), monthPickerView.getMonth(), 1)}
+        selectedDate={selectedDate}
+        onSelectDate={(date) => {
+          setSelectedDate(date);
+          setMonthPickerView(new Date(date.getFullYear(), date.getMonth(), 1));
+        }}
+        onPrevMonth={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth(), 1), -1))}
+        onNextMonth={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 1))}
+      />
 
       <h2 className="calendar-page__schedule-title">Schedule</h2>
       <div className="calendar-page__earnings-card">

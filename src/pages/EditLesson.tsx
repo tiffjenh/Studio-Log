@@ -1,12 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext, createContext } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatCurrency, getEffectiveRateCents, getEffectiveDurationMinutes } from "@/utils/earnings";
-import DatePicker, { parseToDateKey } from "@/components/DatePicker";
+import { formatCurrency, getEffectiveRateCents, getEffectiveDurationMinutes, toDateKey } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
+import MonthCalendarGrid from "@/components/MonthCalendarGrid";
 import type { Lesson } from "@/types";
 import { Button, IconButton } from "@/components/ui/Button";
+import { ClockIcon, CalendarIcon } from "@/components/ui/Icons";
+import "./EditLesson.css";
+
+export const EditLessonModalContext = createContext(false);
 
 const DURATIONS = [
   { label: "30 min", minutes: 30 },
@@ -34,6 +38,7 @@ function parseTimeOfDay(s: string): { hour: number; minute: number; amPm: "AM" |
 export default function EditLesson() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const asModal = useContext(EditLessonModalContext);
   const { data, updateLesson, deleteLesson } = useStoreContext();
   const { t } = useLanguage();
   const lesson = data.lessons.find((l) => l.id === id);
@@ -53,6 +58,14 @@ export default function EditLesson() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarViewMonth, setCalendarViewMonth] = useState<Date>(() => {
+    if (lesson?.date && /^\d{4}-\d{2}-\d{2}$/.test(lesson.date)) {
+      const [y, m] = lesson.date.split("-").map(Number);
+      return new Date(y, m - 1, 1);
+    }
+    return new Date();
+  });
 
   const openTimePicker = () => {
     const p = parseTimeOfDay(lessonTime);
@@ -90,12 +103,7 @@ export default function EditLesson() {
     setSaveError(null);
     setSaving(true);
     try {
-      // Read date from the visible input at submit time (source of truth), then fallback to state
-      const dateInput = document.getElementById("edit-lesson-date") as HTMLInputElement | null;
-      const rawInput = dateInput?.value?.trim() ?? "";
-      const fromInput = parseToDateKey(rawInput) ?? (/^\d{4}-\d{2}-\d{2}$/.test(rawInput) ? rawInput : null);
-      const fromState = /^\d{4}-\d{2}-\d{2}$/.test(lessonDate) ? lessonDate : null;
-      const normalizedDate = fromInput ?? fromState ?? lesson.date;
+      const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(lessonDate) ? lessonDate : lesson.date;
 
       // Update the existing lesson in place (date, time, duration, amount, note). No new row; no duplicate.
       const updates: Partial<Lesson> = {
@@ -133,6 +141,160 @@ export default function EditLesson() {
       setDeleting(false);
     }
   };
+
+  const closeModal = () => navigate(-1);
+  const titleDateStr = [y, m, d].every(Number) ? `${m}/${d}` : lessonDate;
+  const subtitleDateStr = !isNaN(date.getTime()) ? date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : lessonDate;
+  const originalTimeSubtext = `${dateFormatted} · ${lessonTime || "—"}`;
+  const selectedDateObj = lessonDate && /^\d{4}-\d{2}-\d{2}$/.test(lessonDate)
+    ? (() => { const [yr, mo, day] = lessonDate.split("-").map(Number); return new Date(yr, mo - 1, day); })()
+    : null;
+  const dateDisplayStr = selectedDateObj ? selectedDateObj.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" }) : "Select date";
+
+  useEffect(() => {
+    if (!asModal) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && closeModal();
+    window.addEventListener("keydown", onEsc);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onEsc);
+    };
+  }, [asModal]);
+
+  if (asModal) {
+    return (
+      <div className="editLessonModal__backdrop" onClick={closeModal} role="presentation">
+        <div className="editLessonModal__card" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="edit-lesson-modal-title">
+          {calendarOpen && <div className="editLessonModal__datePopoverBackdrop" onClick={() => setCalendarOpen(false)} aria-hidden />}
+          <div className="editLessonModal__header">
+            <div>
+              <h2 id="edit-lesson-modal-title" className="editLessonModal__title">Edit {titleDateStr} Lesson</h2>
+              <p className="editLessonModal__subtitle">{subtitleDateStr}</p>
+            </div>
+            <button type="button" className="editLessonModal__close" onClick={closeModal} aria-label={t("common.cancel")}>×</button>
+          </div>
+          <div className="editLessonModal__studentCard">
+            <StudentAvatar student={student} size={48} variant="green" />
+            <div>
+              <div className="editLessonModal__studentName">{student.firstName} {student.lastName}</div>
+              <div className="editLessonModal__studentTime">{originalTimeSubtext}</div>
+            </div>
+          </div>
+          <div className="editLessonModal__infoBanner">
+            <span className="editLessonModal__infoIcon" aria-hidden>i</span>
+            <p className="editLessonModal__infoText">This edits this lesson only — not {student.firstName}&apos;s regular weekly schedule.</p>
+          </div>
+          <form onSubmit={handleSave}>
+            <div className="editLessonModal__rescheduleRow">
+              <div className="editLessonModal__field editLessonModal__field--date">
+                <label className="editLessonModal__label">Reschedule date</label>
+                <button
+                  type="button"
+                  className="editLessonModal__pillWrap editLessonModal__pillButton"
+                  onClick={() => {
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(lessonDate)) {
+                      const [y, m] = lessonDate.split("-").map(Number);
+                      setCalendarViewMonth(new Date(y, m - 1, 1));
+                    } else {
+                      setCalendarViewMonth(new Date());
+                    }
+                    setCalendarOpen(true);
+                  }}
+                >
+                  <span>{dateDisplayStr}</span>
+                  <span className="editLessonModal__pillIcon" aria-hidden><CalendarIcon size={18} /></span>
+                </button>
+                {calendarOpen && (
+                  <div className="editLessonModal__datePopover">
+                      <MonthCalendarGrid
+                        month={calendarViewMonth}
+                        selectedDate={selectedDateObj}
+                        onSelectDate={(date) => {
+                          setLessonDate(toDateKey(date));
+                          setCalendarOpen(false);
+                        }}
+                        onPrevMonth={() => setCalendarViewMonth((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+                        onNextMonth={() => setCalendarViewMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+                      />
+                    </div>
+                )}
+              </div>
+              <div className="editLessonModal__field">
+                <label className="editLessonModal__label">Reschedule time</label>
+                <button type="button" className="editLessonModal__pillWrap editLessonModal__pillButton" onClick={openTimePicker}>
+                  <span>{lessonTime || "5:00 PM"}</span>
+                  <span className="editLessonModal__pillIcon" aria-hidden><ClockIcon size={18} /></span>
+                </button>
+              </div>
+            </div>
+            <div className="editLessonModal__durationSection">
+            <label className="editLessonModal__label">Duration</label>
+            <div className="editLessonModal__durationPills">
+              {DURATIONS.map((opt) => (
+                <button
+                  key={opt.minutes}
+                  type="button"
+                  className={`editLessonModal__durationPill ${durationMinutes === opt.minutes ? "editLessonModal__durationPill--active" : ""}`}
+                  onClick={() => setDurationMinutes(opt.minutes)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            </div>
+            <div className="editLessonModal__rateRow">
+              <label className="editLessonModal__label">Lesson Rate</label>
+              <div className="editLessonModal__rateWrap">
+                <span className="editLessonModal__rateInput">${Math.round(defaultRate / 100)}</span>
+                <span className="editLessonModal__rateTotal">= {formatCurrency(amountCents)}</span>
+              </div>
+            </div>
+            {saveError && <p className="editLessonModal__error">{saveError}</p>}
+            <div className="editLessonModal__footer">
+              <button type="button" className="editLessonModal__cancelBtn" onClick={closeModal}>{t("common.cancel")}</button>
+              <Button type="submit" variant="primary" size="md" disabled={saving} loading={saving} className="editLessonModal__saveBtn">
+                {t("common.save")}
+              </Button>
+            </div>
+            <button type="button" className="editLessonModal__deleteLink" onClick={handleDelete} disabled={saving || deleting}>
+              {t("editLesson.deleteLesson")}
+            </button>
+          </form>
+          {timePickerOpen && (
+            <div className="editLessonModal__timePickerBackdrop" onClick={() => setTimePickerOpen(false)}>
+              <div className="editLessonModal__timePickerCard" onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                  <IconButton type="button" variant="ghost" size="sm" onClick={() => setTimePickerOpen(false)} aria-label="Close">&times;</IconButton>
+                </div>
+                <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>Select time</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <select value={timePickerHour} onChange={(e) => setTimePickerHour(Number(e.target.value))} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, fontFamily: "var(--font-sans)" }}>
+                      {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (<option key={h} value={h}>{h}</option>))}
+                    </select>
+                    <span style={{ fontSize: 18, fontWeight: 600 }}>:</span>
+                    <select value={timePickerMinute} onChange={(e) => setTimePickerMinute(Number(e.target.value))} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, fontFamily: "var(--font-sans)" }}>
+                      {Array.from({ length: 60 }, (_, i) => i).map((m) => (<option key={m} value={m}>{String(m).padStart(2, "0")}</option>))}
+                    </select>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <Button type="button" variant="tab" size="sm" active={timePickerAmPm === "AM"} onClick={() => setTimePickerAmPm("AM")}>AM</Button>
+                    <Button type="button" variant="tab" size="sm" active={timePickerAmPm === "PM"} onClick={() => setTimePickerAmPm("PM")}>PM</Button>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setTimePickerOpen(false)}>Cancel</Button>
+                  <Button type="button" variant="primary" size="sm" onClick={applyTime}>OK</Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

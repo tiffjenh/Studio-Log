@@ -435,6 +435,12 @@ export default function Students() {
           )}
         </div>
       </div>
+      {(importProgressBar || importResultBanner) && (
+        <div className="studentsPage__importStatus">
+          {importProgressBar}
+          {importResultBanner}
+        </div>
+      )}
       <div className="studentsPage__segmented">
         <Button type="button" variant="tab" size="sm" className="studentsPage__segmentedBtn" active={rosterTab === "active"} onClick={() => { setRosterTab("active"); setDayFilter(null); }}>
           {t("students.active")}
@@ -568,8 +574,6 @@ export default function Students() {
         </div>
       )}
       <div className="studentsPage__actions">
-        {importProgressBar}
-        {importResultBanner}
         {totalCount > 0 && (
           <div className="studentsPage__bottomRow">
             <button
