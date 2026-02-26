@@ -177,8 +177,6 @@
   color: var(--text-muted);
   margin-bottom: 2px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .addStudent-rateChipAmount {
@@ -187,8 +185,6 @@
   font-weight: 700;
   color: #1E3A5F;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* Set rate button — full-width pill, dark teal, visible without scrolling */

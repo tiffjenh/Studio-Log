@@ -379,22 +379,29 @@
   }
 }
 
-/* Voice FAB: mock green (same as hero border, attended) */
+/* Voice FAB: mock green (same as hero border, attended).
+   .dashboard selector for in-tree; body.dashboard-route for when FAB is portaled to #phone-portal. */
 .dashboard .voice-fab.ui-button,
-.dashboard .ui-button.voice-fab {
+.dashboard .ui-button.voice-fab,
+body.dashboard-route .voice-fab.ui-button,
+body.dashboard-route .ui-button.voice-fab {
   background: #1b5e4a !important;
   border-color: #1b5e4a !important;
   color: #fff !important;
 }
 
 .dashboard .voice-fab.ui-button:hover,
-.dashboard .ui-button.voice-fab:hover {
+.dashboard .ui-button.voice-fab:hover,
+body.dashboard-route .voice-fab.ui-button:hover,
+body.dashboard-route .ui-button.voice-fab:hover {
   background: #16543f !important;
   border-color: #16543f !important;
 }
 
 .dashboard .voice-fab[data-variant="danger"],
-.dashboard .ui-button.voice-fab[data-variant="danger"] {
+.dashboard .ui-button.voice-fab[data-variant="danger"],
+body.dashboard-route .voice-fab[data-variant="danger"],
+body.dashboard-route .ui-button.voice-fab[data-variant="danger"] {
   background: #b91c1c !important;
   border-color: #b91c1c !important;
 }

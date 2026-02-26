@@ -110,13 +110,15 @@ input, select, textarea {
   font-size: 16px; /* avoids iOS zoom on focus */
 }
 
-/* Main content: transparent so body gradient shows; height/scroll controlled by Layout flex.
-   width/max-width/overflow-x prevent horizontal overflow on mobile (e.g. Students page uses
-   negative horizontal margins for edge-to-edge gradient; without containment this causes scroll.) */
+/* Main content: app gradient so authenticated pages match login; height uses var for simulator.
+   When inside desktop simulator, --app-layout-height is set to 100% so app fills phone. */
 .app-layout {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
+  background: var(--app-gradient);
+  height: var(--app-layout-height, 100dvh);
+  max-height: var(--app-layout-height, 100dvh);
 }
 
 .app-shell {
@@ -136,7 +138,7 @@ input, select, textarea {
   left: 50%;
   transform: translateX(-50%);
   width: calc(100% - 24px);
-  max-width: 480px;
+  max-width: none;
   height: calc(var(--nav-height) + var(--safe-bottom));
   padding: 6px 8px var(--safe-bottom);
   background: rgba(255, 255, 255, 0.92);
@@ -151,6 +153,16 @@ input, select, textarea {
   z-index: 100;
   -webkit-transform: translateX(-50%) translateZ(0);
   transform: translateX(-50%) translateZ(0);
+}
+
+/* Desktop simulator: pin nav to bottom of phone shell (absolute to shell, not viewport) */
+[data-desktop-simulator="true"] .bottom-nav {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) translateZ(0);
+  -webkit-transform: translateX(-50%) translateZ(0);
+  width: calc(100% - 24px);
 }
 
 .bottom-nav a {

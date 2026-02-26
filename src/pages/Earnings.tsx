@@ -1043,7 +1043,9 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
             />
           </div>
           {dailyHasAnyCompletedLessons
-            ? dailyData.map((d) => {
+            ? dailyData
+                .filter((d) => completedLessons.some((l) => l.date === d.dateKey))
+                .map((d) => {
             const dayLessons = completedLessons.filter((l) => l.date === d.dateKey);
             const numStudents = dayLessons.length;
             const totalMinutes = dayLessons.reduce((s, l) => s + l.durationMinutes, 0);
@@ -1145,7 +1147,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                   onClick={() => setStudentsYearDropdownOpen((o) => !o)}
                   aria-expanded={studentsYearDropdownOpen}
                 >
-                  {studentsDisplayYear} YTD
+                  {studentsDisplayYear}{studentsDisplayYear === thisYear ? " YTD" : ""}
                   <span style={{ display: "inline-flex", transform: "rotate(90deg)" }}><ChevronRightIcon size={12} /></span>
                 </button>
                 {studentsYearDropdownOpen && (
@@ -1159,7 +1161,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                           onClick={() => { setStudentsYearOffset(y - thisYear); setStudentsYearDropdownOpen(false); }}
                           style={{ width: "100%", padding: "10px 16px", border: "none", background: studentsDisplayYear === y ? "rgba(90, 122, 126, 0.1)" : "transparent", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text)", textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
                         >
-                          {y} YTD
+                          {y}{y === thisYear ? " YTD" : ""}
                           {studentsDisplayYear === y && <span style={{ color: "#26434b" }}>✓</span>}
                         </button>
                       ))}

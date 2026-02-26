@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -23,6 +23,7 @@ export default function Landing() {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const loginPasswordInputRef = useRef<HTMLInputElement>(null);
 
   const isEmailNotConfirmed = (msg: string) => /email not confirmed|confirm your email/i.test(msg);
 
@@ -101,7 +102,7 @@ export default function Landing() {
             </div>
             <div className="landingMock__badge">✦ AI-POWERED PLATFORM</div>
             <h1 className="landingMock__headline">Think like a business owner,<br /><em>not just a service provider</em></h1>
-            <p className="landingMock__subtitle">The elegant way for teachers, tutors and trainers to automate operations and grow earnings.</p>
+            <p className="landingMock__subtitle">AI-Native Earnings & Operations Dashboard for Independent Service Providers</p>
           </header>
 
           <div className="landing__tabs" role="tablist" aria-label="Log in or Sign up">
@@ -129,6 +130,29 @@ export default function Landing() {
             </button>
           </div>
 
+          {mode === "login" && (
+            <button
+              type="button"
+              className="landingMock__autologin"
+              onClick={() => {
+                setEmail("tiffhtest+01@gmail.com");
+                setPassword("Testing2026!");
+                setError("");
+                requestAnimationFrame(() => loginPasswordInputRef.current?.focus());
+              }}
+              aria-label="Autologin with test credentials"
+            >
+              <span className="landingMock__autologin-icon" aria-hidden>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" />
+                  <path d="m21 2-9.6 9.6" />
+                  <circle cx="7.5" cy="15.5" r="5.5" />
+                </svg>
+              </span>
+              <span>Autologin with test credentials</span>
+            </button>
+          )}
+
           {mode === "login" ? (
             <div className="landingMock__form-card">
               <form id="landing-login-panel" role="tabpanel" aria-labelledby="landing-tab-login" onSubmit={handleLogin} className="landing__form">
@@ -141,6 +165,7 @@ export default function Landing() {
                 />
                 <div className="landingMock__password-wrap">
                   <input
+                    ref={loginPasswordInputRef}
                     type={showLoginPassword ? "text" : "password"}
                     placeholder={t("landing.password")}
                     value={password}
@@ -157,9 +182,17 @@ export default function Landing() {
                     <EyeIcon show={!showLoginPassword} />
                   </button>
                 </div>
-                <div className="landingMock__remember-row">
-                  <input type="checkbox" id="landing-remember" />
-                  <label htmlFor="landing-remember">Remember me</label>
+                <button type="submit" className="landingMock__cta">
+                  {t("landing.logInButton")}
+                </button>
+                <div className="landingMock__remember-forgot-row">
+                  <div className="landingMock__remember-row">
+                    <input type="checkbox" id="landing-remember" />
+                    <label htmlFor="landing-remember">Remember me</label>
+                  </div>
+                  <Link to="/forgot-password" className="landing__link landing__link--muted">
+                    {t("landing.forgotPassword")}
+                  </Link>
                 </div>
                 {error && !isEmailNotConfirmed(error) && (
                   <p className="landing__error">{error}</p>
@@ -184,14 +217,6 @@ export default function Landing() {
                     )}
                   </div>
                 )}
-                <button type="submit" className="landingMock__cta">
-                  {t("landing.logInButton")}
-                </button>
-                <div className="landing__links">
-                  <Link to="/forgot-password" className="landing__link landing__link--muted">
-                    {t("landing.forgotPassword")}
-                  </Link>
-                </div>
               </form>
             </div>
           ) : (

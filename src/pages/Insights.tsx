@@ -14,14 +14,6 @@ import { useInsightsConversation } from "./insights/useInsightsConversation";
 import { useVoiceInput } from "./insights/useVoiceInput";
 import "./Insights.css";
 
-const LIGHTBULB_SVG = (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
-    <path d="M9 18h6" />
-    <path d="M10 22h4" />
-  </svg>
-);
-
 /** Chips shown above composer when no user message yet (match mock: How much this month?, Top student?, Tax estimate) */
 const SUGGESTION_CHIP_QUESTIONS: string[] = [
   "How much did I make this month?",
@@ -346,9 +338,8 @@ export default function Insights() {
 
   return (
     <div className="insights-page">
-      {/* 1) Page header — icon + title + subtitle, tight spacing */}
+      {/* 1) Page header — title + subtitle */}
       <header className="insights-header">
-        <div className="insights-header__icon">{LIGHTBULB_SVG}</div>
         <div className="insights-header__text">
           <h1 className="insights-header__title">{t("insights.title")}</h1>
           <p className="insights-header__subtitle">{t("insights.subtitle")}</p>
@@ -419,8 +410,8 @@ export default function Insights() {
         );
       })()}
 
-      {/* Scrollable conversation + chips (when no user message) + composer */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+      {/* Scrollable conversation + chips; composer is fixed at bottom */}
+      <div className="insights-content" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
         <div className="insights-chat">
           {error && (
             <div className="insights-errorCard">
@@ -438,7 +429,6 @@ export default function Insights() {
 
           {messages.length === 0 && !isLoading && (
             <div className="insights-empty">
-              <div className="insights-empty__icon">{LIGHTBULB_SVG}</div>
               <h2 className="insights-empty__title">Ask anything about your studio</h2>
               <p className="insights-empty__sub">Earnings, students, forecasts, taxes...</p>
               <div className="insights-empty__pills">
@@ -476,8 +466,8 @@ export default function Insights() {
           </div>
         )}
 
-        {/* 5) Bottom composer — input pill + mic inside + Ask / Clear / New */}
-        <div className="insights-composer">
+        {/* 5) Bottom composer — fixed at bottom above nav */}
+        <div className="insights-composer insights-composer--fixed">
           {voice.phase === "recording" && (
             <p style={{ textAlign: "center", fontSize: 13, color: "var(--text-muted)", margin: "0 0 8px", fontFamily: "var(--font-sans)" }}>{t("insights.listening")}</p>
           )}

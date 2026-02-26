@@ -15,24 +15,7 @@
 
 /* ---- 1) Page header ---- */
 .insights-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   margin-bottom: 12px;
-  flex-shrink: 0;
-}
-
-.insights-header__icon {
-  width: 48px;
-  height: 48px;
-  min-width: 48px;
-  min-height: 48px;
-  border-radius: 50%;
-  background: #26434b;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
   flex-shrink: 0;
 }
 
@@ -392,18 +375,33 @@
   cursor: not-allowed;
 }
 
-/* ---- 5) Bottom composer (transparent: no panel behind input + buttons) ---- */
+/* ---- 5) Bottom composer — fixed at bottom above nav ---- */
 .insights-composer {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  flex-shrink: 0;
   padding-top: 16px;
-  padding-bottom: calc(var(--nav-height, 56px) + var(--safe-bottom, 0px) + 12px);
+  padding-bottom: 12px;
   background: transparent;
   box-shadow: none;
   border: none;
-  flex-shrink: 0;
+}
+
+/* Fixed at bottom of viewport, just above bottom nav */
+.insights-composer--fixed {
+  position: fixed;
+  bottom: calc(var(--nav-height, 56px) + var(--safe-bottom, 0px) + 12px);
+  left: 0;
+  right: 0;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-top: 16px;
+  padding-bottom: 12px;
+  background: var(--app-gradient);
+  box-sizing: border-box;
+}
+
+/* Reserve space at bottom of scroll area so content can scroll above fixed composer */
+.insights-content {
+  padding-bottom: 200px;
 }
 
 .insights-inputPill {

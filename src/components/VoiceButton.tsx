@@ -4,6 +4,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { Button, IconButton } from "@/components/ui/Button";
@@ -280,71 +281,72 @@ export default function VoiceButton({
 
   const isListening = phase === "listening";
 
-  return (
-    <>
-      {/* Floating mic button (dashboard.css can override to green when inside .dashboard) */}
-      <IconButton
-        type="button"
-        className="voice-fab"
-        onClick={isListening ? stopListening : startListening}
-        aria-label={isListening ? "Stop listening" : "Voice input"}
-        variant={isListening ? "danger" : "primary"}
-        size="lg"
-        style={{
-          position: "fixed",
-          bottom: 88,
-          right: 20,
-          color: "#fff",
-          zIndex: 900,
-          transition: "background 0.2s, transform 0.15s",
-          transform: isListening ? "scale(1.1)" : "scale(1)",
-        }}
-      >
-        {isListening ? (
-          /* Stop icon (square) */
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="6" y="6" width="12" height="12" rx="2" />
-          </svg>
-        ) : (
-          /* Mic icon */
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="23" />
-            <line x1="8" y1="23" x2="16" y2="23" />
-          </svg>
-        )}
-      </IconButton>
+  const overlayTarget =
+    typeof document !== "undefined"
+      ? (document.getElementById("phone-portal") ?? document.getElementById("root"))
+      : null;
 
-      {/* Feedback panel (slides up from bottom) */}
-      {showPanel && (
-        <div
-          className="voice-panel"
-          style={{
-            position: "fixed",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            background: "var(--card, #fff)",
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            boxShadow: "0 -4px 24px rgba(0,0,0,0.12)",
-            padding: "20px 24px 28px",
-            zIndex: 1000,
-            maxHeight: "50vh",
-            overflowY: "auto",
-            fontFamily: "var(--font-sans)",
-          }}
+  const floatingFab = (
+    <IconButton
+      type="button"
+      className="voice-fab"
+      onClick={isListening ? stopListening : startListening}
+      aria-label={isListening ? "Stop listening" : "Voice input"}
+      variant={isListening ? "danger" : "primary"}
+      size="lg"
+      style={{
+        position: "fixed",
+        bottom: 88,
+        right: 20,
+        color: "#fff",
+        zIndex: 900,
+        transition: "background 0.2s, transform 0.15s",
+        transform: isListening ? "scale(1.1)" : "scale(1)",
+      }}
+    >
+      {isListening ? (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="6" width="12" height="12" rx="2" />
+        </svg>
+      ) : (
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          <line x1="12" y1="19" x2="12" y2="23" />
+          <line x1="8" y1="23" x2="16" y2="23" />
+        </svg>
+      )}
+    </IconButton>
+  );
+
+  const floatingPanel = showPanel ? (
+    <div
+      className="voice-panel"
+      style={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: "var(--card, #fff)",
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        boxShadow: "0 -4px 24px rgba(0,0,0,0.12)",
+        padding: "20px 24px 28px",
+        zIndex: 1000,
+        maxHeight: "50vh",
+        overflowY: "auto",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
           {/* Close button */}
           <div
             style={{
@@ -687,7 +689,19 @@ export default function VoiceButton({
             </div>
           )}
         </div>
-      )}
+  ) : null;
+
+  return (
+    <>
+      {overlayTarget
+        ? createPortal(
+            <>
+              {floatingFab}
+              {floatingPanel}
+            </>,
+            overlayTarget
+          )
+        : null}
     </>
   );
 }

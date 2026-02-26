@@ -826,7 +826,7 @@ export default function StudentDetail() {
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <Button type="button" variant="secondary" size="sm" onClick={() => setPerDayTimePickerOpen(false)}>Cancel</Button>
-                <Button type="button" variant="primary" size="sm" onClick={applyPerDayTime}>OK</Button>
+                <Button type="button" variant="primary" size="sm" className="studentDetailPage__timeModalOk" onClick={applyPerDayTime}>OK</Button>
               </div>
             </div>
           </div>
@@ -875,7 +875,7 @@ export default function StudentDetail() {
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <Button type="button" variant="secondary" size="sm" onClick={() => setSchedChangeTimePickerOpen(false)}>Cancel</Button>
-                <Button type="button" variant="primary" size="sm" onClick={applySchedChangeTime}>OK</Button>
+                <Button type="button" variant="primary" size="sm" className="studentDetailPage__timeModalOk" onClick={applySchedChangeTime}>OK</Button>
               </div>
             </div>
           </div>

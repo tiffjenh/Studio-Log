@@ -454,10 +454,11 @@ export default function AddStudent() {
               {DURATIONS.map((d) => {
                 const hourly = parseFloat(rateKeypadValue) || 0;
                 const amount = (hourly * d) / 60;
+                const roundedDollars = Math.round(amount);
                 return (
                   <div key={d} className="addStudent-rateChip" role="presentation">
                     <span className="addStudent-rateChipDuration">{DURATION_LABELS[d]}</span>
-                    <span className="addStudent-rateChipAmount">{currencySymbol}{amount.toFixed(2)}</span>
+                    <span className="addStudent-rateChipAmount">{currencySymbol}{roundedDollars}</span>
                   </div>
                 );
               })}

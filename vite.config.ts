@@ -10,8 +10,8 @@ const srcRoot = path.resolve(__dirname, "src");
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    port: 5000,
-    strictPort: true, // always use 5000; fail if in use so you can stop the other process
+    port: 5001,
+    strictPort: true, // mobile-view-branch: use 5001 so main can stay on 5000
     headers: { "Cache-Control": "no-store" },
   },
   resolve: {

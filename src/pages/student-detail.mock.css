@@ -840,6 +840,25 @@ button.studentDetailPage__editFieldInput {
   opacity: 0.95;
 }
 
+/* Time selector modal OK — same dark green as Save Changes, compact for modal row */
+.studentDetailPage__timeModalOk,
+.studentDetailPage__timeModalOk.ui-button {
+  min-width: 80px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(145deg, var(--mock-teal) 0%, #1e363d 100%) !important;
+  color: #fff !important;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.studentDetailPage__timeModalOk:hover,
+.studentDetailPage__timeModalOk.ui-button:hover {
+  opacity: 0.95;
+}
+
 .studentDetailPage__secondaryCancel {
   width: 100%;
   height: 46px;
