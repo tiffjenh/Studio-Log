@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Button, IconButton } from "@/components/ui/Button";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import {
@@ -11,6 +10,7 @@ import {
   getMonthBounds,
   getStudentsForDay,
   getEffectiveSchedule,
+  getEffectiveSchedules,
   getEffectiveDurationMinutes,
   getEffectiveRateCents,
   getLessonForStudentOnDate,
@@ -21,13 +21,28 @@ import {
   getSuppressedGeneratedSlotIds,
   computeLessonAmountCents,
   isStudentActive,
+  getDayOfWeekFromDateKey,
 } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import VoiceButton from "@/components/VoiceButton";
 import type { Lesson, Student } from "@/types";
-import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/Icons";
+import "./dashboard.css";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const MusicNoteIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M9 18V5l12-2v13" />
+    <circle cx="6" cy="18" r="3" />
+    <circle cx="18" cy="16" r="3" />
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
 
 function LessonRow({
   student,
@@ -47,20 +62,30 @@ function LessonRow({
   const duration = lesson?.durationMinutes ?? effectiveDuration;
   const effectiveAmountCents = computeLessonAmountCents(student, lesson ?? undefined, dateKey);
   const rateText = duration >= 60 ? `${duration / 60} hour` : `${duration} mins`;
-  const displayTime = lesson?.timeOfDay ?? getEffectiveSchedule(student, dateKey).timeOfDay;
+  const dateDow = getDayOfWeekFromDateKey(dateKey);
+  const schedules = getEffectiveSchedules(student, dateKey);
+  const schedForDay = schedules.find((s) => s.dayOfWeek === dateDow);
+  const fallbackTime = schedules.map((s) => s.timeOfDay).find((t) => t != null && String(t).trim() !== "");
+  const displayTime =
+    (lesson?.timeOfDay != null && String(lesson.timeOfDay).trim() !== "" ? lesson.timeOfDay : null) ??
+    (schedForDay?.timeOfDay != null && String(schedForDay.timeOfDay).trim() !== "" ? schedForDay.timeOfDay : null) ??
+    (student.timeOfDay != null && String(student.timeOfDay).trim() !== "" ? student.timeOfDay : null) ??
+    (fallbackTime != null ? fallbackTime : null);
+  const timeAndDuration = displayTime ? `${displayTime.trim()} · ${rateText}` : `— · ${rateText}`;
   return (
-    <div className="float-card cardInteractive" style={{ display: "flex", alignItems: "center", marginBottom: 12, cursor: "pointer", gap: 16 }} onClick={onEdit}>
-      <StudentAvatar student={student} size={48} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontFamily: "var(--font-sans)" }}>{student.firstName} {student.lastName}</div>
-        <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{rateText} / {formatCurrency(effectiveAmountCents)}</div>
-        {displayTime && displayTime !== "—" && (
-          <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{displayTime}</div>
-        )}
+    <div className={`dashboard-lesson-row ${completed ? "dashboard-lesson-row--attended" : ""}`} onClick={onEdit}>
+      <div className="dashboard-avatar-wrap">
+        <StudentAvatar student={student} size={48} />
       </div>
-      <label className="toggle-wrap" onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
+      <div className="dashboard-lesson-row__body">
+        <div className="dashboard-lesson-row__name">{student.firstName} {student.lastName}</div>
+        <div className="dashboard-lesson-row__meta">{timeAndDuration}</div>
+        <div className="dashboard-lesson-row__amount">{formatCurrency(effectiveAmountCents)}</div>
+      </div>
+      <label className="dashboard-toggle" onClick={(e) => e.stopPropagation()}>
         <input type="checkbox" checked={completed} onChange={(e) => onToggle(e.target.checked)} />
-        {completed && <span style={{ color: "var(--success)", fontWeight: 600 }}>{formatCurrency(effectiveAmountCents)}</span>}
+        <span className="dashboard-toggle__circle">{completed && <CheckIcon />}</span>
+        <span className="dashboard-toggle__label">{completed ? "Attended" : "Pending"}</span>
       </label>
     </div>
   );
@@ -96,7 +121,6 @@ export default function Dashboard() {
   // Include all completed lessons for overview (rescheduled lessons have date off recurring schedule)
   const countableLessons = dedupeLessons(dedupedLessons.filter((l) => l.completed));
   const earned = earnedThisWeek(countableLessons, today);
-  const dashboardTitle = today.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   const { start: monthStart, end: monthEnd } = getMonthBounds(today);
   const monthStartKey = toDateKey(monthStart);
@@ -127,6 +151,25 @@ export default function Dashboard() {
   });
   const isToday = toDateKey(selectedDate) === toDateKey(today);
 
+  const earnedOnSelectedDay = useMemo(() => {
+    return dedupedLessons
+      .filter((l) => l.date === dateKey && l.completed)
+      .reduce((sum, l) => sum + (l.amountCents ?? 0), 0);
+  }, [dedupedLessons, dateKey]);
+  const completedCountOnDay = useMemo(
+    () => dedupedLessons.filter((l) => l.date === dateKey && l.completed).length,
+    [dedupedLessons, dateKey]
+  );
+  const totalScheduledOnDay = todaysStudents.length;
+  const heroAmountDollars = (earnedOnSelectedDay / 100).toLocaleString("en-US", { maximumFractionDigits: 0 });
+  const heroAmountDecimals = (earnedOnSelectedDay % 100)
+    .toString()
+    .padStart(2, "0");
+  const heroCentsDisplay = `.${heroAmountDecimals}`;
+
+  const heroTitle = isToday ? "Today's Earnings" : `${DAY_NAMES[dayOfWeek]}, ${selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} Earnings`;
+  const dateNavLabel = isToday ? "Today" : `${DAY_NAMES[dayOfWeek]}, ${selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+
   // If the student has a lesson on another date this week (rescheduled), return it so we can edit it instead of creating a new one.
   const getLessonElsewhereThisWeek = (studentId: string): Lesson | undefined => {
     const { start, end } = getWeekBounds(selectedDate);
@@ -136,6 +179,15 @@ export default function Dashboard() {
     return inWeek[0];
   };
 
+  const [attendedToast, setAttendedToast] = useState(false);
+  const attendedToastRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (attendedToastRef.current) clearTimeout(attendedToastRef.current);
+    };
+  }, []);
+
   const handleToggle = (studentId: string, completed: boolean) => {
     const existing = getLessonForStudentOnDate(dedupedLessons, studentId, dateKey);
     const student = data.students.find((s) => s.id === studentId);
@@ -144,11 +196,25 @@ export default function Dashboard() {
       const updates: { completed: boolean; amountCents?: number } = { completed };
       if (completed && amountCents > 0 && existing.amountCents !== amountCents) updates.amountCents = amountCents;
       updateLesson(existing.id, updates);
+      if (completed) {
+        if (attendedToastRef.current) clearTimeout(attendedToastRef.current);
+        setAttendedToast(true);
+        attendedToastRef.current = setTimeout(() => {
+          setAttendedToast(false);
+          attendedToastRef.current = null;
+        }, 3000);
+      }
     } else {
       const elsewhere = getLessonElsewhereThisWeek(studentId);
       if (!elsewhere) {
         if (!student) return;
         addLesson({ studentId, date: dateKey, durationMinutes: getEffectiveDurationMinutes(student, dateKey), amountCents: getEffectiveRateCents(student, dateKey), completed: true });
+        if (attendedToastRef.current) clearTimeout(attendedToastRef.current);
+        setAttendedToast(true);
+        attendedToastRef.current = setTimeout(() => {
+          setAttendedToast(false);
+          attendedToastRef.current = null;
+        }, 3000);
       }
     }
   };
@@ -169,76 +235,100 @@ export default function Dashboard() {
   };
 
   return (
-    <>
-      <div style={{ marginBottom: 28 }}>
-        <h2 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0, color: "var(--text)" }}>{dashboardTitle}</h2>
-      </div>
-      <div className="hero-card" style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 16 }}>{t("earnings.overview")}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
-          <div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("dashboard.thisWeek")}</div>
-            <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earned)}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("dashboard.thisMonth")}</div>
-            <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earningsThisMonth)}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("dashboard.ytd")}</div>
-            <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(earningsYTD)}</div>
-          </div>
+    <div className="dashboard">
+      <div className="dashboard-hero">
+        <h2 className="dashboard-hero__title">{heroTitle}</h2>
+        <div className="dashboard-hero__amount-wrap">
+          <span className="dashboard-hero__amount-dollar">$</span>
+          <span className="dashboard-hero__amount-main">{heroAmountDollars}</span>
+          <span className="dashboard-hero__amount-cents">{heroCentsDisplay}</span>
+        </div>
+        <div className="dashboard-hero__pills">
+          <span className="dashboard-pill">
+            <span className="dashboard-pill__icon" aria-hidden><MusicNoteIcon /></span>
+            <span>{completedCountOnDay}/{totalScheduledOnDay} lessons</span>
+          </span>
+          <span className="dashboard-pill dashboard-pill--nav">
+            <button
+              type="button"
+              className="dashboard-pill__nav-btn"
+              onClick={() => setSelectedDate((d) => addDays(d, -1))}
+              aria-label="Previous day"
+            >
+              ‹
+            </button>
+            <span className="dashboard-pill__label">{dateNavLabel}</span>
+            <button
+              type="button"
+              className="dashboard-pill__nav-btn"
+              onClick={() => setSelectedDate((d) => addDays(d, 1))}
+              aria-label="Next day"
+            >
+              ›
+            </button>
+          </span>
         </div>
       </div>
-      <div className="float-card" style={{ display: "flex", alignItems: "center", flexWrap: "nowrap", gap: 10, marginBottom: 16, padding: "12px 16px" }}>
-        <h3 className="headline-serif" style={{ fontSize: 17, fontWeight: 400, margin: 0, flexShrink: 0 }}>
-          {isToday ? t("dashboard.todaysLessons") : t("dashboard.lessons")}
-        </h3>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 1, marginLeft: "auto", minWidth: 0 }}>
-          <IconButton
-            type="button"
-            onClick={() => setSelectedDate((d) => addDays(d, -1))}
-            variant="secondary"
-            size="sm"
-            aria-label="Previous day"
-          >
-            <ChevronLeftIcon />
-          </IconButton>
-          <span style={{ minWidth: 88, textAlign: "center", fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>
-            {DAY_NAMES[dayOfWeek]}, {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-          </span>
-          <IconButton
-            type="button"
-            onClick={() => setSelectedDate((d) => addDays(d, 1))}
-            variant="secondary"
-            size="sm"
-            aria-label="Next day"
-          >
-            <ChevronRightIcon />
-          </IconButton>
-        </span>
+
+      <div className="dashboard-summary-row">
+        <div className="dashboard-summary-card">
+          <div className="dashboard-summary-card__label">{t("dashboard.thisWeek")}</div>
+          <div className="dashboard-summary-card__value">{formatCurrency(earned)}</div>
+        </div>
+        <div className="dashboard-summary-card dashboard-summary-card--highlight">
+          <div className="dashboard-summary-card__label">{t("dashboard.thisMonth")}</div>
+          <div className="dashboard-summary-card__value">{formatCurrency(earningsThisMonth)}</div>
+        </div>
+        <div className="dashboard-summary-card">
+          <div className="dashboard-summary-card__label">{t("dashboard.ytd")}</div>
+          <div className="dashboard-summary-card__value">{formatCurrency(earningsYTD)}</div>
+        </div>
       </div>
+
+      <div className="dashboard-lessons-header">
+        <div>
+          <h3 className="dashboard-lessons-title">{isToday ? t("dashboard.todaysLessons") : t("dashboard.lessons")}</h3>
+          <p className="dashboard-lessons-subtitle">{DAY_NAMES[dayOfWeek]}, {selectedDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })}</p>
+        </div>
+        <span className="dashboard-scheduled-pill">{totalScheduledOnDay} scheduled</span>
+      </div>
+
       {todaysStudents.length === 0 ? (
-        <p style={{ color: "var(--text-muted)", padding: 28, fontSize: 15, textAlign: "center", fontStyle: "italic" }}>{t("dashboard.noLessonsScheduled")}</p>
+        <div className="dashboard-lessons-container">
+          <p style={{ padding: 28, textAlign: "center", fontStyle: "italic", color: "#5a6b65", fontSize: 15, margin: 0 }}>{t("dashboard.noLessonsScheduled")}</p>
+        </div>
       ) : (
-        todaysStudents.map((student) => {
-          const lesson = getLessonForStudentOnDate(dedupedLessons, student.id, dateKey);
-          return (
-            <LessonRow
-              key={student.id}
-              student={student}
-              lesson={lesson}
-              dateKey={dateKey}
-              onToggle={(v) => handleToggle(student.id, v)}
-              onEdit={() => handleEdit(student)}
-            />
-          );
-        })
+        <div className="dashboard-lessons-container">
+          {todaysStudents.map((student) => {
+            const lesson = getLessonForStudentOnDate(dedupedLessons, student.id, dateKey);
+            return (
+              <LessonRow
+                key={student.id}
+                student={student}
+                lesson={lesson}
+                dateKey={dateKey}
+                onToggle={(v) => handleToggle(student.id, v)}
+                onEdit={() => handleEdit(student)}
+              />
+            );
+          })}
+        </div>
       )}
+
       <div style={{ marginTop: 28, textAlign: "center" }}>
-        <Button to="/calendar" variant="primary" size="lg">{t("dashboard.viewCalendar")}</Button>
+        <Link to="/calendar" className="dashboard-calendar-btn">{t("dashboard.viewCalendar")}</Link>
       </div>
+
+      {attendedToast && (
+        <div className="dashboard-toast" role="status" aria-live="polite">
+          <span className="dashboard-toast__icon" aria-hidden>
+            <CheckIcon />
+          </span>
+          <span>Lesson marked as attended</span>
+        </div>
+      )}
+
       <VoiceButton dateKey={dateKey} dayOfWeek={dayOfWeek} onDateChange={setSelectedDate} />
-    </>
+    </div>
   );
 }

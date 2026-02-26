@@ -1,14 +1,39 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
-import { formatCurrency, getAllScheduledDays, toDateKey, isStudentActive, isStudentHistorical } from "@/utils/earnings";
+import { formatCurrency, getAllScheduledDays, toDateKey, isStudentActive, isStudentHistorical, getLessonForStudentOnDate } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
-import type { Student } from "@/types";
+import type { Lesson, Student } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { ChevronRightIcon, DownloadIcon } from "@/components/ui/Icons";
 import { downloadCsv, getStudentLessonsMatrixCsv, getStudentLessonsMatrixFilename } from "@/utils/importTemplates";
+import { parseLessonMatrixCSV, type ImportResult } from "@/utils/csvImport";
+import "./students.mock.css";
+
+/** Upload/import icon for dropdown (arrow up into tray). */
+function UploadIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: "block", flexShrink: 0 }}>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+/** Trash icon for Delete All button. */
+function TrashIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: "block", flexShrink: 0 }}>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
@@ -38,8 +63,32 @@ function sortStudentsByTime(students: Student[]): Student[] {
   });
 }
 
+function matchStudentByName(name: string, studentList: Student[]): Student | undefined {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return undefined;
+  const exact = studentList.find((s) => `${s.firstName} ${s.lastName}`.toLowerCase() === name.toLowerCase());
+  if (exact) return exact;
+  const first = parts[0] ?? "";
+  const last = parts.slice(1).join(" ") || first;
+  const match = studentList.find(
+    (s) =>
+      s.firstName.toLowerCase() === first.toLowerCase() &&
+      s.lastName.toLowerCase() === last.toLowerCase()
+  );
+  if (match) return match;
+  if (parts.length >= 2) {
+    const lastAlt = parts[1];
+    return studentList.find(
+      (s) =>
+        s.firstName.toLowerCase() === first.toLowerCase() &&
+        s.lastName.toLowerCase() === (lastAlt ?? "").toLowerCase()
+    );
+  }
+  return undefined;
+}
+
 export default function Students() {
-  const { data, clearAllStudents } = useStoreContext();
+  const { data, clearAllStudents, addStudentsBulk, addLessonsBulk, updateLesson, clearAllLessons, reload } = useStoreContext();
   const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [dayFilter, setDayFilter] = useState<number | null>(null);
@@ -47,6 +96,30 @@ export default function Students() {
   const [historicalSort, setHistoricalSort] = useState<"az" | "za">("az");
   const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const matrixFileInputRef = useRef<HTMLInputElement>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [clearingLessons, setClearingLessons] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setDropdownOpen(false);
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDropdownOpen(false);
+    };
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEsc);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [dropdownOpen]);
 
   const todayKey = toDateKey(new Date());
   const activeStudents = data.students.filter((s) => isStudentActive(s, todayKey));
@@ -99,110 +172,316 @@ export default function Students() {
     }
   };
 
+  const handleMatrixImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportResult(null);
+    setImporting(true);
+    setImportProgress(null);
+    try {
+      const text = await file.text();
+      const parsed = parseLessonMatrixCSV(text, new Date().getFullYear());
+      if (parsed.error) {
+        setImportResult({ imported: 0, skipped: 0, errors: [parsed.error] });
+        setImporting(false);
+        setImportProgress(null);
+        e.target.value = "";
+        return;
+      }
+      const total = parsed.attendance.length;
+      setImportProgress({ current: 0, total });
+      await new Promise((r) => setTimeout(r, 80));
+      const existingSet = new Set(data.lessons.map((l) => `${l.studentId}|${l.date}`));
+      const toAdd: Omit<Lesson, "id">[] = [];
+      const toUpdate: { id: string; date: string; updates: { completed: boolean; amountCents: number; durationMinutes: number } }[] = [];
+      const errors: string[] = [];
+      let studentListForMatch = data.students;
+      const uniqueNames = [...new Set(parsed.studentNames)];
+      const missingNames = uniqueNames.filter((n) => !matchStudentByName(n, studentListForMatch));
+      if (missingNames.length > 0) {
+        const toCreate: Omit<Student, "id">[] = missingNames.map((name) => {
+          const parts = name.trim().split(/\s+/).filter(Boolean);
+          const firstName = parts[0] ?? "";
+          const lastName = parts.slice(1).join(" ") || "";
+          return {
+            firstName,
+            lastName,
+            durationMinutes: 60,
+            rateCents: 0,
+            dayOfWeek: 1,
+            timeOfDay: "9:00 AM",
+          };
+        });
+        const { created } = await addStudentsBulk(toCreate);
+        studentListForMatch = [...data.students, ...created];
+      }
+      const PROGRESS_BATCH = 150;
+      for (let idx = 0; idx < parsed.attendance.length; idx++) {
+        if (idx % PROGRESS_BATCH === 0 || idx === parsed.attendance.length - 1) {
+          setImportProgress({ current: idx + 1, total });
+          if (idx > 0 && idx < parsed.attendance.length - 1) await new Promise((r) => setTimeout(r, 0));
+        }
+        const { date, studentIndex } = parsed.attendance[idx];
+        const name = parsed.studentNames[studentIndex];
+        const student = name ? matchStudentByName(name, studentListForMatch) : undefined;
+        if (!student) {
+          if (!errors.some((x) => x.includes(name ?? ""))) errors.push(`No student named "${name}"`);
+          continue;
+        }
+        const key = `${student.id}|${date}`;
+        if (existingSet.has(key)) {
+          const existing = getLessonForStudentOnDate(data.lessons, student.id, date);
+          if (existing) toUpdate.push({ id: existing.id, date, updates: { completed: true, amountCents: student.rateCents, durationMinutes: student.durationMinutes } });
+        } else {
+          toAdd.push({ studentId: student.id, date, durationMinutes: student.durationMinutes, amountCents: student.rateCents, completed: true });
+          existingSet.add(key);
+        }
+      }
+      const totalSteps = parsed.attendance.length + toUpdate.length + toAdd.length;
+      let updateImported = 0;
+      const countsByYear: Record<string, number> = {};
+      for (let i = 0; i < toUpdate.length; i++) {
+        if (i % PROGRESS_BATCH === 0 || i === toUpdate.length - 1) {
+          setImportProgress({ current: parsed.attendance.length + i + 1, total: totalSteps });
+          if (i > 0 && i < toUpdate.length - 1) await new Promise((r) => setTimeout(r, 0));
+        }
+        const { id, date, updates } = toUpdate[i]!;
+        try {
+          await updateLesson(id, updates);
+          updateImported++;
+          const y = date.slice(0, 4);
+          countsByYear[y] = (countsByYear[y] ?? 0) + 1;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`Update failed for ${date}: ${msg}`);
+        }
+      }
+      const toAddCountsByYear: Record<string, number> = {};
+      for (const l of toAdd) {
+        const y = l.date.slice(0, 4);
+        toAddCountsByYear[y] = (toAddCountsByYear[y] ?? 0) + 1;
+      }
+      let bulkImported = 0;
+      if (toAdd.length > 0) {
+        setImportProgress({ current: totalSteps, total: totalSteps });
+        try {
+          const created = await addLessonsBulk(toAdd);
+          bulkImported = created.length;
+          for (const l of created) {
+            const y = l.date.slice(0, 4);
+            countsByYear[y] = (countsByYear[y] ?? 0) + 1;
+          }
+          if (created.length !== toAdd.length) {
+            errors.push(`Only ${created.length} of ${toAdd.length} lessons were saved; ${toAdd.length - created.length} may have failed.`);
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`Bulk add failed (${toAdd.length} lessons): ${msg}`);
+        }
+      }
+      const imported = updateImported + bulkImported;
+      const skipped = parsed.attendance.length - imported;
+      const dateRange =
+        parsed.dates.length > 0
+          ? { min: parsed.dates[0]!, max: parsed.dates[parsed.dates.length - 1]! }
+          : undefined;
+      const yearsInFile = dateRange
+        ? (() => {
+            const yMin = parseInt(dateRange.min.slice(0, 4), 10);
+            const yMax = parseInt(dateRange.max.slice(0, 4), 10);
+            const years: number[] = [];
+            for (let y = yMin; y <= yMax; y++) years.push(y);
+            return years;
+          })()
+        : undefined;
+      const parsedCountsByYear: Record<string, number> = {};
+      for (const { date } of parsed.attendance) {
+        const y = date.slice(0, 4);
+        parsedCountsByYear[y] = (parsedCountsByYear[y] ?? 0) + 1;
+      }
+      setImportResult({
+        imported,
+        skipped,
+        errors,
+        dateRange,
+        yearsInFile,
+        countsByYear: Object.keys(countsByYear).length > 0 ? countsByYear : undefined,
+        parsedCountsByYear: Object.keys(parsedCountsByYear).length > 0 ? parsedCountsByYear : undefined,
+        toAddCountsByYear: Object.keys(toAddCountsByYear).length > 0 ? toAddCountsByYear : undefined,
+        skippedRowsNoYear: parsed.skippedRowsNoYear,
+      });
+      if (imported > 0 && hasSupabase()) await reload();
+    } catch (err) {
+      setImportResult({ imported: 0, skipped: 0, errors: [err instanceof Error ? err.message : "Import failed"] });
+    } finally {
+      setImporting(false);
+      setImportProgress(null);
+      e.target.value = "";
+    }
+  };
+
+  const importProgressBar = importing && importProgress ? (
+    <div style={{ marginTop: 12, fontSize: 14, fontFamily: "var(--font-sans)" }}>
+      <p style={{ margin: "0 0 8px", fontWeight: 600 }}>Importing... {importProgress.current} of {importProgress.total}</p>
+      <div style={{ width: "100%", height: 8, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
+        <div style={{ width: `${importProgress.total > 0 ? Math.round((importProgress.current / importProgress.total) * 100) : 0}%`, height: "100%", borderRadius: 4, background: "var(--mock-teal)", transition: "width 0.2s ease" }} />
+      </div>
+    </div>
+  ) : null;
+
+  const importResultBanner = importResult && !importing ? (() => {
+    const success = importResult.imported > 0 && importResult.errors.length === 0;
+    const partial = importResult.imported > 0 && importResult.errors.length > 0;
+    const fail = importResult.imported === 0 && importResult.errors.length > 0;
+    const label = success ? "lessons" : "items";
+    return (
+      <div style={{ marginTop: 12, padding: 12, borderRadius: 10, fontSize: 14, fontFamily: "var(--font-sans)", background: success ? "#f0fdf4" : fail ? "#fef2f2" : "#fffbeb", border: `1px solid ${success ? "#bbf7d0" : fail ? "#fecaca" : "#fde68a"}` }}>
+        <p style={{ margin: 0, fontWeight: 700, color: success ? "#166534" : fail ? "#991b1b" : "#92400e" }}>
+          {success ? `Success! Imported ${importResult.imported} ${label}.` : partial ? `Partially imported: ${importResult.imported} added, ${importResult.skipped} skipped.` : `Import failed — ${importResult.skipped} item${importResult.skipped !== 1 ? "s" : ""} skipped.`}
+        </p>
+        {importResult.errors.length > 0 && (
+          <ul style={{ margin: "8px 0 0", paddingLeft: 20, color: fail ? "#991b1b" : "#92400e", maxHeight: 120, overflowY: "auto", fontSize: 13 }}>
+            {importResult.errors.slice(0, 10).map((err, i) => (<li key={i} style={{ marginBottom: 2 }}>{err}</li>))}
+            {importResult.errors.length > 10 && <li>...and {importResult.errors.length - 10} more</li>}
+          </ul>
+        )}
+      </div>
+    );
+  })() : null;
+
   return (
-    <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-          <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0 }}>{t("students.title")}</h1>
-          <span style={{ fontSize: 16, color: "var(--text-muted)", fontWeight: 500 }}>
+    <div className="studentsPage">
+      <div className="studentsPage__header">
+        <div className="studentsPage__titleBlock">
+          <h1 className="studentsPage__title">{t("students.title")}</h1>
+          <span className="studentsPage__count">
             {totalCount === 1 ? t("students.oneStudent") : `${totalCount} ${t("students.studentCountLabel")}`}
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Link
-            to="/add-student"
-            title={t("students.addStudent")}
-            style={{
-              width: 40,
-              height: 40,
-              minWidth: 40,
-              maxWidth: 40,
-              minHeight: 40,
-              maxHeight: 40,
-              borderRadius: "50%",
-              background: "var(--avatar-gradient)",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 22,
-              fontWeight: 300,
-              lineHeight: 1,
-              textDecoration: "none",
-              flexShrink: 0,
-              padding: 0,
-            }}
-          >
-            +
-          </Link>
+        <div ref={dropdownRef} className="studentsPage__splitWrap">
+          <input
+            ref={matrixFileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleMatrixImport}
+            style={{ display: "none" }}
+            aria-hidden
+          />
+          <div className="studentsPage__splitPill" role="group" aria-label={t("students.title")}>
+            <Link
+              to="/add-student"
+              className="studentsPage__splitLeft"
+              onClick={() => setDropdownOpen(false)}
+            >
+              <span>+</span>
+              <span>{t("students.title")}</span>
+            </Link>
+            <span className="studentsPage__splitDivider" aria-hidden />
+            <button
+              type="button"
+              className="studentsPage__splitCaret"
+              onClick={() => setDropdownOpen((o) => !o)}
+              aria-expanded={dropdownOpen}
+              aria-haspopup="menu"
+              aria-label={dropdownOpen ? "Close menu" : "Open menu"}
+            >
+              <span className="studentsPage__addBtnChevron" aria-hidden>{dropdownOpen ? "▲" : "▼"}</span>
+            </button>
+          </div>
+          {dropdownOpen && (
+            <div className="studentsPage__dropdown" role="menu" aria-label={t("students.title")}>
+              <button
+                type="button"
+                role="menuitem"
+                className="studentsPage__dropdownItem"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  matrixFileInputRef.current?.click();
+                }}
+                disabled={importing || clearingLessons}
+              >
+                <UploadIcon size={20} />
+                <span>{t("students.importLessons")}</span>
+              </button>
+              <div className="studentsPage__dropdownDivider" />
+              <button
+                type="button"
+                role="menuitem"
+                className="studentsPage__dropdownItem"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  const csv = getStudentLessonsMatrixCsv(data.students, data.lessons);
+                  downloadCsv(getStudentLessonsMatrixFilename(), csv);
+                }}
+                disabled={data.students.length === 0}
+              >
+                <DownloadIcon size={20} />
+                <span>{t("students.downloadLessons")}</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <Button type="button" variant="tab" size="sm" active={rosterTab === "active"} onClick={() => { setRosterTab("active"); setDayFilter(null); }}>
+      <div className="studentsPage__segmented">
+        <Button type="button" variant="tab" size="sm" className="studentsPage__segmentedBtn" active={rosterTab === "active"} onClick={() => { setRosterTab("active"); setDayFilter(null); }}>
           {t("students.active")}
         </Button>
-        <Button type="button" variant="tab" size="sm" active={rosterTab === "historical"} onClick={() => setRosterTab("historical")}>
+        <Button type="button" variant="tab" size="sm" className="studentsPage__segmentedBtn" active={rosterTab === "historical"} onClick={() => setRosterTab("historical")}>
           {t("students.historical")}
         </Button>
       </div>
 
       {rosterTab === "active" && (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <Button type="button" variant="tab" size="sm" active={dayFilter === null} onClick={() => setDayFilter(null)} style={{ flexShrink: 0 }}>
-              {t("students.all")}
-            </Button>
+          <div className="studentsPage__searchWrap">
             <input
               type="search"
               placeholder={t("students.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="search-frosted"
-              style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
+              className="studentsPage__searchInput"
             />
           </div>
-          <div style={{ display: "flex", flexWrap: "nowrap", gap: 10, marginBottom: 20 }}>
+          <div className="studentsPage__dayChips">
+            <button
+              type="button"
+              className="studentsPage__dayChip studentsPage__dayChip--all"
+              aria-pressed={dayFilter === null}
+              onClick={() => setDayFilter(null)}
+            >
+              <span className="studentsPage__dayChipCircle">{t("students.all")}</span>
+              <span className="studentsPage__dayChipCount">{totalCount}</span>
+            </button>
             {DAY_SHORT.map((label, i) => (
-              <Button
+              <button
                 key={i}
                 type="button"
-                variant="tab"
-                size="sm"
-                active={dayFilter === i}
+                className={`studentsPage__dayChip ${countPerDay[i] === 0 ? "studentsPage__dayChip--empty" : ""}`}
+                aria-pressed={dayFilter === i}
                 onClick={() => setDayFilter(i)}
-                style={{ minWidth: 40, minHeight: 40, flexShrink: 0 }}
                 title={`${DAY_FULL[i]} (${countPerDay[i]})`}
               >
-                {label}
-              </Button>
+                <span className="studentsPage__dayChipCircle">{label}</span>
+                <span className="studentsPage__dayChipCount">{countPerDay[i]}</span>
+              </button>
             ))}
           </div>
         </>
       )}
 
       {rosterTab === "historical" && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 16 }}>
+        <div className="studentsPage__historicalBar">
           <input
             type="search"
             placeholder={t("students.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="search-frosted"
-            style={{ flex: 1, minWidth: 120, marginBottom: 0 }}
+            className="studentsPage__searchInput"
           />
           <select
             value={historicalSort}
             onChange={(e) => setHistoricalSort(e.target.value as "az" | "za")}
-            style={{
-              padding: "8px 12px",
-              fontSize: 14,
-              borderRadius: 10,
-              border: "1px solid var(--border)",
-              background: "var(--card)",
-              fontFamily: "var(--font-sans)",
-              color: "var(--text)",
-              cursor: "pointer",
-            }}
+            className="studentsPage__sortSelect"
           >
             <option value="az">A–Z</option>
             <option value="za">Z–A</option>
@@ -211,12 +490,12 @@ export default function Students() {
       )}
 
       {rosterTab === "active" && filtered.length === 0 && (
-        <div className="float-card" style={{ padding: 28, textAlign: "center" }}>
+        <div className="studentsPage__emptyCard">
           <p style={{ color: "var(--text-muted)", marginBottom: 8, fontSize: 15 }}>
             {search ? t("students.noMatch") : dayFilter !== null ? `${t("students.noStudentsOnDay")} ${DAY_LABELS[dayFilter!]}` : t("students.noStudentsYet")}
           </p>
           {hasSupabase() && data.user && !search && dayFilter === null && (
-            <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 12, marginBottom: 0 }}>
               Logged in as <strong>{data.user.email}</strong>. Students added in another browser will only show if you use this same account.
             </p>
           )}
@@ -224,84 +503,99 @@ export default function Students() {
       )}
 
       {rosterTab === "historical" && historicalSorted.length === 0 && (
-        <div className="float-card" style={{ padding: 28, textAlign: "center" }}>
-          <p style={{ color: "var(--text-muted)", fontSize: 15 }}>
+        <div className="studentsPage__emptyCard">
+          <p style={{ color: "var(--text-muted)", fontSize: 15, margin: 0 }}>
             {search ? t("students.noMatch") : t("students.noHistoricalStudents")}
           </p>
         </div>
       )}
 
       {rosterTab === "active" && filtered.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="studentsPage__dayList">
           {byDayThenTime.map(({ dayIndex, students }) => (
-            <div key={dayIndex}>
-              <h2 className="headline-serif" style={{ fontSize: 18, fontWeight: 400, color: "var(--text-muted)", margin: "0 0 12px", textTransform: "none" }}>
-                {DAY_FULL[dayIndex]} ({students.length})
-              </h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {students.map((s) => (
-                  <Link key={s.id} to={`/students/${s.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                    <div className="float-card" style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                      <StudentAvatar student={s} size={48} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
-                        <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{durationStr(s)} / {formatCurrency(s.rateCents)}</div>
-                        <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{getAllScheduledDays(s).map((sched) => DAY_LABELS[sched.dayOfWeek]).join(", ")}{s.timeOfDay && s.timeOfDay !== "\u2014" ? ` at ${s.timeOfDay}` : ""}</div>
-                        {s.terminatedFromDate && (
-                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4, fontStyle: "italic" }}>{t("studentDetail.terminatingOn", { date: s.terminatedFromDate })}</div>
-                        )}
+            <div key={dayIndex} className="studentsPage__dayGroup">
+              <h2 className="studentsPage__dayHeader">{DAY_FULL[dayIndex]}</h2>
+              {students.map((s) => (
+                <Link key={s.id} to={`/students/${s.id}`} className="studentsPage__rowLink">
+                  <div className="studentsPage__row">
+                    <StudentAvatar student={s} size={48} />
+                    <div className="studentsPage__rowContent">
+                      <div className="studentsPage__rowName">{s.firstName} {s.lastName}</div>
+                      <div className="studentsPage__rowMeta">
+                        {s.timeOfDay && s.timeOfDay !== "\u2014" ? `${s.timeOfDay} · ` : ""}{durationStr(s)}
                       </div>
-                      <span style={{ color: "var(--text-muted)", display: "inline-flex", alignItems: "center" }}><ChevronRightIcon size={16} /></span>
+                      <div className="studentsPage__rowRate">{formatCurrency(s.rateCents)}</div>
+                      {s.terminatedFromDate && (
+                        <div className="studentsPage__rowTerminated">{t("studentDetail.terminatingOn", { date: s.terminatedFromDate })}</div>
+                      )}
                     </div>
-                  </Link>
-                ))}
-              </div>
+                    <span className="studentsPage__rowChevron" aria-hidden><ChevronRightIcon size={16} /></span>
+                  </div>
+                </Link>
+              ))}
             </div>
           ))}
         </div>
       )}
 
       {rosterTab === "historical" && historicalSorted.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="studentsPage__historicalList">
           {historicalSorted.map((s) => (
-            <Link key={s.id} to={`/students/${s.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-              <div className="float-card" style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <Link key={s.id} to={`/students/${s.id}`} className="studentsPage__rowLink">
+              <div className="studentsPage__row studentsPage__row--historical">
                 <StudentAvatar student={s} size={48} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{t("students.terminatedOn", { date: s.terminatedFromDate ?? "" })}</div>
+                <div className="studentsPage__rowContent">
+                  <div className="studentsPage__rowName">{s.firstName} {s.lastName}</div>
+                  <div className="studentsPage__rowMeta">{t("students.terminatedOn", { date: s.terminatedFromDate ?? "" })}</div>
                 </div>
-                <span style={{ color: "var(--text-muted)", display: "inline-flex", alignItems: "center" }}><ChevronRightIcon size={16} /></span>
+                <span className="studentsPage__rowChevron" aria-hidden><ChevronRightIcon size={16} /></span>
               </div>
             </Link>
           ))}
         </div>
       )}
-      <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "center", flexWrap: "wrap", alignItems: "stretch", gap: 12 }}>
-        <Button
-          type="button"
-          variant="danger"
-          size="md"
-          onClick={() => setDeleteAllConfirmOpen(true)}
-          disabled={totalCount === 0}
-          style={{ minHeight: 40 }}
-        >
-          {t("students.deleteAllStudents")}
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          size="md"
-          onClick={() => {
-            const csv = getStudentLessonsMatrixCsv(data.students, data.lessons);
-            downloadCsv(getStudentLessonsMatrixFilename(), csv);
-          }}
-          disabled={data.students.length === 0}
-          leftIcon={<DownloadIcon size={7} />}
-          style={{ minHeight: 40 }}
-        >
-          {t("students.downloadStudentLessons")}
-        </Button>
+      <div className="studentsPage__actions">
+        {importProgressBar}
+        {importResultBanner}
+        {totalCount > 0 && (
+          <div className="studentsPage__bottomRow">
+            <button
+              type="button"
+              className="studentsPage__clearLessonsBtn"
+              disabled={clearingLessons}
+              onClick={async () => {
+                if (!window.confirm("Are you sure?")) return;
+                if (!window.confirm("This will delete ALL lessons. This cannot be undone. You can re-import the attendance matrix after. Continue?")) return;
+                setClearingLessons(true);
+                try {
+                  await clearAllLessons();
+                  if (hasSupabase()) await reload();
+                } catch (e) {
+                  console.error(e);
+                  window.alert(e instanceof Error ? e.message : "Failed to clear");
+                } finally {
+                  setClearingLessons(false);
+                }
+              }}
+            >
+              {clearingLessons ? "…" : (
+                <>
+                  <span className="studentsPage__bottomBtnIcon" aria-hidden>×</span>
+                  <span>{t("students.clearLessons")}</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              className="studentsPage__deleteAllBtnBottom"
+              onClick={() => setDeleteAllConfirmOpen(true)}
+              disabled={totalCount === 0}
+            >
+              <TrashIcon size={18} />
+              {t("students.deleteAllStudents")}
+            </button>
+          </div>
+        )}
       </div>
       {deleteAllConfirmOpen && (
         <div
@@ -355,6 +649,6 @@ export default function Students() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

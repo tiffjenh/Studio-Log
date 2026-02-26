@@ -1,0 +1,58 @@
+/* Settings page — header only; card uses .float-card. Keep: currency circle, language emoji. Title matches Students heading. */
+
+.settings-page {
+  font-family: var(--font-sans);
+  padding: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.settings-page__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Same font as Students page heading: sans-serif, 24px, bold */
+.settings-page__title {
+  font-family: var(--font-sans);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.settings-page__headerRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Currency: white circle, $ only (keep per request) */
+.settings-page__currencyCircle {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  border: none;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1E3A5F;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  padding: 0;
+  transition: filter 0.15s ease;
+}
+
+.settings-page__currencyCircle:hover {
+  filter: brightness(0.98);
+}

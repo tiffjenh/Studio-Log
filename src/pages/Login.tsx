@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { Button } from "@/components/ui/Button";
-import logo from "@/assets/wwweekly-logo.png";
+import logo from "@/assets/wwweekly-hero.png";
 
 export default function Login() {
   const { setUser } = useStoreContext();
@@ -20,7 +20,7 @@ export default function Login() {
   return (
     <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", justifyContent: "center", padding: 24 }}>
       <div className="authLogoWrapper">
-        <img src={logo} alt="WWEEKLY" className="authLogo" />
+        <img src={logo} alt="WWEEKLY" className="authLogo authLogo--dark" />
       </div>
       <form onSubmit={handleLogin} style={{ maxWidth: 400, width: "100%", margin: "0 auto" }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 24 }}>Log In</h1>

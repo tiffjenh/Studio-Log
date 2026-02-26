@@ -10,6 +10,8 @@ import { hasSupabase } from "@/lib/supabase";
 import { fetchStudentChangeEvents, insertStudentChangeEvent } from "@/store/supabaseSync";
 import type { DaySchedule, Student, StudentChangeEvent } from "@/types";
 import { Button, IconButton } from "@/components/ui/Button";
+import { PencilIcon, ClockIcon, DollarIcon, CalendarIcon, ChevronDownIcon, TrashIcon, CloseIcon, RefreshIcon } from "@/components/ui/Icons";
+import "./student-detail.mock.css";
 
 const DURATIONS = [30, 45, 60, 90, 120];
 const DURATION_LABELS: Record<number, string> = { 30: "30 min", 45: "45 min", 60: "1 hr", 90: "1.5 hr", 120: "2 hr" };
@@ -191,6 +193,7 @@ export default function StudentDetail() {
 
   const [editing, setEditing] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
+  const [expandedYear, setExpandedYear] = useState<number | null>(null);
   const [selectedLessonYear, setSelectedLessonYear] = useState<number>(() => new Date().getFullYear());
   const lessonLogYears = useMemo(() => {
     const currentYear = now.getFullYear();
@@ -275,8 +278,8 @@ export default function StudentDetail() {
   const openSchedChangeTimePicker = (entryId: number) => { setSchedChangeTimePickerDay(entryId); const entry = schedChangeEntries.find((e) => e.id === entryId); const p = parseTimeOfDay(entry?.timeOfDay || ""); setSchedChangeTimePickerHour(p.hour); setSchedChangeTimePickerMinute(p.minute); setSchedChangeTimePickerAmPm(p.amPm); setSchedChangeTimePickerOpen(true); };
   const applySchedChangeTime = () => { updateSchedChangeEntry(schedChangeTimePickerDay, "timeOfDay", `${schedChangeTimePickerHour}:${String(schedChangeTimePickerMinute).padStart(2, "0")} ${schedChangeTimePickerAmPm}`); setSchedChangeTimePickerOpen(false); };
   const [terminatedFromDate, setTerminatedFromDate] = useState(student?.terminatedFromDate ?? "");
-  const [changeScheduleOpen, setChangeScheduleOpen] = useState(false);
-  const [terminateStudentOpen, setTerminateStudentOpen] = useState(false);
+  const [changeScheduleModalOpen, setChangeScheduleModalOpen] = useState(false);
+  const [endLessonsModalOpen, setEndLessonsModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [scheduleChangeSaveMessage, setScheduleChangeSaveMessage] = useState("");
   const [scheduleChangeCancelMessage, setScheduleChangeCancelMessage] = useState("");
@@ -532,20 +535,17 @@ export default function StudentDetail() {
   // (schedule change rate/time modals are handled via openSchedChangeRateModal / openSchedChangeTimePicker above)
 
   return (
-    <>
-      <Link to="/students" style={{ display: "inline-flex", alignItems: "center", marginBottom: 20, color: "var(--text)", textDecoration: "none", fontSize: 15 }}>← Back</Link>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-          <StudentAvatar student={student} size={48} />
-          <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0 }}>{student.firstName} {student.lastName}</h1>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {!editing ? (
-            <Button type="button" variant="tab" size="sm" active onClick={handleStartEdit}>{t("common.edit")}</Button>
-          ) : (
-            <Button type="button" variant="danger" size="sm" onClick={() => setDeleteConfirmOpen(true)}>{t("common.delete")}</Button>
-          )}
-        </div>
+    <div className="studentDetailPage">
+      <div className="studentDetailPage__topBar">
+        <Link to="/students" className="studentDetailPage__backCircle" aria-label={t("common.back")}>←</Link>
+        <h1 className="studentDetailPage__name">{student.firstName} {student.lastName}</h1>
+        {!editing ? (
+          <Button type="button" variant="tab" size="sm" active onClick={handleStartEdit} className="studentDetailPage__editCircle" aria-label={t("common.edit")} title={t("common.edit")}>
+            <PencilIcon size={20} />
+          </Button>
+        ) : (
+          <Button type="button" variant="danger" size="sm" onClick={() => setDeleteConfirmOpen(true)} className="studentDetailPage__editCircle studentDetailPage__deletePill">{t("common.delete")}</Button>
+        )}
       </div>
 
       {!editing && student.scheduleChangeFromDate && (
@@ -581,153 +581,195 @@ export default function StudentDetail() {
       )}
 
       {editing ? (
-        <div>
-        <form onSubmit={handleSaveEdit} className="float-card" style={{ marginBottom: 28, ...fontStyle }}>
-          <label style={labelStyle}>First name</label>
-          <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" style={inputStyle} required />
-          <label style={labelStyle}>Last name</label>
-          <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" style={inputStyle} required />
-          {/* + Day above first lesson module, right side */}
-          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 12 }}>
-            <Button type="button" variant="primary" size="sm" onClick={addScheduleEntry} leftIcon={<span>+</span>}>
-              Day
-            </Button>
-          </div>
-          {/* Schedule entries */}
-          {scheduleEntries.map((entry) => (
-            <div key={entry.id} style={{ marginBottom: 20, padding: 16, borderRadius: 12, border: "1px solid var(--border)", background: "var(--bg)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <span style={{ fontWeight: 700, fontSize: 15, ...fontStyle }}>{DAYS_FULL[entry.dayOfWeek]} Lesson</span>
-                {scheduleEntries.length > 1 && (
-                  <Button type="button" variant="danger" size="sm" onClick={() => removeScheduleEntry(entry.id)}>Delete Day</Button>
-                )}
-              </div>
-              <label style={labelStyle}>Day of week</label>
-              <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
-                {DAY_SHORT.map((label, i) => (
-                  <Button key={i} type="button" variant="tab" size="sm" active={entry.dayOfWeek === i} onClick={() => updateEntry(entry.id, "dayOfWeek", i)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>{label}</Button>
-                ))}
-              </div>
-              <label style={labelStyle}>Lesson duration</label>
-              <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
-                {DURATIONS.map((m) => (
-                  <Button key={m} type="button" variant="tab" size="sm" active={entry.durationMinutes === m} onClick={() => updateEntry(entry.id, "durationMinutes", m)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>
-                    {DURATION_LABELS[m]}
-                  </Button>
-                ))}
-              </div>
-              <label style={labelStyle}>Rate</label>
-              <Button type="button" variant="secondary" size="md" onClick={() => openPerDayRateModal(entry.id)} fullWidth style={{ marginBottom: 16, textAlign: "left", justifyContent: "flex-start" }}>
-                {entry.rateDollars ? `${getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$"}${entry.rateDollars}` : (getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$") + "0"}
-              </Button>
-              <label style={labelStyle}>Time</label>
-              <Button type="button" variant="secondary" size="md" onClick={() => openPerDayTimePicker(entry.id)} fullWidth style={{ textAlign: "left", justifyContent: "flex-start" }}>
-                {entry.timeOfDay || "5:00 PM"}
-              </Button>
+        <>
+        <div className="studentDetailPage__editModalBackdrop" onClick={handleCancelEdit} role="presentation">
+          <div className="studentDetailPage__editModalCard" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="edit-student-title">
+            <div className="studentDetailPage__editModalHeader">
+              <h2 id="edit-student-title" className="studentDetailPage__editModalTitle">{t("studentDetail.editStudent")}</h2>
+              <button type="button" className="studentDetailPage__editModalClose" onClick={handleCancelEdit} aria-label={t("common.cancel")}>
+                <CloseIcon size={20} />
+              </button>
             </div>
-          ))}
-
-          {error ? <p style={{ color: "#dc2626", marginBottom: 16, ...fontStyle }}>{error}</p> : null}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 16, justifyContent: "center" }}>
-            <Button type="submit" variant="secondary" size="sm">{t("common.save")}</Button>
-            <Button type="button" variant="secondary" size="sm" onClick={handleCancelEdit}>{t("common.cancel")}</Button>
-          </div>
-        </form>
-
-        {/* Change Schedule / Terminate — outside the card so it expands full width */}
-        <div style={{ marginTop: 20, marginBottom: 28 }}>
-          {/* Buttons row - always side by side */}
-          <div style={{ display: "flex", gap: 8, marginBottom: (changeScheduleOpen || terminateStudentOpen) ? 12 : 0 }}>
-            <Button
-              type="button"
-              variant="tab"
-              size="md"
-              active={changeScheduleOpen}
-              onClick={() => { setChangeScheduleOpen((o) => !o); setTerminateStudentOpen(false); }}
-              style={{ flex: "1 1 0", minWidth: 0, justifyContent: "flex-start", textAlign: "left", paddingLeft: 14, paddingRight: 14 }}
-            >
-              <span style={{ fontSize: 14 }}>{changeScheduleOpen ? "\u25BC" : "\u25B6"}</span>
-              {t("studentDetail.changeSchedule")}
-            </Button>
-            <Button
-              type="button"
-              variant="danger"
-              size="md"
-              onClick={() => { setTerminateStudentOpen((o) => !o); setChangeScheduleOpen(false); }}
-              style={{ flex: "1 1 0", minWidth: 0, justifyContent: "flex-start", textAlign: "left", paddingLeft: 14, paddingRight: 14 }}
-            >
-              <span style={{ fontSize: 14 }}>{terminateStudentOpen ? "\u25BC" : "\u25B6"}</span>
-              {t("studentDetail.terminateStudent")}
-            </Button>
-          </div>
-          {/* Expanded content - full width below */}
-          {changeScheduleOpen && (
-            <div className="float-card" style={{ padding: "16px 20px 20px" }}>
-              <p style={{ fontSize: 14, color: "var(--text-muted)", margin: "0 0 12px" }}>{t("studentDetail.scheduleChangeHint")}</p>
-              <label style={labelStyle}>{t("studentDetail.fromDate")}</label>
-              <div style={{ marginBottom: 16 }}>
-                <DatePicker value={scheduleChangeFromDate} onChange={setScheduleChangeFromDate} placeholder="Select date" />
+            <form onSubmit={handleSaveEdit} style={fontStyle}>
+              <div className="studentDetailPage__editGrid2">
+                <div>
+                  <label className="studentDetailPage__editFieldLabel" htmlFor="edit-first-name">{t("studentDetail.firstName")}</label>
+                  <input id="edit-first-name" type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t("studentDetail.firstName")} className="studentDetailPage__editFieldInput" required />
+                </div>
+                <div>
+                  <label className="studentDetailPage__editFieldLabel" htmlFor="edit-last-name">{t("studentDetail.lastName")}</label>
+                  <input id="edit-last-name" type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder={t("studentDetail.lastName")} className="studentDetailPage__editFieldInput" required />
+                </div>
               </div>
-              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 12 }}>
-                <Button type="button" variant="primary" size="sm" onClick={addSchedChangeEntry} leftIcon={<span>+</span>}>
-                  Day
+              <div className="studentDetailPage__editGrid2">
+                <div>
+                  <label className="studentDetailPage__editFieldLabel" htmlFor="edit-default-duration">{t("studentDetail.defaultDuration")}</label>
+                  <select id="edit-default-duration" className="studentDetailPage__editFieldInput" value={scheduleEntries[0]?.durationMinutes ?? 45} onChange={(e) => scheduleEntries[0] && updateEntry(scheduleEntries[0].id, "durationMinutes", parseInt(e.target.value, 10))}>
+                    {DURATIONS.map((m) => (
+                      <option key={m} value={m}>{DURATION_LABELS[m]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="studentDetailPage__editFieldLabel">{t("studentDetail.ratePerHour")}</label>
+                  <button type="button" className="studentDetailPage__editFieldInput" onClick={() => scheduleEntries[0] && openPerDayRateModal(scheduleEntries[0].id)}>
+                    {(getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$")}{scheduleEntries[0]?.rateDollars ?? "0"}
+                  </button>
+                </div>
+              </div>
+              <div className="studentDetailPage__weeklyHeaderRow">
+                <span className="studentDetailPage__editFieldLabel">{t("studentDetail.weeklyScheduleLabel")}</span>
+                <button type="button" className="studentDetailPage__addDayBtn" onClick={addScheduleEntry}>{t("studentDetail.addDay")}</button>
+              </div>
+              {scheduleEntries.map((entry) => (
+                <div key={entry.id} className="studentDetailPage__scheduleCard">
+                  <div className="studentDetailPage__scheduleCardTopRow">
+                    <select className="studentDetailPage__scheduleDaySelect" value={entry.dayOfWeek} onChange={(e) => updateEntry(entry.id, "dayOfWeek", parseInt(e.target.value, 10))} aria-label="Day">
+                      {DAYS_FULL.map((day, i) => (
+                        <option key={i} value={i}>{day}</option>
+                      ))}
+                    </select>
+                    <button type="button" className="studentDetailPage__scheduleRemoveBtn" onClick={() => removeScheduleEntry(entry.id)} disabled={scheduleEntries.length <= 1} aria-label={t("common.delete")}>
+                      <CloseIcon size={18} />
+                    </button>
+                  </div>
+                  <div className="studentDetailPage__scheduleTwoCol">
+                    <div>
+                      <label className="studentDetailPage__editFieldLabel">{t("studentDetail.time")}</label>
+                      <button type="button" className="studentDetailPage__editFieldInput" onClick={() => openPerDayTimePicker(entry.id)}>
+                        <span>{entry.timeOfDay || "5:00 PM"}</span>
+                        <ClockIcon size={16} />
+                      </button>
+                    </div>
+                    <div>
+                      <label className="studentDetailPage__editFieldLabel">{t("studentDetail.duration")}</label>
+                      <select className="studentDetailPage__editFieldInput" value={entry.durationMinutes} onChange={(e) => updateEntry(entry.id, "durationMinutes", parseInt(e.target.value, 10))}>
+                        {DURATIONS.map((m) => (
+                          <option key={m} value={m}>{DURATION_LABELS[m]}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {scheduleEntries.length > 1 && (
+                    <div style={{ marginTop: 10 }}>
+                      <label className="studentDetailPage__editFieldLabel">{t("studentDetail.rate")}</label>
+                      <button type="button" className="studentDetailPage__editFieldInput" onClick={() => openPerDayRateModal(entry.id)}>
+                        {(getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$")}{entry.rateDollars ?? "0"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {error ? <p style={{ color: "#dc2626", marginBottom: 16, marginTop: 12, ...fontStyle }}>{error}</p> : null}
+              <div className="studentDetailPage__editActionRow">
+                <Button type="button" variant="primary" size="sm" className="studentDetailPage__changeSchedulePill" onClick={() => { setChangeScheduleModalOpen(true); setEndLessonsModalOpen(false); }} leftIcon={<RefreshIcon size={14} />} style={{ flex: "1 1 0", minWidth: 0 }}>
+                  {t("studentDetail.changeScheduleShort")}
+                </Button>
+                <Button type="button" variant="danger" size="sm" onClick={() => { setEndLessonsModalOpen(true); setChangeScheduleModalOpen(false); }} leftIcon={<CalendarIcon size={14} />} style={{ flex: "1 1 0", minWidth: 0 }}>
+                  {t("studentDetail.endLessons")}
                 </Button>
               </div>
+              <div className="studentDetailPage__editBottomRow">
+                <button type="button" className="studentDetailPage__secondaryCancel" onClick={handleCancelEdit}>{t("common.cancel")}</button>
+                <button type="submit" className="studentDetailPage__primarySave">{t("studentDetail.saveChanges")}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {changeScheduleModalOpen && (
+          <div className="studentDetailPage__overlayBackdrop" onClick={() => setChangeScheduleModalOpen(false)} role="presentation">
+            <div className="studentDetailPage__overlayCard" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="change-schedule-title">
+              <div className="studentDetailPage__overlayHeader">
+                <h2 id="change-schedule-title" className="studentDetailPage__overlayTitle">{t("studentDetail.changeScheduleShort")}</h2>
+                <button type="button" className="studentDetailPage__overlayClose" onClick={() => setChangeScheduleModalOpen(false)} aria-label={t("common.cancel")}>
+                  <CloseIcon size={20} />
+                </button>
+              </div>
+              <div className="studentDetailPage__overlayHint">
+                <p>{t("studentDetail.scheduleChangeHint")}</p>
+              </div>
+              <label className="studentDetailPage__editFieldLabel" htmlFor="sched-change-from">{t("studentDetail.effectiveDate")}</label>
+              <div className="studentDetailPage__dateFieldWrap">
+                <DatePicker value={scheduleChangeFromDate} onChange={setScheduleChangeFromDate} placeholder="mm/dd/yyyy" id="sched-change-from" />
+              </div>
+              <div className="studentDetailPage__weeklyHeaderRow">
+                <span className="studentDetailPage__editFieldLabel">{t("studentDetail.weeklyScheduleLabel")}</span>
+                <button type="button" className="studentDetailPage__addDayBtn" onClick={addSchedChangeEntry}>{t("studentDetail.addDay")}</button>
+              </div>
               {schedChangeEntries.map((entry) => (
-                <div key={entry.id} style={{ marginBottom: 20, padding: 16, borderRadius: 12, border: "1px solid var(--border)", background: "var(--bg)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <span style={{ fontWeight: 700, fontSize: 15, ...fontStyle }}>{DAYS_FULL[entry.dayOfWeek]} Lesson</span>
+                <div key={entry.id} className="studentDetailPage__scheduleCard">
+                  <div className="studentDetailPage__scheduleCardTopRow">
+                    <select className="studentDetailPage__scheduleDaySelect" value={entry.dayOfWeek} onChange={(e) => updateSchedChangeEntry(entry.id, "dayOfWeek", Number(e.target.value))} aria-label="Day">
+                      {DAYS_FULL.map((day, i) => (
+                        <option key={i} value={i}>{day}</option>
+                      ))}
+                    </select>
                     {schedChangeEntries.length > 1 && (
-                      <Button type="button" variant="danger" size="sm" onClick={() => removeSchedChangeEntry(entry.id)}>Delete Day</Button>
+                      <button type="button" className="studentDetailPage__scheduleRemoveBtn" onClick={() => removeSchedChangeEntry(entry.id)} aria-label={t("common.delete")}>
+                        <CloseIcon size={18} />
+                      </button>
                     )}
                   </div>
-                  <label style={labelStyle}>{t("studentDetail.newDayOfWeek")}</label>
-                  <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
-                    {DAY_SHORT.map((label, i) => (
-                      <Button key={i} type="button" variant="tab" size="sm" active={entry.dayOfWeek === i} onClick={() => updateSchedChangeEntry(entry.id, "dayOfWeek", i)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>{label}</Button>
-                    ))}
+                  <div className="studentDetailPage__scheduleTwoCol">
+                    <div>
+                      <label className="studentDetailPage__editFieldLabel">{t("studentDetail.time")}</label>
+                      <button type="button" className="studentDetailPage__editFieldInput" onClick={() => openSchedChangeTimePicker(entry.id)}>
+                        <span>{entry.timeOfDay || "5:00 PM"}</span>
+                        <ClockIcon size={16} />
+                      </button>
+                    </div>
+                    <div>
+                      <label className="studentDetailPage__editFieldLabel">{t("studentDetail.duration")}</label>
+                      <select className="studentDetailPage__editFieldInput" value={entry.durationMinutes} onChange={(e) => updateSchedChangeEntry(entry.id, "durationMinutes", Number(e.target.value))}>
+                        {DURATIONS.map((m) => (
+                          <option key={m} value={m}>{DURATION_LABELS[m]}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <label style={labelStyle}>{t("studentDetail.newLessonDuration")}</label>
-                  <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
-                    {DURATIONS.map((m) => (
-                      <Button key={m} type="button" variant="tab" size="sm" active={entry.durationMinutes === m} onClick={() => updateSchedChangeEntry(entry.id, "durationMinutes", m)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>
-                        {DURATION_LABELS[m]}
-                      </Button>
-                    ))}
+                  <div style={{ marginTop: 10 }}>
+                    <label className="studentDetailPage__editFieldLabel">{t("studentDetail.newRate")}</label>
+                    <button type="button" className="studentDetailPage__editFieldInput" onClick={() => openSchedChangeRateModal(entry.id)}>
+                      {(getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$")}{entry.rateDollars ?? "0"}
+                    </button>
                   </div>
-                  <label style={labelStyle}>{t("studentDetail.newRate")}</label>
-                  <Button type="button" variant="secondary" size="md" onClick={() => openSchedChangeRateModal(entry.id)} fullWidth style={{ marginBottom: 16, textAlign: "left", justifyContent: "flex-start" }}>
-                    {entry.rateDollars ? `${getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$"}${entry.rateDollars}` : (getCurrencyByCode(getStoredCurrencyCode())?.symbol ?? "$") + "0"}
-                  </Button>
-                  <label style={labelStyle}>{t("common.newTime")}</label>
-                  <Button type="button" variant="secondary" size="md" onClick={() => openSchedChangeTimePicker(entry.id)} fullWidth style={{ textAlign: "left", justifyContent: "flex-start" }}>
-                    {entry.timeOfDay || "5:00 PM"}
-                  </Button>
                 </div>
               ))}
               {scheduleChangeError ? <p style={{ color: "#dc2626", marginBottom: 12, ...fontStyle }}>{scheduleChangeError}</p> : null}
               {scheduleChangeSaveMessage ? <p style={{ color: "var(--success, #16a34a)", marginBottom: 12, ...fontStyle }}>{scheduleChangeSaveMessage}</p> : null}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12, justifyContent: "center" }}>
-                <Button type="button" variant="primary" size="sm" onClick={handleSaveScheduleChange}>{t("studentDetail.saveScheduleChanges")}</Button>
-                <Button type="button" variant="secondary" size="sm" onClick={() => setChangeScheduleOpen(false)}>{t("common.cancel")}</Button>
+              <div className="studentDetailPage__editBottomRow">
+                <button type="button" className="studentDetailPage__secondaryCancel" onClick={() => setChangeScheduleModalOpen(false)}>{t("common.cancel")}</button>
+                <button type="button" className="studentDetailPage__primarySave" onClick={handleSaveScheduleChange}>{t("studentDetail.saveChanges")}</button>
               </div>
             </div>
-          )}
-          {terminateStudentOpen && (
-            <div className="float-card" style={{ padding: "16px 20px 20px" }}>
-              <p style={{ fontSize: 14, color: "var(--text-muted)", margin: "0 0 12px" }}>{t("studentDetail.terminateHint")}</p>
-              <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>{t("studentDetail.lastLessonDate")}</label>
-              <div style={{ marginBottom: 16 }}>
-                <DatePicker value={terminatedFromDate} onChange={setTerminatedFromDate} placeholder="Select date" />
+          </div>
+        )}
+
+        {endLessonsModalOpen && (
+          <div className="studentDetailPage__overlayBackdrop" onClick={() => setEndLessonsModalOpen(false)} role="presentation">
+            <div className="studentDetailPage__overlayCard" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="end-lessons-title">
+              <div className="studentDetailPage__overlayHeader">
+                <h2 id="end-lessons-title" className="studentDetailPage__overlayTitle">{t("studentDetail.endLessons")}</h2>
+                <button type="button" className="studentDetailPage__overlayClose" onClick={() => setEndLessonsModalOpen(false)} aria-label={t("common.cancel")}>
+                  <CloseIcon size={20} />
+                </button>
+              </div>
+              <div className="studentDetailPage__overlayHint">
+                <p>{t("studentDetail.terminateHint")}</p>
+              </div>
+              <label className="studentDetailPage__editFieldLabel" htmlFor="end-lessons-date">{t("studentDetail.lastLessonDate")}</label>
+              <div className="studentDetailPage__dateFieldWrap">
+                <DatePicker value={terminatedFromDate} onChange={setTerminatedFromDate} placeholder="mm/dd/yyyy" id="end-lessons-date" />
               </div>
               {terminationSaveMessage ? <p style={{ color: "var(--success, #16a34a)", marginBottom: 12, ...fontStyle }}>{terminationSaveMessage}</p> : null}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, justifyContent: "center" }}>
-                <Button type="button" variant="secondary" size="sm" onClick={handleSaveTermination} disabled={!terminatedFromDate.trim()}>{t("common.save")}</Button>
-                <Button type="button" variant="secondary" size="sm" onClick={() => setTerminateStudentOpen(false)}>{t("common.cancel")}</Button>
+              <div className="studentDetailPage__editBottomRow">
+                <button type="button" className="studentDetailPage__secondaryCancel" onClick={() => setEndLessonsModalOpen(false)}>{t("common.cancel")}</button>
+                <button type="button" className="studentDetailPage__endLessonsSave" onClick={handleSaveTermination} disabled={!terminatedFromDate.trim()}>{t("common.save")}</button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {deleteConfirmOpen && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setDeleteConfirmOpen(false)}>
@@ -840,43 +882,62 @@ export default function StudentDetail() {
             </div>
           </div>
         )}
-        </div>
+        </>
       ) : (
         <>
-          <div className="hero-card" style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", marginBottom: 12 }}>{t("studentDetail.progressEarnings")}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-              <div>
-                <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400, lineHeight: 1.3, whiteSpace: "nowrap" }}>{thisMonthLessons.length} out of {availableThisMonth} lessons</div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{monthLabel}</div>
+          <div className="studentDetailPage__hero">
+            <div className="studentDetailPage__heroHeader">
+              <div className="studentDetailPage__heroAvatarWrap">
+                <StudentAvatar student={student} size={56} variant="green" />
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div className="headline-serif" style={{ fontSize: 24, fontWeight: 400 }}>{formatCurrency(earningsThisMonth)}</div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{t("studentDetail.thisMonth")}</div>
+              <div className="studentDetailPage__heroHeaderText">
+                <span className="studentDetailPage__heroName">{student.firstName} {student.lastName}</span>
+                <span className="studentDetailPage__heroRate">{formatCurrency(student.rateCents)}/hr · {formatDuration(student.durationMinutes)}</span>
               </div>
-              <div>
-                <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400, lineHeight: 1.3, whiteSpace: "nowrap" }}>{thisYearLessons.length} out of {availableThisYear} lessons</div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{t("studentDetail.ytd")}</div>
+            </div>
+            <div className="studentDetailPage__heroTiles" data-month={monthLabel} data-available-month={availableThisMonth} data-earnings-month={earningsThisMonth} data-available-year={availableThisYear}>
+              <div className="studentDetailPage__heroTile">
+                <span className="studentDetailPage__heroTileValue">{thisYearLessons.length}</span>
+                <span className="studentDetailPage__heroTileLabel">{t("studentDetail.ytd")}</span>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div className="headline-serif" style={{ fontSize: 24, fontWeight: 400 }}>{formatCurrency(earningsYTD)}</div>
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>{t("studentDetail.ytdEarnings")}</div>
+              <div className="studentDetailPage__heroTile">
+                <span className="studentDetailPage__heroTileValue">{formatCurrency(earningsYTD)}</span>
+                <span className="studentDetailPage__heroTileLabel">{t("studentDetail.ytdEarnings")}</span>
               </div>
             </div>
           </div>
-          <div className="float-card" style={{ padding: 16, marginBottom: 24 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, display: "flex", flexDirection: "column", gap: 6 }}>
-              {getAllScheduledDays(student).map((sched, i) => {
-                const timeRange = sched.timeOfDay && sched.timeOfDay !== "\u2014" ? ` @ ${formatCompactTimeRange(sched.timeOfDay, sched.durationMinutes)}` : "";
-                return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span>{DAYS_FULL[sched.dayOfWeek]}s{timeRange}</span>
-                    <span style={{ color: "var(--text-muted)" }}>|</span>
-                    <span>{formatDuration(sched.durationMinutes)}, {formatCurrency(sched.rateCents)}</span>
-                  </div>
-                );
-              })}
+          {/* DETAILS + WEEKLY SCHEDULE in one card */}
+          <div className="float-card studentDetailPage__detailsAndScheduleCard">
+            <h3 className="studentDetailPage__detailsTitle">{t("studentDetail.detailsLabel")}</h3>
+            <div className="studentDetailPage__detailsRow">
+              <span className="studentDetailPage__detailsIcon" aria-hidden><ClockIcon size={18} /></span>
+              <span className="studentDetailPage__detailsLabel">{t("studentDetail.lessonDuration")}</span>
+              <span className="studentDetailPage__detailsValue">{formatDuration(student.durationMinutes)}</span>
             </div>
+            <div className="studentDetailPage__detailsRow">
+              <span className="studentDetailPage__detailsIcon" aria-hidden><DollarIcon size={18} /></span>
+              <span className="studentDetailPage__detailsLabel">{t("studentDetail.hourlyRate")}</span>
+              <span className="studentDetailPage__detailsValue">{formatCurrency(student.rateCents)}/hr</span>
+            </div>
+            <div className="studentDetailPage__detailsRow">
+              <span className="studentDetailPage__detailsIcon" aria-hidden><DollarIcon size={18} /></span>
+              <span className="studentDetailPage__detailsLabel">{t("studentDetail.perLesson")}</span>
+              <span className="studentDetailPage__detailsValue studentDetailPage__detailsValue--green">{formatCurrency(Math.round((student.rateCents * student.durationMinutes) / 60))}</span>
+            </div>
+
+            <div className="studentDetailPage__scheduleLabel">{t("studentDetail.weeklyScheduleLabel")}</div>
+            {getAllScheduledDays(student).map((sched, i) => {
+              const timeStr = sched.timeOfDay && sched.timeOfDay !== "\u2014" ? sched.timeOfDay : "";
+              return (
+                <div key={i} className="studentDetailPage__schedulePill" style={{ marginBottom: i < getAllScheduledDays(student).length - 1 ? 10 : 0 }}>
+                  <span className="studentDetailPage__schedulePillIcon" aria-hidden><CalendarIcon size={18} /></span>
+                  <div className="studentDetailPage__schedulePillText">
+                    <span className="studentDetailPage__schedulePillDay">{DAYS_FULL[sched.dayOfWeek]}</span>
+                    <span className="studentDetailPage__schedulePillTime">{timeStr ? `${timeStr} · ${formatDuration(sched.durationMinutes)}, ${formatCurrency(sched.rateCents)}` : formatDuration(sched.durationMinutes) + ", " + formatCurrency(sched.rateCents)}</span>
+                  </div>
+                </div>
+              );
+            })}
             {student.scheduleChangeFromDate && (() => {
               const allSchedChangeDays: DaySchedule[] = [];
               if (student.scheduleChangeDayOfWeek != null && student.scheduleChangeTimeOfDay != null) {
@@ -884,13 +945,13 @@ export default function StudentDetail() {
               }
               (student.scheduleChangeAdditionalSchedules ?? []).forEach((s) => allSchedChangeDays.push(s));
               return (
-                <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>
+                <div className="studentDetailPage__scheduleMeta" style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 10 }}>
                   <div style={{ marginBottom: 2 }}>From {new Date(student.scheduleChangeFromDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}:</div>
                   {allSchedChangeDays.map((sc, i) => {
                     const timeRange = sc.timeOfDay && sc.timeOfDay !== "\u2014" ? ` @ ${formatCompactTimeRange(sc.timeOfDay, sc.durationMinutes)}` : "";
                     return (
                       <div key={i} style={{ marginLeft: 8 }}>
-                        {DAYS_FULL[sc.dayOfWeek]}s{timeRange} &middot; {formatDuration(sc.durationMinutes)}, {formatCurrency(sc.rateCents)}
+                        {DAYS_FULL[sc.dayOfWeek]}s{timeRange} · {formatDuration(sc.durationMinutes)}, {formatCurrency(sc.rateCents)}
                       </div>
                     );
                   })}
@@ -898,7 +959,7 @@ export default function StudentDetail() {
               );
             })()}
             {student.terminatedFromDate && (
-              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 8 }}>Last lesson: {new Date(student.terminatedFromDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+              <div className="studentDetailPage__scheduleMeta" style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 10 }}>Last lesson: {new Date(student.terminatedFromDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
             )}
           </div>
         </>
@@ -908,124 +969,163 @@ export default function StudentDetail() {
 
       {!editing && student && (
         <>
-          {lessonLogYears.length > 0 && (() => {
+          {lessonLogYears.length > 0 && student && (() => {
             const currentYear = now.getFullYear();
             const currentMonth = now.getMonth() + 1;
-            const effectiveYear = lessonLogYears.includes(selectedLessonYear) ? selectedLessonYear : lessonLogYears[0]!;
-            const monthRows: { monthKey: string; monthName: string; scheduledDateKeys: string[]; completedCount: number; totalEarned: number }[] = [];
-            const monthEnd = effectiveYear === currentYear ? currentMonth : 12;
-            for (let month = 1; month <= monthEnd; month++) {
-              const scheduledDateKeys = getScheduledDateKeysInMonth(student, effectiveYear, month);
-              if (scheduledDateKeys.length === 0) continue;
-              let completedCount = 0;
-              let totalEarned = 0;
-              for (const dateKey of scheduledDateKeys) {
-                const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
-                if (lesson?.completed) {
-                  completedCount++;
-                  totalEarned += lesson.amountCents;
+            const yearSummaries = lessonLogYears.map((y) => {
+              const yearLessons = studentLessons.filter((l) => l.date.startsWith(String(y)));
+              const totalEarned = yearLessons.reduce((sum, l) => sum + l.amountCents, 0);
+              return { year: y, lessonCount: yearLessons.length, totalEarned };
+            });
+            function getMonthRowsForYear(effectiveYear: number, s: Student) {
+              const rows: { monthKey: string; monthName: string; scheduledDateKeys: string[]; completedCount: number; totalEarned: number }[] = [];
+              const monthEnd = effectiveYear === currentYear ? currentMonth : 12;
+              for (let month = 1; month <= monthEnd; month++) {
+                const scheduledDateKeys = getScheduledDateKeysInMonth(s, effectiveYear, month);
+                if (scheduledDateKeys.length === 0) continue;
+                let completedCount = 0;
+                let totalEarned = 0;
+                for (const dateKey of scheduledDateKeys) {
+                  const lesson = getLessonForStudentOnDate(data.lessons, s.id, dateKey);
+                  if (lesson?.completed) {
+                    completedCount++;
+                    totalEarned += lesson.amountCents;
+                  }
                 }
+                const first = new Date(effectiveYear, month - 1, 1);
+                const monthName = first.toLocaleDateString("en-US", { month: "long" });
+                const monthKey = `${effectiveYear}-${String(month).padStart(2, "0")}`;
+                rows.push({ monthKey, monthName, scheduledDateKeys: scheduledDateKeys.sort((a, b) => b.localeCompare(a)), completedCount, totalEarned });
               }
-              const first = new Date(effectiveYear, month - 1, 1);
-              const monthName = first.toLocaleDateString("en-US", { month: "long" });
-              const monthKey = `${effectiveYear}-${String(month).padStart(2, "0")}`;
-              monthRows.push({ monthKey, monthName, scheduledDateKeys: scheduledDateKeys.sort((a, b) => b.localeCompare(a)), completedCount, totalEarned });
+              return rows;
             }
             return (
-              <>
-                <div className="tabs-row" style={{ marginBottom: 16 }}>
-                  {lessonLogYears.map((y) => (
-                    <Button key={y} type="button" variant="tab" size="sm" className="tabButton" active={effectiveYear === y} onClick={() => setSelectedLessonYear(y)}>{y}</Button>
-                  ))}
+              <div className="studentDetailPage__historyCard">
+                <div className="studentDetailPage__historyCardHeader">
+                  <div>
+                    <h3 className="studentDetailPage__historyCardTitle">{t("studentDetail.lessonHistory")}</h3>
+                    <button type="button" onClick={() => setHistoryOpen(true)} className="studentDetailPage__historyLink">{t("studentDetail.history")}</button>
+                  </div>
                 </div>
-                <div style={{ marginBottom: 28 }}>
-                  {monthRows.length === 0 ? (
-                    <p style={{ color: "var(--text-muted)", margin: 0 }}>{t("studentDetail.lessonsLogged")} {effectiveYear} — no lessons</p>
-                  ) : (
-                    <div className="float-card" style={{ overflow: "hidden", padding: 0 }}>
-                      <div style={{ display: "flex", flexDirection: "column" }}>
-                        {monthRows.map(({ monthKey, monthName, scheduledDateKeys, completedCount, totalEarned }) => (
-                          <Fragment key={monthKey}>
-                            <div
-                              className="cardInteractive"
-                              onClick={() => setExpandedMonth((prev) => (prev === monthKey ? null : monthKey))}
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                padding: "14px 20px",
-                                cursor: "pointer",
-                                background: expandedMonth === monthKey ? "var(--hero-gradient-subtle)" : undefined,
-                                borderBottom: "1px solid rgba(201, 123, 148, 0.08)",
-                              }}
-                            >
-                              <span style={{ fontWeight: 500 }}>{expandedMonth === monthKey ? "▼ " : "▶ "}{monthName}</span>
-                              <span style={{ fontSize: 14, color: "var(--text-muted)" }}>{completedCount}/{scheduledDateKeys.length} · {formatCurrency(totalEarned)}</span>
-                            </div>
-                            <div className={`collapsible ${expandedMonth === monthKey ? "open" : "closed"}`}>
-                              <div style={{ padding: "12px 20px 16px", background: "var(--hero-gradient-subtle)" }}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                  {scheduledDateKeys.map((dateKey) => {
-                                    const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
-                                    const attended = lesson?.completed ?? false;
-                                    const handleToggle = async () => {
-                                      if (attended) {
-                                        if (lesson) await updateLesson(lesson.id, { completed: false });
-                                      } else {
-                                        const duration = getEffectiveDurationMinutes(student, dateKey);
-                                        const amount = getEffectiveRateCents(student, dateKey);
-                                        if (lesson) {
-                                          await updateLesson(lesson.id, { completed: true, durationMinutes: duration, amountCents: amount });
+                <div className="studentDetailPage__historyList">
+                  {yearSummaries.map(({ year, lessonCount, totalEarned }) => {
+                    const isYearExpanded = expandedYear === year;
+                    const monthRows = isYearExpanded ? getMonthRowsForYear(year, student) : [];
+                    return (
+                      <Fragment key={year}>
+                        <div
+                          className="studentDetailPage__historyYearRow"
+                          onClick={() => {
+                            setExpandedYear((prev) => (prev === year ? null : year));
+                            setExpandedMonth(null);
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setExpandedYear((prev) => (prev === year ? null : year));
+                              setExpandedMonth(null);
+                            }
+                          }}
+                          aria-expanded={isYearExpanded}
+                        >
+                          <span className="studentDetailPage__historyYearSummary">{lessonCount} lessons · {formatCurrency(totalEarned)}</span>
+                          <span className="studentDetailPage__historyYearPill">
+                            {year}
+                            <span className={isYearExpanded ? "studentDetailPage__historyYearPillChevron studentDetailPage__historyYearPillChevron--open" : "studentDetailPage__historyYearPillChevron"}>
+                              <ChevronDownIcon size={14} />
+                            </span>
+                          </span>
+                        </div>
+                        {isYearExpanded && (
+                          <>
+                            {monthRows.length === 0 ? (
+                              <p style={{ color: "var(--text-muted)", margin: 0, padding: 16 }}>{t("studentDetail.lessonsLogged")} {year} — no lessons</p>
+                            ) : (
+                              monthRows.map(({ monthKey, monthName, scheduledDateKeys, completedCount, totalEarned }) => (
+                                <Fragment key={monthKey}>
+                                  <div
+                                    className="studentDetailPage__historyMonthRow"
+                                    onClick={() => setExpandedMonth((prev) => (prev === monthKey ? null : monthKey))}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedMonth((prev) => (prev === monthKey ? null : monthKey)); } }}
+                                    aria-expanded={expandedMonth === monthKey}
+                                  >
+                                    <span>{expandedMonth === monthKey ? "▼ " : "▶ "}{monthName}</span>
+                                    <span className="studentDetailPage__historyMonthMeta">{completedCount}/{scheduledDateKeys.length} · {formatCurrency(totalEarned)}</span>
+                                  </div>
+                                  <div className={`studentDetailPage__historyMonthContent ${expandedMonth === monthKey ? "open" : "closed"}`}>
+                                    {scheduledDateKeys.map((dateKey) => {
+                                      const lesson = getLessonForStudentOnDate(data.lessons, student.id, dateKey);
+                                      const attended = lesson?.completed ?? false;
+                                      const handleToggle = async () => {
+                                        if (attended) {
+                                          if (lesson) await updateLesson(lesson.id, { completed: false });
                                         } else {
-                                          await addLesson({ studentId: student.id, date: dateKey, durationMinutes: duration, amountCents: amount, completed: true });
+                                          const duration = getEffectiveDurationMinutes(student, dateKey);
+                                          const amount = getEffectiveRateCents(student, dateKey);
+                                          if (lesson) {
+                                            await updateLesson(lesson.id, { completed: true, durationMinutes: duration, amountCents: amount });
+                                          } else {
+                                            await addLesson({ studentId: student.id, date: dateKey, durationMinutes: duration, amountCents: amount, completed: true });
+                                          }
                                         }
-                                      }
-                                    };
-                                    return (
-                                      <Button
-                                        key={dateKey}
-                                        type="button"
-                                        variant={attended ? "secondary" : "tab"}
-                                        size="sm"
-                                        fullWidth
-                                        onClick={handleToggle}
-                                        style={{
-                                          display: "flex",
-                                          justifyContent: "space-between",
-                                          alignItems: "center",
-                                          margin: 0,
-                                          borderRadius: 12,
-                                          background: attended ? "var(--card)" : "rgba(0,0,0,0.06)",
-                                          color: attended ? "var(--text)" : "var(--text-muted)",
-                                          border: attended ? "1px solid var(--border)" : "1px solid transparent",
-                                          boxShadow: "none",
-                                        }}
-                                      >
-                                        <span style={{ fontSize: 14 }}>{dateKey}</span>
-                                        <span style={{ fontWeight: 600 }}>{attended ? formatCurrency(computeLessonAmountCents(student, lesson!, dateKey)) : "—"}</span>
-                                      </Button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          </Fragment>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                                      };
+                                      const displayDate = new Date(dateKey + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                                      const durationMins = lesson?.durationMinutes ?? getEffectiveDurationMinutes(student, dateKey);
+                                      return (
+                                        <button
+                                          key={dateKey}
+                                          type="button"
+                                          className="studentDetailPage__historyRow"
+                                          onClick={handleToggle}
+                                        >
+                                          <span className="studentDetailPage__historyDot" />
+                                          <div className="studentDetailPage__historyRowText">
+                                            <span className="studentDetailPage__historyRowDate">{displayDate}</span>
+                                            <span className="studentDetailPage__historyRowDuration">{durationMins} minutes</span>
+                                          </div>
+                                          <span className="studentDetailPage__historyAmount">{attended && lesson ? formatCurrency(computeLessonAmountCents(student, lesson, dateKey)) : "—"}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </Fragment>
+                              ))
+                            )}
+                          </>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </div>
-              </>
+              </div>
             );
           })()}
         </>
       )}
 
-      <div style={{ paddingTop: 24, paddingBottom: 32, display: "flex", justifyContent: "center" }}>
-        <Button type="button" variant="secondary" size="sm" onClick={() => setHistoryOpen(true)}>
-          {t("studentDetail.history")}
-        </Button>
-      </div>
+      {!editing && student && (
+        <div className="studentDetailPage__bottomActions">
+          <button
+            type="button"
+            className="studentDetailPage__actionPill studentDetailPage__actionPill--orange"
+            onClick={() => { setEditing(true); setEndLessonsModalOpen(true); }}
+          >
+            {t("studentDetail.markInactive")}
+          </button>
+          <button
+            type="button"
+            className="studentDetailPage__actionPill studentDetailPage__actionPill--red"
+            onClick={() => setDeleteConfirmOpen(true)}
+          >
+            <TrashIcon size={14} />
+            {t("studentDetail.deleteStudent")}
+          </button>
+        </div>
+      )}
 
       {historyOpen && (
         <div
@@ -1062,6 +1162,6 @@ export default function StudentDetail() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

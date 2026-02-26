@@ -3,9 +3,9 @@ import { useLanguage } from "@/context/LanguageContext";
 import { Button } from "@/components/ui/Button";
 
 const OPTIONS: { code: "en" | "es" | "zh"; label: string }[] = [
-  { code: "en", label: "EN" },
-  { code: "es", label: "ES" },
-  { code: "zh", label: "繁" },
+  { code: "en", label: "🇺🇸 EN" },
+  { code: "es", label: "🇪🇸 ES" },
+  { code: "zh", label: "🇨🇳 中文" },
 ];
 
 export default function LanguageSwitcher() {
@@ -29,7 +29,7 @@ export default function LanguageSwitcher() {
         size="sm"
         onClick={() => setOpen((o) => !o)}
         aria-label="Switch language"
-        style={{ minWidth: 52 }}
+        style={{ minWidth: 72 }}
       >
         {OPTIONS.find((o) => o.code === lang)?.label ?? "EN"}
       </Button>

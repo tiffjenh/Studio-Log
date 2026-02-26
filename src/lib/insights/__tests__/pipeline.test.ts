@@ -88,13 +88,15 @@ describe("Insights pipeline", () => {
     const es = await askInsights("¿Cuánto gané el mes pasado?", ctxEs);
     expect(es.needsClarification).toBe(false);
     expect(es.trace?.queryPlan.intent).toBe("earnings_in_period");
-    expect(es.finalAnswerText).toMatch(/Basado en/);
+    expect(es.finalAnswerText).toMatch(/ganaste/);
+    expect(es.finalAnswerText).not.toMatch(/last_30_days|this_month|_/);
 
     const ctxZh = { ...ctx, locale: "zh-CN" as const, language: "zh" as const };
     const zh = await askInsights("上个月我赚了多少？", ctxZh);
     expect(zh.needsClarification).toBe(false);
     expect(zh.trace?.queryPlan.intent).toBe("earnings_in_period");
-    expect(zh.finalAnswerText).toMatch(/根據/);
+    expect(zh.finalAnswerText).toMatch(/你賺了|赚了/);
+    expect(zh.finalAnswerText).not.toMatch(/last_30_days|this_month|_/);
   });
 
   it("runs 60-question paraphrase matrix without irrelevant defaults", async () => {

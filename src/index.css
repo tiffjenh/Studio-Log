@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   --primary: #c97b94;
   --primary-dark: #b86b84;
@@ -18,6 +20,9 @@
   --pastel-sea-breeze: #c9dae7;
   --pastel-lilac: #b6b1d9;
   --pastel-bg: linear-gradient(165deg, #f7e7d8 0%, #f3e8ef 25%, #e8eef5 50%, #e5e4f0 75%, #b6b1d9 100%);
+  /* Single source of truth: lighter mock gradient for all app + landing pages */
+  --app-bg: linear-gradient(180deg, #C9DDE7 0%, #CFE3E0 40%, #BFD9D2 75%, #AFCFC7 100%);
+  --app-gradient: var(--app-bg);
   --pastel-bg-motion-1: #f7e7d8;
   --pastel-bg-motion-2: #c9dae7;
   --pastel-bg-motion-3: #e5e4f0;
@@ -27,6 +32,8 @@
   --hero-gradient-subtle: linear-gradient(135deg, #faf5f2 0%, #f8f0f5 50%, #f0f5fa 100%);
   /* Avatar / initial circles: palette gradient */
   --avatar-gradient: linear-gradient(135deg, #b6b1d9 0%, #c9dae7 50%, #f3a2bd 100%);
+  /* Homepage/dashboard green gradient for student detail hero avatar */
+  --avatar-gradient-green: linear-gradient(135deg, #9ac9c2 0%, #a8d5d0 45%, #8fc9c2 100%);
   /* Buttons: white */
   --accent-gradient: #ffffff;
   --accent-gradient-soft: #ffffff;
@@ -38,6 +45,7 @@
   --shadow-soft: 0 2px 16px rgba(140, 120, 150, 0.06);
   --shadow-card: 0 4px 24px rgba(140, 120, 150, 0.06);
   --shadow-elevated: 0 8px 32px rgba(140, 120, 150, 0.08);
+  --modal-surface: rgba(235, 246, 250, 0.95);
   --space-xs: 6px;
   --space-sm: 12px;
   --space-md: 20px;
@@ -59,20 +67,28 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
-  /* Prevent white flash on iOS overscroll / bounce */
-  background-color: #e5e4f0;
+  height: 100%;
+  background: var(--app-gradient);
 }
 
 body {
   margin: 0;
+  height: 100%;
   font-family: var(--font-sans);
-  background-color: #e5e4f0;
-  background: var(--pastel-bg);
+  background: var(--app-gradient);
+  background-attachment: fixed;
   color: var(--text);
-  min-height: 100dvh;
-  padding-bottom: calc(var(--nav-height) + var(--safe-bottom));
-  /* Prevent overscroll bounce on iOS showing white */
+  overflow-x: hidden;
   overscroll-behavior-y: none;
+}
+
+/* Contain viewport width to prevent horizontal overflow (e.g. Students page negative margins). */
+#root {
+  min-height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  background: transparent;
 }
 
 /* Login and forgot-password have no bottom nav; avoid reserved purple bar */
@@ -94,35 +110,47 @@ input, select, textarea {
   font-size: 16px; /* avoids iOS zoom on focus */
 }
 
-/* Bottom nav area */
-.app-shell {
-  max-width: 900px;
-  margin: 0 auto;
-  min-height: calc(100dvh - var(--nav-height) - var(--safe-bottom));
+/* Main content: transparent so body gradient shows; height/scroll controlled by Layout flex.
+   width/max-width/overflow-x prevent horizontal overflow on mobile (e.g. Students page uses
+   negative horizontal margins for edge-to-edge gradient; without containment this causes scroll.) */
+.app-layout {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
-/* Bottom nav - minimal thin style */
+.app-shell {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  overflow-x: hidden;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+/* Bottom nav — white bar so page gradient shows through behind it; no purple strip.
+   Pages with full-height background (e.g. Students) extend with negative margin so gradient fills behind nav. */
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 480px;
   height: calc(var(--nav-height) + var(--safe-bottom));
-  padding-bottom: var(--safe-bottom);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-top: 1px solid rgba(180, 160, 180, 0.15);
+  padding: 6px 8px var(--safe-bottom);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
   display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 100;
-  max-width: 900px;
-  margin: 0 auto;
-  box-shadow: 0 -2px 20px rgba(140, 120, 150, 0.04);
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
+  -webkit-transform: translateX(-50%) translateZ(0);
+  transform: translateX(-50%) translateZ(0);
 }
 
 .bottom-nav a {
@@ -130,16 +158,16 @@ input, select, textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  color: var(--text-muted);
+  gap: 2px;
+  color: #9ca3a8;
   text-decoration: none;
   font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  min-height: 44px;
-  padding: 0 14px;
+  font-size: 10px;
+  font-weight: 400;
+  min-height: 0;
+  padding: 4px 8px;
   transition: color 0.2s;
+  flex: 1;
 }
 
 .bottom-nav__icon {
@@ -147,19 +175,27 @@ input, select, textarea {
   align-items: center;
   justify-content: center;
   color: inherit;
+  width: 20px;
+  height: 20px;
+}
+
+.bottom-nav__icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .bottom-nav__label {
   white-space: nowrap;
+  line-height: 1.2;
 }
 
 .bottom-nav a.active {
-  color: var(--text);
-  font-weight: 600;
+  color: #1e3a5f;
+  font-weight: 700;
 }
 
 .bottom-nav a.active .bottom-nav__icon {
-  color: var(--text);
+  color: #1e3a5f;
 }
 
 /* Cards – white for contrast on pastel background */
@@ -258,10 +294,10 @@ input, select, textarea {
   color: var(--text-muted);
 }
 .earnings-hero__amount {
-  font-family: var(--font-serif);
-  font-weight: 400;
+  font-family: var(--font-sans);
+  font-weight: 700;
   font-size: clamp(20px, 5vw, 26px);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: var(--text);
   text-align: center;
   margin-bottom: 0;
@@ -504,7 +540,7 @@ input, select, textarea {
   color: var(--text-muted);
 }
 
-/* Landing (login / registration) – gradient background */
+/* Landing (login / registration) – same app gradient as all pages */
 .landing {
   min-height: 100dvh;
   display: flex;
@@ -512,25 +548,11 @@ input, select, textarea {
   justify-content: center;
   padding: 24px;
   padding-top: max(24px, var(--safe-top));
-  background: var(--pastel-bg);
+  background: var(--app-bg);
 }
 
 .landing--motion {
-  background: linear-gradient(
-    165deg,
-    #f7e7d8 0%,
-    #f5dfe4 12%,
-    #f3a2bd 25%,
-    #e8b8c8 38%,
-    #c9dae7 50%,
-    #c1d2e2 62%,
-    #b6b1d9 75%,
-    #c5c0dc 88%,
-    #f7e7d8 100%
-  );
-  background-size: 100% 300%;
-  background-position: 0% 0%;
-  animation: landing-wave 9s ease-in-out infinite;
+  background: var(--app-bg);
 }
 
 .landing__inner {
@@ -556,6 +578,10 @@ input, select, textarea {
   height: auto;
   display: block;
   mix-blend-mode: multiply;
+}
+
+.authLogo--dark {
+  mix-blend-mode: normal;
 }
 
 .landing__tabs {
@@ -756,6 +782,9 @@ input, select, textarea {
   }
 }
 .pageTransition {
+  background: transparent;
+  max-width: 100%;
+  overflow-x: hidden;
   animation: fadeInUp 320ms ease-out;
 }
 

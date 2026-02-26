@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -17,6 +17,7 @@ import {
 import type { Lesson } from "@/types";
 import { Button, IconButton } from "@/components/ui/Button";
 import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, TrendDownIcon, TrendUpIcon } from "@/components/ui/Icons";
+import "./earnings.mock.css";
 
 const TABS = ["Daily", "Weekly", "Monthly", "Yearly", "Students"] as const;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -40,6 +41,11 @@ function formatBarLabelCompact(cents: number): string {
   return d > 0 ? "$" + d.toFixed(0) : "$0";
 }
 
+/** Tooltip / display currency with 2 decimals (e.g. $60.00). */
+function formatCurrencyTwoDecimals(cents: number): string {
+  return "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function BarChart({
   data,
   xLabels,
@@ -55,6 +61,10 @@ function BarChart({
   whitePlotBackground = false,
   staggerValueLabels = false,
   compactBarLabels = false,
+  hideValueLabels = false,
+  selectedDateKey,
+  showYAxisLabels = false,
+  barStyleByIndex,
 }: {
   data: number[];
   xLabels: string[];
@@ -64,19 +74,25 @@ function BarChart({
   onBarClick?: (dateKey: string) => void;
   angleXLabels?: boolean;
   noEarningsText?: string;
-  /** When set, Y-axis uses this step in cents (e.g. 500000 = $5000). Used for yearly graph. */
   yAxisStepCents?: number;
-  /** Max width per bar in px (e.g. 22 for 12 skinny bars). */
   maxBarWidth?: number;
-  /** Bar width as % of slot (e.g. 50 for skinny). */
   barWidthPct?: number;
-  /** White plot area (e.g. for Monthly chart). */
   whitePlotBackground?: boolean;
-  /** Stagger value labels above bars to avoid overlap (e.g. for Monthly). */
   staggerValueLabels?: boolean;
-  /** Use short labels like $3.1K to fit above bars (e.g. for Monthly). */
   compactBarLabels?: boolean;
+  /** When true, do not render value labels above bars (e.g. Monthly tab; use tooltip only). */
+  hideValueLabels?: boolean;
+  /** When set, the bar whose dateKey matches is styled as emphasized (dark teal). */
+  selectedDateKey?: string | null;
+  /** When true, show $ tick labels on the left y-axis. Default false to match mocks. */
+  showYAxisLabels?: boolean;
+  /** Optional per-bar style (e.g. background) by index. Used for Yearly current vs prior year. */
+  barStyleByIndex?: (i: number) => React.CSSProperties;
 }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ left: number; bottom: number } | null>(null);
+  const chartAreaRef = useRef<HTMLDivElement>(null);
+
   const isEmpty = maxVal <= 0 || data.every((v) => v === 0);
   const ticks = isEmpty
     ? EMPTY_TICKS
@@ -100,14 +116,34 @@ function BarChart({
   const plotHeight = fitLabelsInPlot ? CHART_HEIGHT + labelTopPadding : CHART_HEIGHT;
 
   const formatAxis = yAxisStepCents != null ? formatCurrencyWithCommas : formatCurrency;
+
+  function handleBarMouseEnter(e: React.MouseEvent, i: number) {
+    setHoveredIndex(i);
+    const bar = e.currentTarget.getBoundingClientRect();
+    const container = chartAreaRef.current?.getBoundingClientRect();
+    if (container) {
+      setTooltipPos({
+        left: bar.left - container.left + bar.width / 2,
+        bottom: bar.bottom - container.top + 8,
+      });
+    }
+  }
+
+  function handleBarMouseLeave() {
+    setHoveredIndex(null);
+    setTooltipPos(null);
+  }
+
   return (
     <div style={{ display: "flex", gap: 0, alignItems: "flex-start" }}>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingRight: 8, minWidth: 40, fontSize: 11, color: "var(--text-muted)", textAlign: "right", height: plotHeight }}>
-        {[...ticks].reverse().map((t) => (
-          <span key={t}>{formatAxis(t)}</span>
-        ))}
-      </div>
-      <div style={{ flex: 1, position: "relative" }}>
+      {showYAxisLabels && (
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", paddingRight: 8, minWidth: 40, fontSize: 11, color: "var(--text-muted)", textAlign: "right", height: plotHeight }}>
+          {[...ticks].reverse().map((t) => (
+            <span key={t}>{formatAxis(t)}</span>
+          ))}
+        </div>
+      )}
+      <div ref={chartAreaRef} style={{ flex: 1, position: "relative" }}>
         {!fitLabelsInPlot && labelTopPadding > 0 && <div style={{ height: labelTopPadding, flexShrink: 0 }} aria-hidden="true" />}
         <div
           style={{
@@ -132,8 +168,8 @@ function BarChart({
                 left: 0,
                 right: 0,
                 bottom: fitLabelsInPlot ? `${(t / chartMax) * 100 * (CHART_HEIGHT / plotHeight)}%` : `${(t / chartMax) * 100}%`,
-                height: 1,
-                background: gridLineColor,
+                height: 0,
+                borderBottom: "1px dashed rgba(0,0,0,0.12)",
               }}
             />
           ))}
@@ -147,6 +183,7 @@ function BarChart({
               const heightPct = chartMax > 0 ? (v / chartMax) * 100 : 0;
               const barHeight = Math.max(v > 0 ? 6 : 0, (heightPct / 100) * CHART_HEIGHT);
               const dateKey = dateKeys?.[i];
+              const isEmphasized = (selectedDateKey != null && dateKey === selectedDateKey) || hoveredIndex === i;
               const staggerOffset = staggerValueLabels ? (i % 2 === 0 ? -8 : 8) : 0;
               const labelStyle = staggerValueLabels
                 ? { fontSize: 10, fontWeight: 600, marginBottom: 8, color: "var(--text)", transform: `translateY(${staggerOffset}px)` }
@@ -156,6 +193,8 @@ function BarChart({
                   key={i}
                   role={isClickable ? "button" : undefined}
                   onClick={isClickable && dateKey ? () => onBarClick?.(dateKey) : undefined}
+                  onMouseEnter={(e) => handleBarMouseEnter(e, i)}
+                  onMouseLeave={handleBarMouseLeave}
                   style={{
                     flex: 1,
                     display: "flex",
@@ -166,15 +205,16 @@ function BarChart({
                     cursor: isClickable ? "pointer" : "default",
                   }}
                 >
-                  <span style={labelStyle}>{compactBarLabels ? formatBarLabelCompact(v) : formatBarLabel(v)}</span>
+                  {!hideValueLabels && (
+                    <span style={labelStyle}>{compactBarLabels ? formatBarLabelCompact(v) : formatBarLabel(v)}</span>
+                  )}
                   <div
-                    className="chart-bar"
-                    title={formatCurrency(v)}
+                    className={`chart-bar ${isEmphasized ? "earnings-bar--emphasized" : "earnings-bar--default"}`}
                     style={{
                       width: `${barWidthPct}%`,
                       height: barHeight,
                       minHeight: v > 0 ? 6 : 0,
-                      background: "var(--avatar-gradient)",
+                      background: isEmphasized ? "#26434b" : (barStyleByIndex?.(i)?.background ?? "#93c5fd"),
                       borderTopLeftRadius: 6,
                       borderTopRightRadius: 6,
                       borderBottomLeftRadius: 0,
@@ -185,6 +225,20 @@ function BarChart({
               );
             })}
           </div>
+          {hoveredIndex !== null && tooltipPos != null && (
+            <div
+              className="earnings-chart-tooltip"
+              style={{
+                position: "absolute",
+                left: tooltipPos.left,
+                bottom: tooltipPos.bottom,
+                transform: "translateX(-50%)",
+              }}
+            >
+              <div className="earnings-chart-tooltip__period">{xLabels[hoveredIndex] ?? ""}</div>
+              <div className="earnings-chart-tooltip__value">Earnings : {formatCurrencyTwoDecimals(data[hoveredIndex] ?? 0)}</div>
+            </div>
+          )}
         </div>
         <div
           style={{
@@ -295,21 +349,30 @@ function EarningsHero({
 
   return (
     <div className="earnings-hero">
-      <div
-        className="earnings-hero__header"
-        style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", marginBottom: 2, minHeight: 38 }}
-      >
-        <div className="earnings-hero__selector" style={{ gap: 6, alignItems: "center" }}>
-          <button
-            type="button"
-            className="earnings-hero__arrowBtn"
-            onClick={onPrev}
-            disabled={disablePrev}
-            aria-label="Previous period"
-          >
-            <ChevronLeftIcon size={10} />
-          </button>
-          <span className="earnings-hero__periodText" style={{ fontSize: 13, minWidth: 72 }}>{periodText}</span>
+      <div className="earnings-hero__header">
+        <button
+          type="button"
+          className="earnings-hero__arrowBtn"
+          onClick={onPrev}
+          disabled={disablePrev}
+          aria-label="Previous period"
+        >
+          <ChevronLeftIcon size={10} />
+        </button>
+        <div className="earnings-hero__center">
+          <span className="earnings-hero__periodText">{periodText}</span>
+          <div className="earnings-hero__amount">{amount}</div>
+        </div>
+        <div className="earnings-hero__rightControls">
+          <div className="earnings-hero__deltaBlock">
+            <span className={`earnings-hero__chip earnings-hero__chip--${chipContent.mod}`}>
+              {chipContent.Icon ? (() => { const Icon = chipContent.Icon; return <Icon size={10} />; })() : null}
+              {chipContent.text}
+            </span>
+            <span className={`earnings-hero__delta earnings-hero__delta--${deltaMod}`}>
+              {deltaText}
+            </span>
+          </div>
           <button
             type="button"
             className="earnings-hero__arrowBtn"
@@ -320,17 +383,7 @@ function EarningsHero({
             <ChevronRightIcon size={10} />
           </button>
         </div>
-        <div className="earnings-hero__chip-block">
-          <span className={`earnings-hero__chip earnings-hero__chip--${chipContent.mod}`}>
-            {chipContent.Icon ? (() => { const Icon = chipContent.Icon; return <Icon size={12} />; })() : null}
-            {chipContent.text}
-          </span>
-          <span className={`earnings-hero__delta earnings-hero__delta--${deltaMod}`}>
-            {deltaText}
-          </span>
-        </div>
       </div>
-      <div className="earnings-hero__amount" style={{ marginTop: 0 }}>{amount}</div>
     </div>
   );
 }
@@ -363,6 +416,7 @@ export default function Earnings() {
   const [dlYear, setDlYear] = useState(0); // 0 = unset; will init on open
   const [dlFormat, setDlFormat] = useState<"csv" | "pdf">("csv");
   const [dlDelivery, setDlDelivery] = useState<"device" | "email">("device");
+  const [studentsYearDropdownOpen, setStudentsYearDropdownOpen] = useState(false);
   const now = new Date();
   // Use all completed, deduped lessons so matrix-imported attendance (any day) and tax CSV match. Scheduled-day filter excluded those.
   const completedLessons = dedupeLessons(data.lessons.filter((l) => l.completed));
@@ -393,6 +447,7 @@ export default function Earnings() {
   const visibleMonthLabels = MONTH_LABELS.slice(0, monthsToShow);
   const visibleMonthlyTotals = monthlyTotals.slice(0, monthsToShow);
   const visibleMonthlyHours = monthlyHours.slice(0, monthsToShow);
+  const monthlyHasAnyCompletedLessons = visibleMonthlyTotals.some((v) => v > 0);
   const monthlyTitle = String(displayYear);
   const earningsForDisplayYear = completedLessons
     .filter((l) => l.date.startsWith(String(displayYear)))
@@ -426,6 +481,7 @@ export default function Earnings() {
 
   const dailyData = getDailyTotalsForWeek(completedLessons, now, dailyWeekOffset);
   const dailyWeekTotal = dailyData.reduce((s, d) => s + d.total, 0);
+  const dailyHasAnyCompletedLessons = dailyData.some((d) => completedLessons.some((l) => l.date === d.dateKey));
   const dailyStartKey = dailyData[0]?.dateKey ?? "";
   const dailyEndKey = dailyData[6]?.dateKey ?? "";
   const dailyPeriodText = dailyStartKey && dailyEndKey ? formatWeekPeriodRange(dailyStartKey, dailyEndKey) : "";
@@ -586,160 +642,89 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
   }
 
   return (
-    <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h1 className="headline-serif" style={{ fontSize: 28, fontWeight: 400, margin: 0 }}>{t("earnings.title")}</h1>
-        <IconButton
+    <div className="earnings-page">
+      <header className="earnings-page__header">
+        <div className="earnings-page__titleBlock">
+          <h1 className="earnings-page__title">{t("earnings.title")}</h1>
+          <p className="earnings-page__subtitle">{t("earnings.subtitle")}</p>
+        </div>
+        <button
           type="button"
-          variant="ghost"
-          size="sm"
+          className="earnings-page__downloadBtn"
           onClick={openDownloadModal}
           aria-label="Download earnings"
         >
-          <DownloadIcon size={7} />
-        </IconButton>
-      </div>
+          <DownloadIcon size={20} />
+        </button>
+      </header>
 
-      {/* Download modal overlay */}
+      {/* Download modal */}
       {downloadOpen && (
-        <div
-          onClick={() => setDownloadOpen(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "var(--card, #fff)", borderRadius: 16, padding: 28, width: "100%", maxWidth: 360, boxShadow: "0 12px 40px rgba(0,0,0,0.18)" }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 600, margin: 0, fontFamily: "var(--font-sans)" }}>Download Earnings</h2>
-              <IconButton
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setDownloadOpen(false)}
-                aria-label="Close"
-              >
-                &times;
-              </IconButton>
+        <div className="earnings-dl-overlay" onClick={() => setDownloadOpen(false)}>
+          <div className="earnings-dl-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="earnings-dl-modal__header">
+              <h2 className="earnings-dl-modal__title">Download Earnings</h2>
+              <button type="button" className="earnings-dl-modal__close" onClick={() => setDownloadOpen(false)} aria-label="Close">&times;</button>
             </div>
-
-            {/* Year */}
-            <label style={{ display: "block", marginBottom: 16 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Year</span>
+            <label>
+              <span className="earnings-dl-modal__label">Year</span>
               <select
+                className="earnings-dl-modal__yearSelect"
                 value={dlYear}
                 onChange={(e) => setDlYear(Number(e.target.value))}
-                style={{ width: "100%", padding: "10px 12px", fontSize: 15, borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", fontFamily: "var(--font-sans)", color: "var(--text)" }}
               >
                 {yearsWithData.map((y) => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
             </label>
-
-            {/* Format */}
-            <div style={{ marginBottom: 16 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Format</span>
-              <div style={{ display: "flex", gap: 8 }}>
-                {(["csv", "pdf"] as const).map((fmt) => (
-                  <Button
-                    key={fmt}
-                    type="button"
-                    variant="tab"
-                    active={dlFormat === fmt}
-                    size="sm"
-                    onClick={() => setDlFormat(fmt)}
-                    style={{
-                      flex: 1,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {fmt}
-                  </Button>
-                ))}
+            <div>
+              <span className="earnings-dl-modal__label">Format</span>
+              <div className="earnings-dl-modal__formatRow">
+                <button type="button" className={`earnings-dl-modal__formatBtn ${dlFormat === "csv" ? "earnings-dl-modal__formatBtn--active" : "earnings-dl-modal__formatBtn--inactive"}`} onClick={() => setDlFormat("csv")}>CSV</button>
+                <button type="button" className={`earnings-dl-modal__formatBtn ${dlFormat === "pdf" ? "earnings-dl-modal__formatBtn--active" : "earnings-dl-modal__formatBtn--inactive"}`} onClick={() => setDlFormat("pdf")}>PDF</button>
               </div>
             </div>
-
-            {/* Delivery */}
             <div style={{ marginBottom: 24 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", display: "block", marginBottom: 6 }}>Deliver to</span>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <Button
-                  type="button"
-                  variant="tab"
-                  active={dlDelivery === "device"}
-                  size="sm"
-                  fullWidth
-                  onClick={() => setDlDelivery("device")}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    textAlign: "left",
-                    justifyContent: "flex-start",
-                  }}
-                  leftIcon={<DownloadIcon size={7} />}
-                >
-                  Download to device
-                </Button>
-                <Button
-                  type="button"
-                  variant="tab"
-                  active={dlDelivery === "email"}
-                  size="sm"
-                  fullWidth
-                  onClick={() => setDlDelivery("email")}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    textAlign: "left",
-                    justifyContent: "flex-start",
-                  }}
-                  leftIcon={
-                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="4" width="20" height="16" rx="2" />
-                      <path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7" />
-                    </svg>
-                  }
-                >
-                  Email to {data.user?.email ? data.user.email : "profile"}
-                </Button>
+              <span className="earnings-dl-modal__label">Deliver to</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <button type="button" className={`earnings-dl-modal__deliverRow ${dlDelivery === "device" ? "earnings-dl-modal__deliverRow--selected" : ""}`} onClick={() => setDlDelivery("device")}>
+                  <span className="earnings-dl-modal__deliverIcon"><DownloadIcon size={20} /></span>
+                  <span className="earnings-dl-modal__deliverLabel">Download to device</span>
+                </button>
+                <button type="button" className={`earnings-dl-modal__deliverRow ${dlDelivery === "email" ? "earnings-dl-modal__deliverRow--selected" : ""}`} onClick={() => setDlDelivery("email")}>
+                  <span className="earnings-dl-modal__deliverIcon">
+                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7" /></svg>
+                  </span>
+                  <span className="earnings-dl-modal__deliverLabel">Email to {data.user?.email ? data.user.email : "profile"}</span>
+                </button>
               </div>
             </div>
-
-            {/* Action button */}
-            <Button
-              type="button"
-              variant="primary"
-              size="md"
-              onClick={handleDownload}
-              fullWidth
-            >
+            <button type="button" className="earnings-dl-modal__downloadBtn" onClick={handleDownload}>
               {dlDelivery === "email" ? "Download & Open Email" : "Download"}
-            </Button>
+            </button>
           </div>
         </div>
       )}
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-        {TABS.map((tab) => (
-          <Button
-            key={tab}
-            type="button"
-            variant="tab"
-            size="sm"
-            active={activeTab === tab}
-            onClick={() => setActiveTab(tab)}
-            className="tabButton"
-            style={{ flex: "1 1 0", minWidth: 0 }}
-          >
-            {t(TAB_KEYS[tab])}
-          </Button>
-        ))}
+      <div className="earnings-page__tabsWrap">
+        <div className="earnings-page__tabs">
+          {TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={`earnings-page__tab ${activeTab === tab ? "earnings-page__tab--active" : ""}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {t(TAB_KEYS[tab])}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {activeTab === "Weekly" && (
+      {activeTab === "Weekly" && (() => {
+        const weeklyHasAnyCompletedLessons = weeklyData.some((w) => w.total > 0);
+        return (
         <>
           <EarningsHero
             amount={formatCurrency(weeklyHeroTotal)}
@@ -749,7 +734,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
             pctChange={weeklyPctChange}
             dollarDeltaCents={weeklyHeroTotal - weeklyPrevTotal}
           />
-          <div className="float-card" style={{ marginBottom: 24 }}>
+          <div className="earnings-card earnings-chart-card" style={{ marginBottom: 24 }}>
             {weeklyData.length > 0 ? (
               <BarChart
                 data={weeklyData.map((w) => w.total)}
@@ -758,64 +743,66 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                 noEarningsText={t("earnings.noEarnings")}
                 dateKeys={weeklyData.map((w) => w.startKey)}
                 onBarClick={(key) => setSelectedWeekStartKey((prev) => (prev === key ? null : key))}
+                selectedDateKey={selectedWeekStartKey}
                 angleXLabels
               />
             ) : (
               <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>No weeks in this month</div>
             )}
           </div>
-          {selectedWeekStartKey && (() => {
-            const week = weeklyData.find((w) => w.startKey === selectedWeekStartKey);
-            if (!week) return null;
+          {weeklyHasAnyCompletedLessons && weeklyData.map((week) => {
             const weekLessons = completedLessons.filter((l) => l.date >= week.startKey && l.date <= week.endKey);
             const numStudents = weekLessons.length;
             const totalMinutes = weekLessons.reduce((s, l) => s + l.durationMinutes, 0);
             const totalHours = totalMinutes / 60;
-            const totalEarned = weekLessons.reduce((s, l) => s + l.amountCents, 0);
             const [sy, sm, sd] = week.startKey.split("-").map(Number);
             const [ey, em, ed] = week.endKey.split("-").map(Number);
             const startFormatted = new Date(sy, sm - 1, sd).toLocaleDateString("en-US", { month: "short", day: "numeric" });
             const endFormatted = new Date(ey, em - 1, ed).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-            const formatDuration = (mins: number) => mins === 60 ? "1 hour" : mins < 60 ? `${mins} min` : `${mins / 60} hr ${mins % 60 ? `${mins % 60} min` : ""}`;
+            const formatDuration = (mins: number) => mins === 60 ? "1 hour" : mins < 60 ? `${mins} min` : `${(mins / 60).toFixed(1)} hrs`;
+            const isExpanded = selectedWeekStartKey === week.startKey;
             return (
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <strong>{startFormatted} – {endFormatted}</strong>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => setSelectedWeekStartKey(null)}>Close</Button>
-                </div>
-                <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
-                    <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.studentsTab")}</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{numStudents}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Hours</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.earningsYear")}</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{formatCurrency(totalEarned)}</div>
-                    </div>
+              <div key={week.startKey} className="earnings-list-card" style={{ marginBottom: 16 }}>
+                <div className="earnings-list-card__head">
+                  <div>
+                    <h3 className="earnings-list-card__title">{startFormatted} – {endFormatted}</h3>
+                    <p className="earnings-list-card__meta">
+                      {weekLessons.length} lessons · {totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)} hrs · <span className="earnings-amount--green">{formatCurrency(week.total)}</span>
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    className={`earnings-list-card__viewBtn ${isExpanded ? "earnings-list-card__viewBtn--close" : "earnings-list-card__viewBtn--view"}`}
+                    onClick={() => setSelectedWeekStartKey((prev) => (prev === week.startKey ? null : week.startKey))}
+                  >
+                    {isExpanded ? "Close" : "View"}
+                  </button>
                 </div>
-                <div className="float-card" style={{ padding: 0, overflow: "hidden" }}>
-                  {weekLessons.map((l) => {
-                    const student = data.students.find((s) => s.id === l.studentId);
-                    return (
-                      <div key={l.id} className="card-list-item" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20 }}>
-                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)" }}>{student ? `${student.firstName} ${student.lastName}` : "—"}</span>
-                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "center" }}>{formatDuration(l.durationMinutes)}</span>
-                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "right" }}>{formatCurrency(l.amountCents)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {isExpanded && weekLessons.length > 0 && (
+                  <div className="earnings-list-card__body">
+                    {weekLessons.map((l) => {
+                      const student = data.students.find((s) => s.id === l.studentId);
+                      const [ly, lm, ld] = l.date.split("-").map(Number);
+                      const dayName = new Date(ly, lm - 1, ld).toLocaleDateString("en-US", { weekday: "short" });
+                      return (
+                        <div key={l.id} className="earnings-list-card__row">
+                          <div className="earnings-list-card__avatar">{student ? `${student.firstName[0]}${student.lastName[0]}` : "—"}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="earnings-list-card__name">{student ? `${student.firstName} ${student.lastName}` : "—"}</div>
+                            <div className="earnings-list-card__sub">{dayName} {l.date.slice(5)} · {formatDuration(l.durationMinutes)}</div>
+                          </div>
+                          <span className="earnings-list-card__amount">{formatCurrency(l.amountCents)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
-          })()}
+          })}
         </>
-      )}
+        );
+      })()}
 
       {activeTab === "Monthly" && (
         <>
@@ -829,7 +816,8 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
           />
           {monthsToShow > 0 && (
             <>
-              <div style={{ marginBottom: 24 }}>
+              <div className="earnings-card earnings-chart-card" style={{ marginBottom: 24 }}>
+                <div className="earnings-chart-card__title">MONTHLY BREAKDOWN — {displayYear}</div>
                 <BarChart
                   data={visibleMonthlyTotals}
                   xLabels={visibleMonthLabels}
@@ -837,36 +825,34 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                   noEarningsText={t("earnings.noEarnings")}
                   dateKeys={visibleMonthLabels.map((_, i) => `${displayYear}-${String(i + 1).padStart(2, "0")}`)}
                   onBarClick={(key) => setSelectedMonthKey((prev) => (prev === key ? null : key))}
+                  selectedDateKey={selectedMonthKey}
                   maxBarWidth={22}
                   barWidthPct={50}
                   whitePlotBackground
-                  staggerValueLabels
-                  compactBarLabels
+                  hideValueLabels
                 />
               </div>
-              <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
-                {visibleMonthLabels.map((label, i) => {
-                  const monthKey = `${displayYear}-${String(i + 1).padStart(2, "0")}`;
-                  const isSelected = selectedMonthKey === monthKey;
-                  return (
-                    <Button
+              {monthlyHasAnyCompletedLessons && (
+                <div className="earnings-card earnings-card--noPadding earnings-monthly-list" style={{ marginBottom: 24 }}>
+                  {visibleMonthLabels.map((label, i) => (
+                    <button
                       key={i}
                       type="button"
-                      variant="tab"
-                      size="sm"
-                      active={isSelected}
-                      fullWidth
-                      onClick={() => setSelectedMonthKey((prev) => (prev === monthKey ? null : monthKey))}
-                      className="card-list-item"
-                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20, borderRadius: 0, boxShadow: "none" }}
+                      className="earnings-monthly-row"
+                      onClick={() => setSelectedMonthKey((prev) => (prev === `${displayYear}-${String(i + 1).padStart(2, "0")}` ? null : `${displayYear}-${String(i + 1).padStart(2, "0")}`))}
+                      style={{ width: "100%", border: "none", background: "none", cursor: "pointer", textAlign: "left" }}
                     >
-                      <span>{label}</span>
-                      <span style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>{visibleMonthlyHours[i] % 1 === 0 ? visibleMonthlyHours[i] : visibleMonthlyHours[i].toFixed(1)} hrs</span>
-                      <span style={{ fontWeight: 600, textAlign: "right" }}>{formatCurrency(visibleMonthlyTotals[i])}</span>
-                    </Button>
-                  );
-                })}
-              </div>
+                      <span className="earnings-monthly-list__month">{label}</span>
+                      <span className="earnings-monthly-list__hours">{visibleMonthlyHours[i] % 1 === 0 ? visibleMonthlyHours[i] : visibleMonthlyHours[i].toFixed(1)} hrs</span>
+                      <span className="earnings-monthly-list__amount">{formatCurrency(visibleMonthlyTotals[i])}</span>
+                    </button>
+                  ))}
+                  <div className="earnings-monthly-list__footer earnings-monthly-row">
+                    <span className="earnings-monthly-list__month">Total {displayYear}</span>
+                    <span className="earnings-monthly-list__amount">{formatCurrency(visibleMonthlyTotals.reduce((a, b) => a + b, 0))}</span>
+                  </div>
+                </div>
+              )}
             </>
           )}
           {monthsToShow === 0 && (
@@ -899,15 +885,15 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
                     <div>
                       <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.studentsTab")}</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{numStudents}</div>
+                      <div className="earnings-detail-card__value" style={{ fontSize: 20 }}>{numStudents}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Hours</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)}</div>
+                      <div className="earnings-detail-card__value" style={{ fontSize: 20 }}>{totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.earningsYear")}</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{formatCurrency(totalEarned)}</div>
+                      <div className="earnings-detail-card__value" style={{ fontSize: 20 }}>{formatCurrency(totalEarned)}</div>
                     </div>
                   </div>
                 </div>
@@ -931,19 +917,21 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
 
       {activeTab === "Yearly" && (
         <>
-          <EarningsHero
-            amount={formatCurrency(yearlyHeroTotal)}
-            periodText={String(yearlyHeroYear)}
-            onPrev={() => setYearlyYearOffset((o) => o - 1)}
-            onNext={() => setYearlyYearOffset((o) => o + 1)}
-            pctChange={yearlyPctChange}
-            dollarDeltaCents={yearlyHeroTotal - yearlyPrevTotal}
-            disablePrev={yearlyHeroYear <= Math.min(...allYears.map(Number))}
-            disableNext={yearlyHeroYear >= thisYear}
-          />
+          {(() => {
+            const allTimeTotal = completedLessons.reduce((s, l) => s + l.amountCents, 0);
+            return (
+              <div className="earnings-hero earnings-hero--yearly" style={{ marginBottom: 20, textAlign: "center" }}>
+                <div className="earnings-hero__allTimePill">
+                  <span className="earnings-hero__allTimeLabel">All-time earnings</span>
+                  <span className="earnings-hero__allTimeAmount">{formatCurrency(allTimeTotal)}</span>
+                </div>
+              </div>
+            );
+          })()}
           {yearlyLabels.length > 0 && (
             <>
-              <div className="float-card" style={{ marginBottom: 24 }}>
+              <div className="earnings-card earnings-chart-card" style={{ marginBottom: 24 }}>
+                <div className="earnings-chart-card__title">YEAR-OVER-YEAR</div>
                 <BarChart
                   data={yearlyTotals}
                   xLabels={yearlyLabels}
@@ -951,30 +939,39 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                   noEarningsText={t("earnings.noEarnings")}
                   dateKeys={yearlyLabels}
                   onBarClick={(key) => setSelectedYearKey((prev) => (prev === key ? null : key))}
+                  selectedDateKey={selectedYearKey}
                   yAxisStepCents={1000000}
+                  barStyleByIndex={(i) => ({ background: yearlyLabels[i] === String(thisYear) ? "#26434b" : "#93c5fd" })}
                 />
               </div>
-              <div className="float-card" style={{ marginBottom: 24, padding: 0, overflow: "hidden" }}>
+              <div className="earnings-card earnings-card--noPadding earnings-yearly-list" style={{ marginBottom: 24 }}>
                 {yearlyLabels.map((label, i) => {
-                  const isSelected = selectedYearKey === label;
+                  const yr = parseInt(label);
+                  const isCurrentYear = yr === thisYear;
+                  const pctChange = i > 0 && yearlyTotals[i - 1]! > 0 ? ((yearlyTotals[i]! - yearlyTotals[i - 1]!) / yearlyTotals[i - 1]!) * 100 : null;
                   return (
-                    <Button
+                    <button
                       key={label}
                       type="button"
-                      variant="tab"
-                      size="sm"
-                      active={isSelected}
-                      fullWidth
+                      className="earnings-yearly-row"
                       onClick={() => setSelectedYearKey((prev) => (prev === label ? null : label))}
-                      className="card-list-item"
-                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20, borderRadius: 0, boxShadow: "none" }}
+                      style={{ width: "100%", border: "none", background: "none", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}
                     >
-                      <span>{label}{parseInt(label) === thisYear ? " (YTD)" : ""}</span>
-                      <span style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center" }}>{yearlyHours[i] % 1 === 0 ? yearlyHours[i] : yearlyHours[i].toFixed(1)} hrs</span>
-                      <span style={{ fontWeight: 600, textAlign: "right" }}>{formatCurrency(yearlyTotals[i])}</span>
-                    </Button>
+                      <div>
+                        <span className="earnings-yearly-list__year">{label}{isCurrentYear ? " (YTD)" : ""}</span>
+                        <div className="earnings-yearly-list__meta">{yearlyHours[i] % 1 === 0 ? yearlyHours[i] : yearlyHours[i].toFixed(1)} hrs · {completedLessons.filter((l) => l.date.startsWith(label)).length} lessons</div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        {pctChange != null && pctChange < 0 && <span className="earnings-yearly-list__pctPill">{pctChange.toFixed(1)}%</span>}
+                        <span className="earnings-yearly-list__amount">{formatCurrency(yearlyTotals[i])}</span>
+                      </div>
+                    </button>
                   );
                 })}
+                <div className="earnings-yearly-list__footer earnings-yearly-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="earnings-yearly-list__year">All Time</span>
+                  <span className="earnings-yearly-list__amount">{formatCurrency(completedLessons.reduce((s, l) => s + l.amountCents, 0))}</span>
+                </div>
               </div>
             </>
           )}
@@ -1011,15 +1008,15 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
                     <div>
                       <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.studentsTab")}</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{numStudents}</div>
+                      <div className="earnings-detail-card__value" style={{ fontSize: 20 }}>{numStudents}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Hours</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)}</div>
+                      <div className="earnings-detail-card__value" style={{ fontSize: 20 }}>{totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.earningsYear")}</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{formatCurrency(totalEarned)}</div>
+                      <div className="earnings-detail-card__value" style={{ fontSize: 20 }}>{formatCurrency(totalEarned)}</div>
                     </div>
                   </div>
                 </div>
@@ -1053,7 +1050,7 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
             pctChange={dailyPctChange}
             dollarDeltaCents={dailyWeekTotal - dailyPrevWeekTotal}
           />
-          <div className="float-card" style={{ marginBottom: 24 }}>
+          <div className="earnings-card earnings-chart-card" style={{ marginBottom: 24 }}>
             <BarChart
               data={dailyData.map((d) => d.total)}
               xLabels={dailyData.map((d) => d.label)}
@@ -1061,56 +1058,58 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
               maxVal={maxDaily}
               dateKeys={dailyData.map((d) => d.dateKey)}
               onBarClick={(dateKey) => setSelectedDayDateKey((prev) => (prev === dateKey ? null : dateKey))}
-              noEarningsText={t("earnings.noEarnings")}
+              selectedDateKey={selectedDayDateKey}
+              noEarningsText={t("earnings.noLessonsThisWeek")}
             />
           </div>
-          {selectedDayDateKey && (() => {
-            const dayLessons = completedLessons.filter((l) => l.date === selectedDayDateKey);
+          {dailyHasAnyCompletedLessons
+            ? dailyData.map((d) => {
+            const dayLessons = completedLessons.filter((l) => l.date === d.dateKey);
             const numStudents = dayLessons.length;
             const totalMinutes = dayLessons.reduce((s, l) => s + l.durationMinutes, 0);
             const totalHours = totalMinutes / 60;
-            const totalEarned = dayLessons.reduce((s, l) => s + l.amountCents, 0);
-            const dateStr = selectedDayDateKey;
-            const [y, m, d] = dateStr.split("-").map(Number);
-            const dateFormatted = new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
-            const formatDuration = (mins: number) => mins === 60 ? "1 hour" : mins < 60 ? `${mins} min` : `${mins / 60} hr ${mins % 60 ? `${mins % 60} min` : ""}`;
+            const [y, m, dayNum] = d.dateKey.split("-").map(Number);
+            const dateFormatted = new Date(y, m - 1, dayNum).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+            const formatDuration = (mins: number) => mins === 60 ? "1 hour" : mins < 60 ? `${mins} min` : `${(mins / 60).toFixed(1)} hrs`;
+            const isExpanded = selectedDayDateKey === d.dateKey;
             return (
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <strong>{dateFormatted}</strong>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => setSelectedDayDateKey(null)}>Close</Button>
-                </div>
-                <div className="float-card" style={{ marginBottom: 16, padding: 16 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, textAlign: "center" }}>
-                    <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.studentsTab")}</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{numStudents}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Hours</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.earningsYear")}</div>
-                      <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{formatCurrency(totalEarned)}</div>
-                    </div>
+              <div key={d.dateKey} className="earnings-list-card" style={{ marginBottom: 16 }}>
+                <div className="earnings-list-card__head">
+                  <div>
+                    <h3 className="earnings-list-card__title">{dateFormatted}</h3>
+                    <p className="earnings-list-card__meta">
+                      {numStudents} student{numStudents !== 1 ? "s" : ""} · {totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1)} hrs · <span className="earnings-amount--green">{formatCurrency(d.total)}</span>
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    className={`earnings-list-card__viewBtn ${isExpanded ? "earnings-list-card__viewBtn--close" : "earnings-list-card__viewBtn--view"}`}
+                    onClick={() => setSelectedDayDateKey((prev) => (prev === d.dateKey ? null : d.dateKey))}
+                  >
+                    {isExpanded ? "Close" : "View"}
+                  </button>
                 </div>
-                <div className="float-card" style={{ padding: 0, overflow: "hidden" }}>
-                  {dayLessons.map((l) => {
-                    const student = data.students.find((s) => s.id === l.studentId);
-                    return (
-                      <div key={l.id} className="card-list-item" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, alignItems: "center", paddingLeft: 20, paddingRight: 20 }}>
-                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)" }}>{student ? `${student.firstName} ${student.lastName}` : "—"}</span>
-                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "center" }}>{formatDuration(l.durationMinutes)}</span>
-                        <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "var(--font-sans)", color: "var(--text)", textAlign: "right" }}>{formatCurrency(l.amountCents)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {isExpanded && dayLessons.length > 0 && (
+                  <div className="earnings-list-card__body">
+                    {dayLessons.map((l) => {
+                      const student = data.students.find((s) => s.id === l.studentId);
+                      return (
+                        <div key={l.id} className="earnings-list-card__row">
+                          <div className="earnings-list-card__avatar">{student ? `${student.firstName[0]}${student.lastName[0]}` : "—"}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="earnings-list-card__name">{student ? `${student.firstName} ${student.lastName}` : "—"}</div>
+                            <div className="earnings-list-card__sub">{formatDuration(l.durationMinutes)}</div>
+                          </div>
+                          <span className="earnings-list-card__amount">{formatCurrency(l.amountCents)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
-          })()}
+          })
+            : null}
         </>
       )}
 
@@ -1153,69 +1152,62 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
           }
         });
         const isEmptyInactive = studentsStatusFilter === "inactive" && sorted.length === 0;
+        const totalLessonsStudentsTab = lessonsForStudentsYear.length;
+        const totalEarningsStudentsTab = lessonsForStudentsYear.reduce((s, l) => s + l.amountCents, 0);
+        const sortLabel = studentsSort === "az" || studentsSort === "za" ? "A – Z" : "By Earnings";
         return (
           <>
-            {/* Students hero: date switcher at top, then active/inactive counts */}
-            <div className="earnings-hero" style={{ marginBottom: 20 }}>
-              <div className="earnings-hero__selector" style={{ gap: 6, alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+            <div className="earnings-students__controls">
+              <div style={{ position: "relative" }}>
                 <button
                   type="button"
-                  className="earnings-hero__arrowBtn"
-                  onClick={() => setStudentsYearOffset((o) => o - 1)}
-                  aria-label="Previous year"
+                  className="earnings-students__yearPill"
+                  onClick={() => setStudentsYearDropdownOpen((o) => !o)}
+                  aria-expanded={studentsYearDropdownOpen}
                 >
-                  <ChevronLeftIcon size={10} />
+                  {studentsDisplayYear} YTD
+                  <ChevronRightIcon size={12} style={{ transform: "rotate(90deg)" }} />
                 </button>
-                <span className="earnings-hero__periodText" style={{ fontSize: 13, minWidth: 72 }}>
-                  {studentsDisplayYear}
-                </span>
-                <button
-                  type="button"
-                  className="earnings-hero__arrowBtn"
-                  onClick={() => setStudentsYearOffset((o) => o + 1)}
-                  aria-label="Next year"
-                >
-                  <ChevronRightIcon size={10} />
-                </button>
+                {studentsYearDropdownOpen && (
+                  <>
+                    <div style={{ position: "fixed", inset: 0, zIndex: 1 }} onClick={() => setStudentsYearDropdownOpen(false)} aria-hidden="true" />
+                    <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 6, background: "#fff", borderRadius: 16, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", border: "1px solid var(--border)", padding: "8px 0", minWidth: 140, zIndex: 2 }}>
+                      {[thisYear, thisYear - 1].map((y) => (
+                        <button
+                          key={y}
+                          type="button"
+                          onClick={() => { setStudentsYearOffset(y - thisYear); setStudentsYearDropdownOpen(false); }}
+                          style={{ width: "100%", padding: "10px 16px", border: "none", background: studentsDisplayYear === y ? "rgba(90, 122, 126, 0.1)" : "transparent", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text)", textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+                        >
+                          {y} YTD
+                          {studentsDisplayYear === y && <span style={{ color: "#26434b" }}>✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.activeStudents")}</div>
-                  <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{activeCount}</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>{t("earnings.inactiveStudents")}</div>
-                  <div className="headline-serif" style={{ fontSize: 20, fontWeight: 400 }}>{inactiveCount}</div>
-                </div>
-              </div>
-            </div>
-            {/* Search + Sort */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center" }}>
-              <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={studentsSearch}
-                  onChange={(e) => setStudentsSearch(e.target.value)}
-                  style={{ width: "100%", padding: "8px 10px 8px 32px", fontSize: 14, borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", fontFamily: "var(--font-sans)" }}
-                />
-              </div>
-              <select
-                value={studentsSort}
-                onChange={(e) => setStudentsSort(e.target.value as "az" | "za" | "high" | "low")}
-                style={{ padding: "8px 8px", fontSize: 14, borderRadius: 10, border: "1px solid var(--border)", background: "var(--card)", fontFamily: "var(--font-sans)", color: "var(--text)", cursor: "pointer", flexShrink: 0, WebkitAppearance: "none", MozAppearance: "none", appearance: "none", backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23666' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center", paddingRight: 24 }}
+              <button
+                type="button"
+                className="earnings-students__sortPill"
+                onClick={() => setStudentsSort((prev) => (prev === "high" || prev === "low" ? "az" : "high"))}
               >
-                <option value="az">A–Z</option>
-                <option value="za">Z–A</option>
-                <option value="high">High–Low</option>
-                <option value="low">Low–High</option>
-              </select>
+                {sortLabel}
+              </button>
             </div>
-            {/* Active / Inactive segmented toggle */}
-            <div style={{ display: "flex", gap: 0, marginBottom: 20, borderRadius: "var(--radius-pill)", padding: 4, background: "rgba(180, 160, 180, 0.08)", border: "1px solid var(--border)", width: "fit-content" }}>
+            <div className="earnings-students__searchWrap">
+              <svg className="earnings-students__searchIcon" width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                className="earnings-students__search"
+                placeholder="Search student..."
+                value={studentsSearch}
+                onChange={(e) => setStudentsSearch(e.target.value)}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 0, marginBottom: 16, borderRadius: "var(--radius-pill)", padding: 4, background: "rgba(180, 160, 180, 0.08)", border: "1px solid var(--border)", width: "fit-content" }}>
               <Button type="button" variant="tab" size="sm" active={studentsStatusFilter === "active"} onClick={() => setStudentsStatusFilter("active")} style={{ border: "none" }}>
                 Active
               </Button>
@@ -1223,47 +1215,42 @@ th{font-size:12px;text-transform:uppercase;color:#888;border-bottom:2px solid #d
                 Inactive
               </Button>
             </div>
-            <div className="float-card" style={{ padding: 0, overflow: "hidden" }}>
+            <div className="earnings-students-list">
               {isEmptyInactive && (
                 <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>No inactive students this year.</div>
               )}
-              {sorted.length > 0 && !isEmptyInactive && sorted.map(({ student: s, total }) => (
-                <Link
-                  key={s.id}
-                  to={`/students/${s.id}`}
-                  className="card-list-item"
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    paddingLeft: 20,
-                    paddingRight: 20,
-                    paddingTop: 14,
-                    paddingBottom: 14,
-                    textDecoration: "none",
-                    color: "inherit",
-                    cursor: "pointer",
-                    transition: "background 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(180, 160, 180, 0.06)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <span>{s.firstName} {s.lastName}</span>
-                  <span style={{ fontWeight: 600 }}>{formatCurrency(total)}</span>
-                </Link>
-              ))}
+              {sorted.length > 0 && !isEmptyInactive && sorted.map(({ student: s, total }) => {
+                const lessonCount = lessonsForStudentsYear.filter((l) => l.studentId === s.id).length;
+                const mins = lessonsForStudentsYear.filter((l) => l.studentId === s.id).reduce((a, l) => a + l.durationMinutes, 0);
+                const hrs = mins / 60;
+                return (
+                  <Link key={s.id} to={`/students/${s.id}`} className="earnings-students-list__row">
+                    <div className="earnings-students-list__avatar">{s.firstName[0]}{s.lastName[0]}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="earnings-students-list__name">{s.firstName} {s.lastName}</div>
+                      <div className="earnings-students-list__meta">{lessonCount} lessons · {hrs % 1 === 0 ? hrs : hrs.toFixed(1)} hrs</div>
+                    </div>
+                    <span className="earnings-students-list__amount">{formatCurrency(total)}</span>
+                  </Link>
+                );
+              })}
               {sorted.length === 0 && !isEmptyInactive && (
                 <div style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>No students found</div>
+              )}
+              {sorted.length > 0 && !isEmptyInactive && (
+                <div className="earnings-students-list__footer">
+                  <div>
+                    <div className="earnings-students-list__footerTitle">Total {studentsDisplayYear}</div>
+                    <p className="earnings-students-list__footerMeta">{totalLessonsStudentsTab} lessons</p>
+                  </div>
+                  <span className="earnings-students-list__footerAmount">{formatCurrency(totalEarningsStudentsTab)}</span>
+                </div>
               )}
             </div>
           </>
         );
       })()}
 
-    </>
+    </div>
   );
 }

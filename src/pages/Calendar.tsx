@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatCurrency, getStudentsForDay, getEffectiveSchedule, getEffectiveDurationMinutes, getEffectiveRateCents, getLessonForStudentOnDate, getStudentIdsWithLessonOnDate, toDateKey, dedupeLessonsById, getWeekBounds, getSuppressedGeneratedSlotIds, computeLessonAmountCents, isStudentActive } from "@/utils/earnings";
 import StudentAvatar from "@/components/StudentAvatar";
 import type { Lesson, Student } from "@/types";
-import { Button, IconButton } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/Button";
 import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/Icons";
+import "./calendar.css";
 
 const DAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -16,20 +17,12 @@ function addDays(d: Date, n: number): Date {
   return x;
 }
 
-/** 5 days: 2 before center, center, 2 after */
-function getFiveDays(center: Date): Date[] {
-  return [-2, -1, 0, 1, 2].map((i) => addDays(center, i));
-}
-
 export default function Calendar() {
   const navigate = useNavigate();
   const { data, addLesson, updateLesson } = useStoreContext();
   const { t } = useLanguage();
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [viewCenter, setViewCenter] = useState(new Date());
-  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [monthPickerView, setMonthPickerView] = useState(new Date());
-  const monthPickerRef = useRef<HTMLDivElement>(null);
 
   const dateKey = toDateKey(selectedDate);
   const dayOfWeek = selectedDate.getDay();
@@ -57,22 +50,6 @@ export default function Calendar() {
   const todayEarnings = dedupedLessons
     .filter((l) => l.date === dateKey && l.completed && todaysStudentIds.has(l.studentId))
     .reduce((s, l) => s + l.amountCents, 0);
-  const stripDates = getFiveDays(viewCenter);
-
-  // Always center the 5-day strip on the selected date when it changes
-  useEffect(() => {
-    setViewCenter(selectedDate);
-  }, [selectedDate]);
-
-  // Click outside to close month picker
-  useEffect(() => {
-    if (!monthPickerOpen) return;
-    const handle = (e: MouseEvent) => {
-      if (monthPickerRef.current && !monthPickerRef.current.contains(e.target as Node)) setMonthPickerOpen(false);
-    };
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [monthPickerOpen]);
 
   // If the student has a lesson on another date this week (rescheduled), return it so we can edit it instead of creating a new one.
   const getLessonElsewhereThisWeek = (studentId: string): Lesson | undefined => {
@@ -111,159 +88,94 @@ export default function Calendar() {
     if (id) navigate(`/edit-lesson/${id}`);
   };
 
+  const gridYear = monthPickerView.getFullYear();
+  const gridMonth = monthPickerView.getMonth();
+  const gridFirst = new Date(gridYear, gridMonth, 1);
+  const gridStart = new Date(gridFirst);
+  gridStart.setDate(1 - gridFirst.getDay());
+  const gridCells: { date: Date; isCurrentMonth: boolean }[] = [];
+  for (let i = 0; i < 28; i++) {
+    const d = addDays(gridStart, i);
+    gridCells.push({ date: d, isCurrentMonth: d.getMonth() === gridMonth });
+  }
+
   return (
-    <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, minHeight: 44 }}>
-        <Link to="/" style={{ color: "var(--text)", textDecoration: "none", fontSize: 15, display: "inline-flex", alignItems: "center" }}>← {t("common.back")}</Link>
-        <h1 className="headline-serif" style={{ fontSize: 26, fontWeight: 400, margin: 0, lineHeight: 1 }}>{t("calendar.title")}</h1>
-        <Button
-          to="/add-student"
-          title={t("students.addStudent")}
-          variant="primary"
-          size="sm"
-          iconOnly
-          aria-label={t("students.addStudent")}
-        >
+    <div className="calendar-page">
+      <header className="calendar-page__header">
+        <Link to="/" className="calendar-page__back">
+          <ChevronLeftIcon /> {t("common.back")}
+        </Link>
+        <h1 className="calendar-page__title">{t("calendar.title")}</h1>
+        <Link to="/add-student" className="calendar-page__add-btn" title={t("students.addStudent")} aria-label={t("students.addStudent")}>
           +
-        </Button>
-      </div>
-      <div style={{ marginBottom: 16, position: "relative" }} ref={monthPickerRef}>
-        <Button
+        </Link>
+      </header>
+
+      <div className="calendar-page__month-wrap">
+        <button
           type="button"
-          variant="primary"
-          size="md"
-          onClick={() => { setMonthPickerOpen((o) => !o); setMonthPickerView(selectedDate); }}
-          style={{
-            marginBottom: 12,
-          }}
+          className="calendar-page__month-btn"
+          onClick={() => setMonthPickerView(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1))}
         >
-          {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-        </Button>
+          {monthPickerView.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+        </button>
+      </div>
 
-        {monthPickerOpen && (
-          <div className="float-card" style={{ position: "absolute", left: 16, right: 16, maxWidth: 360, zIndex: 50, marginBottom: 16, padding: 16, boxShadow: "var(--shadow-elevated)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <IconButton
-                type="button"
-                onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth(), 1), -1))}
-                variant="secondary"
-                size="sm"
-                aria-label="Previous month"
-              >
-                <ChevronLeftIcon />
-              </IconButton>
-              <span style={{ fontWeight: 600, fontSize: 16, fontFamily: "var(--font-sans)" }}>{monthPickerView.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
-              <IconButton
-                type="button"
-                onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 1))}
-                variant="secondary"
-                size="sm"
-                aria-label="Next month"
-              >
-                <ChevronRightIcon />
-              </IconButton>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, textAlign: "center", marginBottom: 8 }}>
-              {DAYS_SHORT.map((label) => (
-                <div key={label} style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", fontFamily: "var(--font-sans)" }}>{label}</div>
-              ))}
-              {(() => {
-                const year = monthPickerView.getFullYear();
-                const month = monthPickerView.getMonth();
-                const first = new Date(year, month, 1);
-                const start = new Date(first);
-                start.setDate(1 - first.getDay());
-                const cells: { date: Date; isCurrentMonth: boolean }[] = [];
-                for (let i = 0; i < 42; i++) {
-                  const d = addDays(start, i);
-                  cells.push({ date: d, isCurrentMonth: d.getMonth() === month });
-                }
-                return cells.map(({ date, isCurrentMonth }) => {
-                  const key = toDateKey(date);
-                  const isSelected = key === dateKey;
-                  return (
-                    <Button
-                      key={key}
-                      type="button"
-                      variant={isSelected ? "primary" : "ghost"}
-                      size="sm"
-                      iconOnly
-                      onClick={() => { setSelectedDate(date); setMonthPickerOpen(false); }}
-                      style={{
-                        minWidth: 36,
-                        minHeight: 36,
-                        borderRadius: "50%",
-                        color: isSelected ? "white" : isCurrentMonth ? "var(--text)" : "var(--text-muted)",
-                        opacity: isCurrentMonth ? 1 : 0.6,
-                      }}
-                    >
-                      {date.getDate()}
-                    </Button>
-                  );
-                });
-              })()}
-            </div>
-          </div>
-        )}
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="calendar-page__grid-card">
+        <div className="calendar-page__grid-header">
           <IconButton
             type="button"
-            onClick={() => setViewCenter((prev) => addDays(prev, -5))}
-            variant="secondary"
+            onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth(), 1), -1))}
+            variant="ghost"
             size="sm"
-            style={{ flexShrink: 0 }}
+            aria-label="Previous month"
           >
             <ChevronLeftIcon />
           </IconButton>
-          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
-            {stripDates.map((d) => {
-              const isSelected = toDateKey(d) === dateKey;
-              const chipTypography = {
-                fontFamily: "var(--font-sans)",
-                fontSize: 12,
-                fontWeight: 500,
-                color: isSelected ? "rgba(255,255,255,0.95)" : "var(--text-muted)",
-                lineHeight: 1.1,
-              };
-              const monthDayLabel = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-              return (
-                <Button
-                  key={d.toISOString()}
-                  type="button"
-                  variant={isSelected ? "primary" : "secondary"}
-                  size="sm"
-                  iconOnly
-                  onClick={() => setSelectedDate(d)}
-                  style={{
-                    width: 74, minWidth: 74, height: 56, minHeight: 56, borderRadius: 999,
-                    color: chipTypography.color,
-                    display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-sans)",
-                  }}
-                >
-                  <div style={chipTypography}>{monthDayLabel}</div>
-                </Button>
-              );
-            })}
-          </div>
+          <span className="calendar-page__grid-month">{monthPickerView.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
           <IconButton
             type="button"
-            onClick={() => setViewCenter((prev) => addDays(prev, 5))}
-            variant="secondary"
+            onClick={() => setMonthPickerView((d) => addDays(new Date(d.getFullYear(), d.getMonth() + 1, 0), 1))}
+            variant="ghost"
             size="sm"
-            style={{ flexShrink: 0 }}
+            aria-label="Next month"
           >
             <ChevronRightIcon />
           </IconButton>
         </div>
+        <div className="calendar-page__weekdays">
+          {DAYS_SHORT.map((label) => (
+            <span key={label}>{label}</span>
+          ))}
+        </div>
+        <div className="calendar-page__dates">
+          {gridCells.map(({ date, isCurrentMonth }) => {
+            const key = toDateKey(date);
+            const isSelected = key === dateKey;
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`calendar-page__date-cell ${!isCurrentMonth ? "calendar-page__date-cell--other-month" : ""} ${isSelected ? "calendar-page__date-cell--selected" : ""}`}
+                onClick={() => {
+                  setSelectedDate(date);
+                  setMonthPickerView(new Date(date.getFullYear(), date.getMonth(), 1));
+                }}
+              >
+                {date.getDate()}
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>Schedule</h3>
-      <div className="float-card" style={{ marginBottom: 20, padding: 18 }}>
-        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Today&apos;s earnings</div>
-        <div className="headline-serif" style={{ fontSize: 22, fontWeight: 400 }}>{formatCurrency(todayEarnings)}</div>
+
+      <h2 className="calendar-page__schedule-title">Schedule</h2>
+      <div className="calendar-page__earnings-card">
+        <div className="calendar-page__earnings-label">Today&apos;s earnings</div>
+        <div className="calendar-page__earnings-amount">{formatCurrency(todayEarnings)}</div>
       </div>
       {todaysStudents.length === 0 ? (
-        <p style={{ color: "var(--text-muted)", textAlign: "center", fontStyle: "italic" }}>No lessons scheduled</p>
+        <p className="calendar-page__empty">No lessons scheduled</p>
       ) : (
         todaysStudents.map((student) => {
           const lesson = getLessonForStudentOnDate(dedupedLessons, student.id, dateKey);
@@ -273,22 +185,30 @@ export default function Calendar() {
           const effectiveAmountCents = computeLessonAmountCents(student, lesson ?? undefined, dateKey);
           const display = duration >= 60 ? `${duration / 60} hour / ${formatCurrency(effectiveAmountCents)}` : `${duration} mins / ${formatCurrency(effectiveAmountCents)}`;
           return (
-            <div key={student.id} className="float-card" style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ marginRight: 14, flexShrink: 0 }} onClick={() => handlePressLesson(student)}>
+            <div key={student.id} className="calendar-page__lesson-card" onClick={() => handlePressLesson(student)}>
+              <div className="calendar-page__lesson-avatar-wrap">
                 <StudentAvatar student={student} size={48} />
               </div>
-              <div style={{ flex: 1 }} onClick={() => handlePressLesson(student)}>
-                <div style={{ fontWeight: 600 }}>{student.firstName} {student.lastName}</div>
-                <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{display}</div>
+              <div className="calendar-page__lesson-body">
+                <div className="calendar-page__lesson-name">{student.firstName} {student.lastName}</div>
+                <div className="calendar-page__lesson-meta">{display}</div>
               </div>
-              <label className="toggle-wrap">
-                <input type="checkbox" checked={completed} onChange={(e) => handleToggle(student.id, e.target.checked)} />
-                {completed && <span style={{ color: "var(--success)", fontWeight: 600 }}>{formatCurrency(effectiveAmountCents)}</span>}
-              </label>
+              <div className="calendar-page__lesson-toggle-wrap" onClick={(e) => e.stopPropagation()}>
+                <span className="calendar-page__lesson-amount">{formatCurrency(effectiveAmountCents)}</span>
+                <label className="calendar-page__toggle-label">
+                  <input
+                    type="checkbox"
+                    className="calendar-page__lesson-toggle"
+                    checked={completed}
+                    onChange={(e) => handleToggle(student.id, e.target.checked)}
+                  />
+                  <span className="calendar-page__lesson-toggle-track" aria-hidden />
+                </label>
+              </div>
             </div>
           );
         })
       )}
-    </>
+    </div>
   );
 }

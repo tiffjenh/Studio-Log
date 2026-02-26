@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
+import { isSupabaseTableError } from "@/store/useStore";
 import { useLanguage } from "@/context/LanguageContext";
 import { parseStudentCSV, rowToStudentWithError } from "@/utils/csvImport";
 import { downloadCsv, getStudentTemplateCsv } from "@/utils/importTemplates";
@@ -8,6 +9,19 @@ import { getCurrencyByCode, getStoredCurrencyCode } from "@/utils/currencies";
 import type { DaySchedule, Student } from "@/types";
 import { Button, IconButton } from "@/components/ui/Button";
 import { DownloadIcon } from "@/components/ui/Icons";
+import "./add-student.mock.css";
+import "./add-student.modals.css";
+
+/** Upload/import icon for dropdown (arrow up into tray). */
+function UploadIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: "block", flexShrink: 0 }}>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  );
+}
 
 const DURATIONS = [30, 45, 60, 90, 120];
 const DURATION_LABELS: Record<number, string> = { 30: "30 min", 45: "45 min", 60: "1 hr", 90: "1.5 hr", 120: "2 hr" };
@@ -58,6 +72,36 @@ export default function AddStudent() {
   const [timePickerHour, setTimePickerHour] = useState(5);
   const [timePickerMinute, setTimePickerMinute] = useState(0);
   const [timePickerAmPm, setTimePickerAmPm] = useState<"AM" | "PM">("PM");
+  const [importDropdownOpen, setImportDropdownOpen] = useState(false);
+  const importDropdownRef = useRef<HTMLDivElement>(null);
+  const timePickerHourColRef = useRef<HTMLDivElement>(null);
+  const timePickerMinuteColRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!timePickerOpen) return;
+    const t = setTimeout(() => {
+      timePickerHourColRef.current?.querySelector(".addStudent-timePickerRowSelected")?.scrollIntoView({ block: "nearest", behavior: "auto" });
+      timePickerMinuteColRef.current?.querySelector(".addStudent-timePickerRowSelected")?.scrollIntoView({ block: "nearest", behavior: "auto" });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [timePickerOpen, timePickerHour, timePickerMinute]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (importDropdownRef.current && !importDropdownRef.current.contains(e.target as Node)) setImportDropdownOpen(false);
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setImportDropdownOpen(false);
+    };
+    if (importDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEsc);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [importDropdownOpen]);
 
   const addScheduleEntry = () => {
     setScheduleEntries((prev) => [...prev, { id: nextEntryId, dayOfWeek: 1, durationMinutes: 60, rateDollars: "", timeOfDay: "" }]);
@@ -107,7 +151,13 @@ export default function AddStudent() {
       navigate("/students");
     } catch (e) {
       const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : e instanceof Error ? e.message : "Could not add student. Try again.";
-      setError(msg);
+      if (isSupabaseTableError(msg)) {
+        setError(
+          "Database schema isn’t loaded for this environment. In Supabase Dashboard → SQL Editor, run the script in supabase/bootstrap-schema.sql (it ends with “reload schema”), then try again."
+        );
+      } else {
+        setError(msg);
+      }
     }
   };
 
@@ -230,27 +280,49 @@ export default function AddStudent() {
   };
 
   return (
-    <>
-      <Link to="/students" style={{ display: "inline-flex", marginBottom: 24, color: "var(--text)", textDecoration: "none", ...fontStyle }}>&larr; {t("common.back")}</Link>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, ...fontStyle }}>{t("addStudent.title")}</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} />
-          <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} variant="secondary" size="sm" loading={importing} title={t("students.importStudents")}>
-            {t("students.importStudents")}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => downloadCsv("students-template.csv", getStudentTemplateCsv())}
-            leftIcon={<DownloadIcon size={7} />}
-            style={{ gap: 6, minHeight: 40, height: 40 }}
-          >
-            Template
-          </Button>
+    <div className="addStudentPage">
+      <header className="addStudentPage__header">
+        <Link to="/students" className="addStudentPage__backBtn" aria-label={t("common.back")}>&larr;</Link>
+        <div className="addStudentPage__titleBlock">
+          <h1 className="addStudentPage__title">{t("addStudent.title")}</h1>
         </div>
-      </div>
+        <div className="addStudentPage__importWrap" ref={importDropdownRef}>
+          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImport} style={{ display: "none" }} />
+          <div className="addStudentPage__importPill">
+            <button type="button" className="addStudentPage__importLeft" onClick={() => fileInputRef.current?.click()} disabled={importing} aria-label="Import students CSV">
+              <span className="addStudentPage__importLeftInner">
+                <UploadIcon size={14} />
+                <span>Import</span>
+              </span>
+            </button>
+            <span className="addStudentPage__importDivider" aria-hidden />
+            <button
+              type="button"
+              className="addStudentPage__importCaret"
+              onClick={() => setImportDropdownOpen((o) => !o)}
+              disabled={importing}
+              aria-expanded={importDropdownOpen}
+              aria-haspopup="menu"
+              aria-label={importDropdownOpen ? "Close menu" : "Open menu"}
+            >
+              <span className="addStudentPage__importBtnChevron" aria-hidden>{importDropdownOpen ? "\u25B2" : "\u25BC"}</span>
+            </button>
+          </div>
+          {importDropdownOpen && (
+            <div className="addStudentPage__dropdown" role="menu">
+              <button type="button" role="menuitem" className="addStudentPage__dropdownItem" onClick={() => { setImportDropdownOpen(false); fileInputRef.current?.click(); }} disabled={importing}>
+                <UploadIcon size={20} />
+                <span>Import Students CSV</span>
+              </button>
+              <div className="addStudentPage__dropdownDivider" />
+              <button type="button" role="menuitem" className="addStudentPage__dropdownItem" onClick={() => { setImportDropdownOpen(false); downloadCsv("students-template.csv", getStudentTemplateCsv()); }}>
+                <DownloadIcon size={20} />
+                <span>Download Template</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
       {importing && importProgress && (
         <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, background: "var(--card)", border: "1px solid var(--border)", fontSize: 14, ...fontStyle }}>
           <p style={{ margin: "0 0 10px", fontWeight: 600 }}>Importing students... {importProgress.current} of {importProgress.total}</p>
@@ -278,104 +350,169 @@ export default function AddStudent() {
         );
       })()}
       <form onSubmit={handleSave}>
-        <label style={labelStyle}>{t("addStudent.firstName")}</label>
-        <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t("addStudent.firstName")} style={inputStyle} required />
-        <label style={labelStyle}>{t("addStudent.lastName")}</label>
-        <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder={t("addStudent.lastName")} style={inputStyle} required />
+        <div className="addStudentPage__card addStudentPage__card--info">
+          <h2 className="addStudentPage__cardTitle">Student Information</h2>
+          <div className="addStudentPage__inputGrid">
+            <div>
+              <label style={labelStyle} className="addStudentPage__label">{t("addStudent.firstName")}</label>
+              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jane" style={inputStyle} className="addStudentPage__input" required />
+            </div>
+            <div>
+              <label style={labelStyle} className="addStudentPage__label">{t("addStudent.lastName")}</label>
+              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" style={inputStyle} className="addStudentPage__input" required />
+            </div>
+          </div>
+        </div>
 
         {/* Schedule entries */}
         {scheduleEntries.map((entry) => (
-          <div key={entry.id} style={{ marginBottom: 20, padding: 16, borderRadius: 12, border: "1px solid var(--border)", background: "var(--bg)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <span style={{ fontWeight: 700, fontSize: 15, ...fontStyle }}>{DAYS_FULL[entry.dayOfWeek]} Lesson</span>
+          <div key={entry.id} className="addStudentPage__card addStudentPage__card--lesson">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <span style={{ fontWeight: 700, fontSize: 16, ...fontStyle }}>{DAYS_FULL[entry.dayOfWeek]} Lesson</span>
               {scheduleEntries.length > 1 && (
                 <Button type="button" variant="danger" size="sm" onClick={() => removeScheduleEntry(entry.id)}>Delete Day</Button>
               )}
             </div>
-            <label style={labelStyle}>{t("addStudent.dayOfWeek")}</label>
-            <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
+            <label className="addStudentPage__fieldLabel">{t("addStudent.dayOfWeek")}</label>
+            <div className="addStudentPage__dayPills">
               {DAY_SHORT.map((label, i) => (
-                <Button key={i} type="button" variant="tab" size="sm" active={entry.dayOfWeek === i} onClick={() => updateEntry(entry.id, "dayOfWeek", i)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>
+                <button key={i} type="button" className={`addStudentPage__dayPill ${entry.dayOfWeek === i ? "addStudentPage__dayPillActive" : ""}`} onClick={() => updateEntry(entry.id, "dayOfWeek", i)}>
                   {label}
-                </Button>
+                </button>
               ))}
             </div>
-            <label style={labelStyle}>{t("addStudent.lessonDuration")}</label>
-            <div style={{ display: "flex", flexWrap: "nowrap", gap: 4, marginBottom: 16 }}>
+            <label className="addStudentPage__fieldLabel">{t("addStudent.lessonDuration")}</label>
+            <div className="addStudentPage__durationPills">
               {DURATIONS.map((m) => (
-                <Button key={m} type="button" variant="tab" size="sm" active={entry.durationMinutes === m} onClick={() => updateEntry(entry.id, "durationMinutes", m)} style={{ flex: "1 1 0", minWidth: 0, paddingLeft: 6, paddingRight: 6 }}>
+                <button key={m} type="button" className={`addStudentPage__durationPill ${entry.durationMinutes === m ? "addStudentPage__durationPillActive" : ""}`} onClick={() => updateEntry(entry.id, "durationMinutes", m)}>
                   {DURATION_LABELS[m]}
-                </Button>
+                </button>
               ))}
             </div>
-            <label style={labelStyle}>{t("common.rate")}</label>
-            <Button type="button" variant="secondary" size="md" onClick={() => openRateModal(entry.id)} fullWidth style={{ marginBottom: 16, textAlign: "left", justifyContent: "flex-start" }}>
-              {entry.rateDollars ? `${currencySymbol}${entry.rateDollars}` : `${currencySymbol}0`}
-            </Button>
-            <label style={labelStyle}>{t("common.time")}</label>
-            <Button type="button" variant="secondary" size="md" onClick={() => openTimePicker(entry.id)} fullWidth style={{ textAlign: "left", justifyContent: "flex-start" }}>
-              {entry.timeOfDay || "5:00 PM"}
-            </Button>
+            <div className="addStudentPage__rateTimeRow">
+              <div>
+                <label className="addStudentPage__fieldLabel">Rate (per hour)</label>
+                <button type="button" className="addStudentPage__fieldBtn" onClick={() => openRateModal(entry.id)}>
+                  <span className={!entry.rateDollars ? "addStudentPage__fieldBtnPlaceholder" : ""}>
+                    {entry.rateDollars ? `${currencySymbol}${entry.rateDollars}` : "Tap to set"}
+                  </span>
+                </button>
+              </div>
+              <div>
+                <label className="addStudentPage__fieldLabel">{t("common.time")}</label>
+                <button type="button" className="addStudentPage__fieldBtn" onClick={() => openTimePicker(entry.id)}>
+                  {entry.timeOfDay || "3:00 PM"}
+                </button>
+              </div>
+            </div>
           </div>
         ))}
-        <Button type="button" variant="primary" size="sm" onClick={addScheduleEntry} leftIcon={<span>+</span>} style={{ marginBottom: 20 }}>Day</Button>
+        <button type="button" onClick={addScheduleEntry} className="addStudentPage__addDayBtn">+ Add Day</button>
 
-        {error ? <p style={{ color: "#dc2626", marginBottom: 16, ...fontStyle }}>{error}</p> : null}
-        <Button type="submit" variant="secondary" size="sm" fullWidth style={{ marginTop: 24 }}>{t("common.save")}</Button>
+        {error ? (
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ color: "#dc2626", ...fontStyle }}>{error}</p>
+            {isSupabaseTableError(error) || /schema isn't loaded|bootstrap-schema/i.test(error) ? (
+              <button type="button" onClick={() => setError("")} className="addStudentPage__retrySchemaBtn" style={{ marginTop: 8 }}>
+                Dismiss & try again
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="addStudentPage__bottomRow">
+          <button type="button" onClick={() => navigate("/students")} className="addStudentPage__cancelBtn">{t("common.cancel")}</button>
+          <button type="submit" className="addStudentPage__submitBtn">{t("addStudent.title")}</button>
+        </div>
       </form>
 
       {rateModalOpen && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setRateModalOpen(false)}>
-          <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-              <IconButton type="button" variant="ghost" size="sm" onClick={() => setRateModalOpen(false)} aria-label="Close">&times;</IconButton>
+        <div className="addStudent-rateBackdrop" onClick={() => setRateModalOpen(false)}>
+          <div className="addStudent-rateCard" onClick={(e) => e.stopPropagation()}>
+            <div className="addStudent-rateHeader">
+              <p className="addStudent-rateTitle">
+                {scheduleEntries.length > 1 ? `${DAYS_FULL[scheduleEntries.find((e) => e.id === rateModalDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}{t("common.rate")}
+              </p>
+              <button type="button" className="addStudent-rateClose" onClick={() => setRateModalOpen(false)} aria-label="Close">&times;</button>
             </div>
-            <p style={{ margin: "0 0 8px", fontSize: 13, color: "var(--text-muted)" }}>{scheduleEntries.length > 1 ? `${DAY_SHORT[scheduleEntries.find((e) => e.id === rateModalDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}{t("common.rate")}</p>
-            <div style={{ fontSize: 28, fontWeight: 600, marginBottom: 16, color: "var(--text)" }}>
-              {currencySymbol}{rateKeypadValue || "0"}
+            <div className="addStudent-rateDisplay">
+              <div className="addStudent-rateDisplayInner">
+                <span className="addStudent-rateDisplaySymbol">{currencySymbol}</span>
+                <span className="addStudent-rateDisplayNumber">{rateKeypadValue || "0"}</span>
+              </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
+            <div className="addStudent-rateKeypad">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                <Button key={n} type="button" variant="secondary" size="sm" onClick={() => setRateKeypadValue((v) => v + n)}>{n}</Button>
+                <button key={n} type="button" className="addStudent-rateKey" onClick={() => setRateKeypadValue((v) => v + n)}>{n}</button>
               ))}
-              <Button type="button" variant="secondary" size="sm" onClick={() => setRateKeypadValue((v) => (v.includes(".") ? v : v + "."))}>.</Button>
-              <Button type="button" variant="secondary" size="sm" onClick={() => setRateKeypadValue((v) => v + "0")}>0</Button>
-              <Button type="button" variant="tab" size="sm" onClick={() => setRateKeypadValue((v) => v.slice(0, -1))}>&larr;</Button>
+              <button type="button" className="addStudent-rateKey" onClick={() => setRateKeypadValue((v) => (v.includes(".") ? v : v + "."))}>.</button>
+              <button type="button" className="addStudent-rateKey" onClick={() => setRateKeypadValue((v) => v + "0")}>0</button>
+              <button type="button" className="addStudent-rateKey addStudent-rateKeyBackspace" onClick={() => setRateKeypadValue((v) => v.slice(0, -1))} aria-label="Backspace">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M10 11l4 4"/><path d="M14 11l-4 4"/></svg>
+              </button>
             </div>
-            <Button type="button" variant="primary" size="md" onClick={applyRate} fullWidth>{t("common.setRate")}</Button>
+            <div className="addStudent-rateChips">
+              {DURATIONS.map((d) => {
+                const hourly = parseFloat(rateKeypadValue) || 0;
+                const amount = (hourly * d) / 60;
+                return (
+                  <div key={d} className="addStudent-rateChip" role="presentation">
+                    <span className="addStudent-rateChipDuration">{DURATION_LABELS[d]}</span>
+                    <span className="addStudent-rateChipAmount">{currencySymbol}{amount.toFixed(2)}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <button type="button" className="addStudent-rateSubmit" onClick={applyRate}>{t("common.setRate")}</button>
           </div>
         </div>
       )}
 
-      {timePickerOpen && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setTimePickerOpen(false)}>
-          <div style={{ background: "var(--card)", borderRadius: "var(--radius-card)", padding: 24, boxShadow: "var(--shadow-elevated)", maxWidth: 320, width: "90%", ...fontStyle }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-              <IconButton type="button" variant="ghost" size="sm" onClick={() => setTimePickerOpen(false)} aria-label="Close">&times;</IconButton>
-            </div>
-            <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)" }}>{scheduleEntries.length > 1 ? `${DAY_SHORT[scheduleEntries.find((e) => e.id === timePickerDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}{t("common.selectTime")}</p>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <select value={timePickerHour} onChange={(e) => setTimePickerHour(Number(e.target.value))} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, ...fontStyle }}>
-                  {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (<option key={h} value={h}>{h}</option>))}
-                </select>
-                <span style={{ fontSize: 18, fontWeight: 600 }}>:</span>
-                <select value={timePickerMinute} onChange={(e) => setTimePickerMinute(Number(e.target.value))} style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 18, fontWeight: 600, ...fontStyle }}>
-                  {Array.from({ length: 60 }, (_, i) => i).map((m) => (<option key={m} value={m}>{String(m).padStart(2, "0")}</option>))}
-                </select>
+      {timePickerOpen && (() => {
+        const HOUR_OPTIONS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+        const MINUTE_OPTIONS = [0, 15, 30, 45];
+        const selectedMinuteDisplay = MINUTE_OPTIONS.includes(timePickerMinute) ? timePickerMinute : null;
+        return (
+          <div className="addStudent-rateBackdrop" onClick={() => setTimePickerOpen(false)}>
+            <div className="addStudent-timeCard" onClick={(e) => e.stopPropagation()}>
+              <div className="addStudent-rateHeader">
+                <p className="addStudent-rateTitle">
+                  {scheduleEntries.length > 1 ? `${DAYS_FULL[scheduleEntries.find((e) => e.id === timePickerDay)?.dayOfWeek ?? 0]} \u2014 ` : ""}{t("common.selectTime")}
+                </p>
+                <button type="button" className="addStudent-rateClose" onClick={() => setTimePickerOpen(false)} aria-label="Close">&times;</button>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <Button type="button" variant="tab" size="sm" active={timePickerAmPm === "AM"} onClick={() => setTimePickerAmPm("AM")}>AM</Button>
-                <Button type="button" variant="tab" size="sm" active={timePickerAmPm === "PM"} onClick={() => setTimePickerAmPm("PM")}>PM</Button>
+              <div className="addStudent-timePickerWrap">
+                <div ref={timePickerHourColRef} className="addStudent-timePickerColumn">
+                  <div className="addStudent-timePickerColumnInner">
+                    {HOUR_OPTIONS.map((h) => (
+                      <button key={h} type="button" className={`addStudent-timePickerRow ${timePickerHour === h ? "addStudent-timePickerRowSelected" : ""}`} onClick={() => setTimePickerHour(h)}>
+                        {h}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <span className="addStudent-timePickerColon">:</span>
+                <div ref={timePickerMinuteColRef} className="addStudent-timePickerColumn">
+                  <div className="addStudent-timePickerColumnInner">
+                    {MINUTE_OPTIONS.map((m) => (
+                      <button key={m} type="button" className={`addStudent-timePickerRow ${selectedMinuteDisplay != null && selectedMinuteDisplay === m ? "addStudent-timePickerRowSelected" : ""}`} onClick={() => setTimePickerMinute(m)}>
+                        {String(m).padStart(2, "0")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="addStudent-timeAmPmWrap">
+                  <button type="button" className={`addStudent-timeAmPmBtn ${timePickerAmPm === "AM" ? "addStudent-timeAmPmBtnActive" : ""}`} onClick={() => setTimePickerAmPm("AM")}>AM</button>
+                  <button type="button" className={`addStudent-timeAmPmBtn ${timePickerAmPm === "PM" ? "addStudent-timeAmPmBtnActive" : ""}`} onClick={() => setTimePickerAmPm("PM")}>PM</button>
+                </div>
               </div>
-            </div>
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <Button type="button" variant="secondary" size="sm" onClick={() => setTimePickerOpen(false)}>{t("common.cancel")}</Button>
-              <Button type="button" variant="primary" size="sm" onClick={applyTime}>{t("common.ok")}</Button>
+              <div className="addStudent-timeActions">
+                <button type="button" className="addStudent-timeCancel" onClick={() => setTimePickerOpen(false)}>{t("common.cancel")}</button>
+                <button type="button" className="addStudent-timeOk" onClick={applyTime}>{t("common.ok")}</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </>
+        );
+      })()}
+    </div>
   );
 }

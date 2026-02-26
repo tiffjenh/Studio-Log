@@ -3,8 +3,9 @@
  * Single value: "$82.50/hr". Entity + value: "Leo Chen — $160/hr".
  */
 
+/** Insights only: currency with exactly 2 decimal places (e.g. $1,265.00). */
 function fmt(n: number): string {
-  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function formatEarningsInPeriod(out: { total_dollars?: number; lesson_count?: number }): string {

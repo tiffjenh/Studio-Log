@@ -1,0 +1,383 @@
+/* Add Student page mock — scoped under .addStudentPage. No horizontal overflow. */
+.addStudentPage {
+  --mock-teal: #26434B;
+  background: transparent;
+  padding-bottom: calc(var(--nav-height, 56px) + 24px);
+  font-family: var(--font-sans);
+  max-width: 100%;
+}
+
+/* Header: back (left), title+subtitle (center, single-line), Import pill (right, compact) */
+.addStudentPage__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  min-width: 0;
+}
+
+.addStudentPage__backBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 16px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.addStudentPage__backBtn:hover {
+  background: #f8faf9;
+}
+
+.addStudentPage__titleBlock {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+}
+
+.addStudentPage__title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+
+/* Import split pill: compact, left = file picker, divider, right = chevron dropdown */
+.addStudentPage__importWrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.addStudentPage__importPill {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 999px;
+  background: var(--mock-teal);
+  box-shadow: 0 2px 12px rgba(38, 67, 75, 0.25);
+  overflow: hidden;
+  height: 36px;
+  min-height: 36px;
+}
+
+.addStudentPage__importLeft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  min-height: 36px;
+  border: none;
+  background: transparent;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.addStudentPage__importLeftInner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+}
+
+.addStudentPage__importLeftInner span {
+  line-height: 1;
+}
+
+.addStudentPage__importLeftInner svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.addStudentPage__importLeft:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.addStudentPage__importLeft:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+.addStudentPage__importDivider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.4);
+  margin: 6px 0;
+  flex-shrink: 0;
+}
+
+.addStudentPage__importCaret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  min-width: 36px;
+  min-height: 36px;
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font-size: 9px;
+}
+
+.addStudentPage__importCaret:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.addStudentPage__importBtnChevron {
+  opacity: 0.9;
+}
+
+.addStudentPage__dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  min-width: 220px;
+  background: #fff;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-elevated);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 8px 0;
+  z-index: 200;
+}
+
+.addStudentPage__dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: none;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.addStudentPage__dropdownItem:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.addStudentPage__dropdownItem:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.addStudentPage__dropdownDivider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 4px 0;
+}
+
+/* Cards */
+.addStudentPage__card {
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.addStudentPage__cardTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 16px;
+}
+
+.addStudentPage__inputGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.addStudentPage__label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.addStudentPage__input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 16px;
+  font-family: var(--font-sans);
+  color: var(--text);
+}
+
+.addStudentPage__input:focus {
+  outline: none;
+  border-color: var(--mock-teal);
+}
+
+/* Lesson card */
+.addStudentPage__card--lesson {
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+/* Day of week + duration: compact pills, one line, selected = teal */
+.addStudentPage__dayPills,
+.addStudentPage__durationPills {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin-bottom: 16px;
+  min-width: 0;
+}
+
+.addStudentPage__dayPill,
+.addStudentPage__durationPill {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.addStudentPage__dayPill:hover,
+.addStudentPage__durationPill:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text);
+}
+
+.addStudentPage__dayPillActive,
+.addStudentPage__durationPillActive {
+  background: var(--mock-teal);
+  color: white;
+  border-color: var(--mock-teal);
+}
+
+/* Rate + Time row: two field-like buttons (thin border, rounded) */
+.addStudentPage__rateTimeRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.addStudentPage__fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.addStudentPage__fieldBtn {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-size: 15px;
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.addStudentPage__fieldBtn:hover {
+  border-color: var(--mock-teal);
+  background: rgba(38, 67, 75, 0.03);
+}
+
+.addStudentPage__fieldBtnPlaceholder {
+  color: var(--text-muted);
+}
+
+/* + Add Day button — full width, dashed border (mock) */
+.addStudentPage__addDayBtn {
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 14px 20px;
+  border-radius: 14px;
+  border: 2px dashed rgba(38, 67, 75, 0.35);
+  background: rgba(201, 221, 231, 0.5);
+  color: var(--mock-teal);
+  box-shadow: none;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+/* Schema error: dismiss & try again link */
+.addStudentPage__retrySchemaBtn {
+  background: none;
+  border: none;
+  color: var(--mock-teal);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.addStudentPage__retrySchemaBtn:hover {
+  color: #1a2f35;
+}
+
+/* Bottom row: Cancel (white pill) + Add Student (teal pill) */
+.addStudentPage__bottomRow {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.addStudentPage__bottomRow .addStudentPage__cancelBtn,
+.addStudentPage__bottomRow .addStudentPage__submitBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 14px 20px;
+  border-radius: 999px;
+  font-size: 17px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.addStudentPage__bottomRow .addStudentPage__cancelBtn {
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.addStudentPage__bottomRow .addStudentPage__submitBtn {
+  background: var(--mock-teal);
+  color: white;
+  border: none;
+  box-shadow: 0 2px 12px rgba(38, 67, 75, 0.25);
+}

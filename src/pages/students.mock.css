@@ -1,0 +1,546 @@
+/* Students page mock — scoped under .studentsPage. Do not affect other pages. */
+/* Full-height gradient, edge-to-edge: cancel Layout app-shell padding so no white container edges. */
+.studentsPage {
+  --mock-teal: #26434B;
+  /* Edge-to-edge: cancel app-shell padding so body gradient shows through; no white container */
+  margin: -20px -16px calc(-1 * (var(--nav-height) + var(--safe-bottom)));
+  padding: 20px 16px calc(var(--nav-height) + var(--safe-bottom) + 24px);
+  background: transparent;
+  font-family: var(--font-sans);
+}
+
+/* Dashboard-style avatar (light blue-green) for student initial circles */
+.studentsPage .studentsPage__row > div:first-child,
+.studentsPage .studentsPage__historicalList .studentsPage__row > div:first-child {
+  background: linear-gradient(135deg, #9ac9c2 0%, #a8d5d0 45%, #8fc9c2 100%) !important;
+  color: #fff !important;
+}
+
+/* Header */
+.studentsPage__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.studentsPage__titleBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.studentsPage__title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+
+.studentsPage__count {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Split button: left = "+ Students" (navigate), divider, right = caret (toggle menu) */
+.studentsPage__splitWrap {
+  position: relative;
+}
+
+.studentsPage__splitPill {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 999px;
+  background: var(--mock-teal);
+  box-shadow: 0 2px 12px rgba(38, 67, 75, 0.25);
+  overflow: hidden;
+  min-height: 44px;
+}
+
+.studentsPage__splitLeft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px 10px 18px;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: filter 0.15s ease;
+}
+
+.studentsPage__splitLeft:hover {
+  filter: brightness(1.05);
+}
+
+.studentsPage__splitDivider {
+  width: 1px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.35);
+  margin: 6px 0;
+}
+
+.studentsPage__splitCaret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  min-width: 44px;
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: filter 0.15s ease;
+}
+
+.studentsPage__splitCaret:hover {
+  filter: brightness(1.05);
+}
+
+.studentsPage__splitCaret:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: -2px;
+}
+
+.studentsPage__addBtnChevron {
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.studentsPage__dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  min-width: 220px;
+  background: #fff;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-elevated);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 8px 0;
+  z-index: 200;
+}
+
+.studentsPage__dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: none;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.studentsPage__dropdownItem:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.studentsPage__dropdownItem:focus-visible {
+  outline: 2px solid var(--mock-teal);
+  outline-offset: -2px;
+}
+
+.studentsPage__dropdownItem:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.studentsPage__dropdownItem svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+/* Horizontal divider between Import Lessons and Download Lessons */
+.studentsPage__dropdownDivider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.1);
+  margin: 4px 0;
+}
+
+/* Segmented tabs: smaller, left-aligned like mock */
+.studentsPage__segmented {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 0;
+  background: transparent;
+  border-radius: 999px;
+  justify-content: flex-start;
+}
+
+.studentsPage__segmented .studentsPage__segmentedBtn {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.studentsPage__segmented .studentsPage__segmentedBtn[aria-pressed="true"] {
+  background: var(--mock-teal) !important;
+  color: white !important;
+  border: none !important;
+}
+
+.studentsPage__segmented .studentsPage__segmentedBtn[aria-pressed="false"] {
+  background: #fff !important;
+  color: var(--text-muted) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Search: white module only */
+.studentsPage__searchWrap {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.studentsPage__searchWrap::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") center/contain no-repeat;
+  pointer-events: none;
+}
+
+.studentsPage__searchInput {
+  width: 100%;
+  padding: 12px 14px 12px 44px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  font-size: 15px;
+  font-family: var(--font-sans);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.studentsPage__searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+/* Day chips: circle only for All/M/T/…; count below with gradient behind it */
+.studentsPage__dayChips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.studentsPage__dayChip {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+
+/* Circle only (white when inactive, teal when active) */
+.studentsPage__dayChipCircle {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.studentsPage__dayChip[aria-pressed="true"] .studentsPage__dayChipCircle,
+.studentsPage__dayChip--all[aria-pressed="true"] .studentsPage__dayChipCircle {
+  background: var(--mock-teal);
+  color: white;
+  border-color: var(--mock-teal);
+  box-shadow: 0 2px 12px rgba(38, 67, 75, 0.25);
+}
+
+/* Days with no students: greyed out (e.g. Sunday) */
+.studentsPage__dayChip--empty .studentsPage__dayChipCircle {
+  background: rgba(0, 0, 0, 0.06);
+  color: #9ca3af;
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.studentsPage__dayChip--empty .studentsPage__dayChipCount {
+  color: #9ca3af;
+}
+
+/* Count below circle — on gradient (no circle bg) */
+.studentsPage__dayChipLabel {
+  line-height: 1;
+}
+
+.studentsPage__dayChipCount {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Historical bar */
+.studentsPage__historicalBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.studentsPage__historicalBar .studentsPage__searchInput {
+  flex: 1;
+  min-width: 120px;
+}
+
+.studentsPage__sortSelect {
+  padding: 8px 12px;
+  font-size: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-family: var(--font-sans);
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* Empty state */
+.studentsPage__emptyCard {
+  padding: 28px;
+  text-align: center;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+}
+
+/* Day list: day header on gradient; each student in own white card */
+.studentsPage__dayList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.studentsPage__dayGroup {
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.studentsPage__dayHeader {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 10px 0;
+  padding: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Each student row link = white card */
+.studentsPage__rowLink {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  margin-bottom: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.studentsPage__rowLink:last-child {
+  margin-bottom: 0;
+}
+
+.studentsPage__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+}
+
+.studentsPage__rowContent {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Card layout: name, then time · duration, then $amount in green (like dashboard) */
+.studentsPage__rowName {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.studentsPage__rowMeta {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.studentsPage__rowRate {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a6b1a;
+  margin-top: 2px;
+}
+
+.studentsPage__rowDays {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.studentsPage__rowTerminated {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.studentsPage__rowChevron {
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Historical list */
+.studentsPage__historicalList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.studentsPage__historicalList .studentsPage__rowLink {
+  background: #fff;
+  border-radius: 20px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.studentsPage__historicalList .studentsPage__rowLink:last-child {
+  margin-bottom: 0;
+}
+
+.studentsPage__row--historical {
+  border-bottom: none;
+}
+
+/* Bottom actions: single row — Clear Lessons (orange) + Delete All (red) */
+.studentsPage__actions {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.studentsPage__bottomRow {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.studentsPage__clearLessonsBtn,
+.studentsPage__deleteAllBtnBottom {
+  flex: 0 0 auto;
+  height: 42px;
+  padding-left: 18px;
+  padding-right: 18px;
+  border-radius: 40px;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.studentsPage__clearLessonsBtn {
+  border: 2px solid #F97316;
+  color: #F97316;
+}
+
+.studentsPage__clearLessonsBtn:hover:not(:disabled) {
+  background: rgba(249, 115, 22, 0.06);
+}
+
+.studentsPage__clearLessonsBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.studentsPage__deleteAllBtnBottom {
+  border: 2px solid #DC2626;
+  color: #DC2626;
+}
+
+.studentsPage__deleteAllBtnBottom:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.studentsPage__deleteAllBtnBottom:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.studentsPage__bottomBtnIcon {
+  font-size: 18px;
+  line-height: 1;
+  color: inherit;
+}
+

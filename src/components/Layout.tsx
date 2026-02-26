@@ -6,8 +6,8 @@ import { useLanguage } from "@/context/LanguageContext";
 import { hasSupabase } from "@/lib/supabase";
 import ImportBanner from "@/components/ImportBanner";
 
-const iconSize = 22;
-const strokeWidth = 1.5; /* thin icons */
+const iconSize = 20;
+const strokeWidth = 1.5; /* thin icons — nav mock compact */
 
 const NavIcons = {
   dashboard: (
@@ -57,7 +57,7 @@ const navKeys = [
 const RELOAD_AFTER_HIDDEN_MS = 4000;
 
 export default function Layout() {
-  const { loadError, reload } = useStoreContext();
+  const { reload } = useStoreContext();
   const { t } = useLanguage();
   const hiddenAtRef = useRef<number | null>(null);
 
@@ -82,22 +82,38 @@ export default function Layout() {
 
   return (
     <>
-      <main className="app-shell" style={{ padding: "20px 16px 24px" }}>
+      <div
+        className="app-layout"
+        style={{
+          height: "100dvh",
+          maxHeight: "100dvh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <main
+          className="app-shell"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflowY: "auto",
+            padding: "20px 16px 24px",
+            paddingBottom: "calc(var(--nav-height) + var(--safe-bottom) + 24px)",
+          }}
+        >
         {devLoadedAt != null && (
           <div style={{ position: "fixed", bottom: 56, right: 12, fontSize: 10, color: "var(--text-muted)", opacity: 0.7, pointerEvents: "none", zIndex: 0 }} title="Page load time – if this doesn’t change after refresh, the browser is serving cached code">
             loaded {new Date(devLoadedAt).toLocaleTimeString()}
           </div>
         )}
-        {loadError && (
-          <div style={{ marginBottom: 16, padding: 12, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, fontSize: 14, color: "#dc2626" }}>
-            Could not load data: {loadError}. Try logging out and back in, or check the browser console.
-          </div>
-        )}
         <ImportBanner />
-        <div className="pageTransition">
+        <div className="pageTransition" style={{ flex: 1, minHeight: 0 }}>
           <Outlet />
         </div>
-      </main>
+        </main>
+      </div>
       {createPortal(
         <nav className="bottom-nav" aria-label="Main">
           {navKeys.map(({ to, key, icon }) => (

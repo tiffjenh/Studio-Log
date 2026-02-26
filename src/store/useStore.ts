@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppData, Lesson, Student, User } from "@/types";
 import { dedupeLessonsById } from "@/utils/earnings";
-import { hasSupabase } from "@/lib/supabase";
+import { hasSupabase, supabase } from "@/lib/supabase";
 import {
   loadFromSupabase,
   signOutSupabase,
@@ -54,12 +54,18 @@ function dedupeLessonsByStudentDate(lessons: Lesson[]): Lesson[] {
 /** Skip reload for this long after a bulk student import so we don't overwrite with a stale fetch. */
 const SKIP_RELOAD_AFTER_BULK_IMPORT_MS = 30_000;
 
+/** True when Supabase is configured but tables are missing; we use localStorage so add/import still work. */
+export function isSupabaseTableError(msg: string): boolean {
+  return /schema cache|Could not find the table|relation.*does not exist|students.*table/i.test(msg);
+}
+
 export function useStore() {
   const [data, setData] = useState<AppData>(defaultData);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [importableLocalData, setImportableLocalData] = useState<{ students: Student[]; lessons: Lesson[] } | null>(null);
   const lastBulkImportAtRef = useRef<number | null>(null);
+  const useLocalFallbackRef = useRef(false);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -90,8 +96,41 @@ export function useStore() {
         }
       } catch (e) {
         const msg = e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : "Failed to load data";
-        setLoadError(msg);
-        setData(initialData);
+        if (isSupabaseTableError(msg)) {
+          useLocalFallbackRef.current = true;
+          setLoadError(null);
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            let next: AppData;
+            if (raw) {
+              const parsed = stripSeedData(JSON.parse(raw) as AppData);
+              const lessons = dedupeLessonsByStudentDate(parsed.lessons);
+              next = { ...parsed, lessons: dedupeLessonsById(lessons) };
+            } else {
+              next = initialData;
+            }
+            if (!next.user && supabase) {
+              const { data: { user: authUser } } = await supabase.auth.getUser();
+              if (authUser) {
+                next = {
+                  ...next,
+                  user: {
+                    id: authUser.id,
+                    email: authUser.email ?? "",
+                    name: (authUser.user_metadata?.name as string) ?? "",
+                    phone: undefined,
+                  },
+                };
+              }
+            }
+            setData(next);
+          } catch {
+            setData(initialData);
+          }
+        } else {
+          setLoadError(msg);
+          setData(initialData);
+        }
       }
       setLoaded(true);
       return;
@@ -122,7 +161,7 @@ export function useStore() {
 
   const persist = useCallback((next: AppData) => {
     setData(next);
-    if (!hasSupabase()) {
+    if (!hasSupabase() || useLocalFallbackRef.current) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       } catch {}
@@ -167,7 +206,7 @@ export function useStore() {
 
   const addStudent = useCallback(
     async (student: Student): Promise<void> => {
-      if (hasSupabase() && data.user) {
+      if (hasSupabase() && data.user && !useLocalFallbackRef.current) {
         const created = await addStudentSupabase(data.user.id, {
           firstName: student.firstName,
           lastName: student.lastName,
@@ -192,7 +231,7 @@ export function useStore() {
       onProgress?: (inserted: number, total: number) => void
     ): Promise<{ created: Student[]; addedCount: number; chunkErrors: string[] }> => {
       if (students.length === 0) return { created: [], addedCount: 0, chunkErrors: [] };
-      if (hasSupabase() && data.user) {
+      if (hasSupabase() && data.user && !useLocalFallbackRef.current) {
         const prevStudents = data.students;
         const { inserted, errors: chunkErrors } = await insertStudentsBulkSupabase(
           data.user.id,
@@ -216,7 +255,7 @@ export function useStore() {
 
   const updateStudent = useCallback(
     async (id: string, updates: Partial<Student>) => {
-      if (hasSupabase() && data.user) {
+      if (hasSupabase() && data.user && !useLocalFallbackRef.current) {
         await updateStudentSupabase(data.user.id, id, updates);
         setData((prev) => ({
           ...prev,
@@ -234,7 +273,7 @@ export function useStore() {
 
   const deleteStudent = useCallback(
     async (id: string) => {
-      if (hasSupabase() && data.user) {
+      if (hasSupabase() && data.user && !useLocalFallbackRef.current) {
         await deleteStudentSupabase(data.user.id, id);
         setData((prev) => ({
           ...prev,
@@ -254,7 +293,7 @@ export function useStore() {
 
   const addLesson = useCallback(
     async (lesson: Omit<Lesson, "id">) => {
-      if (hasSupabase() && data.user) {
+      if (hasSupabase() && data.user && !useLocalFallbackRef.current) {
         const existingIdRef = { current: "" };
         const pendingId = `pending_${lesson.studentId}_${lesson.date}`;
         setData((prev) => {
@@ -322,7 +361,7 @@ export function useStore() {
       const allToRemove = [...duplicatesOnNewDate, ...duplicatesOnOldDate];
       const removeIds = new Set(allToRemove.map((l) => l.id));
 
-      if (hasSupabase() && data.user) {
+      if (hasSupabase() && data.user && !useLocalFallbackRef.current) {
         if (isDateMove && oldDate) {
           await deleteOtherLessonsForStudentOnDates(
             data.user.id,
@@ -391,7 +430,7 @@ export function useStore() {
   const addLessonsBulk = useCallback(
     async (lessons: Omit<Lesson, "id">[]): Promise<Lesson[]> => {
       if (lessons.length === 0) return [];
-      if (hasSupabase() && data.user) {
+      if (hasSupabase() && data.user && !useLocalFallbackRef.current) {
         const created = await bulkInsertLessonsSupabase(data.user.id, lessons);
         setData((prev) => ({ ...prev, lessons: [...prev.lessons, ...created] }));
         return created;
@@ -405,7 +444,7 @@ export function useStore() {
 
   const deleteLesson = useCallback(
     async (lessonId: string): Promise<void> => {
-      if (hasSupabase() && data.user) {
+      if (hasSupabase() && data.user && !useLocalFallbackRef.current) {
         await deleteLessonSupabase(data.user.id, lessonId);
         setData((prev) => ({ ...prev, lessons: prev.lessons.filter((l) => l.id !== lessonId) }));
         await load();
@@ -420,7 +459,7 @@ export function useStore() {
 
   const clearAllLessons = useCallback(
     async (): Promise<void> => {
-      if (hasSupabase() && data.user) {
+      if (hasSupabase() && data.user && !useLocalFallbackRef.current) {
         await deleteAllLessonsSupabase(data.user.id);
         setData((prev) => ({ ...prev, lessons: [] }));
         return;
@@ -432,7 +471,7 @@ export function useStore() {
 
   const clearAllStudents = useCallback(
     async (): Promise<void> => {
-      if (hasSupabase() && data.user) {
+      if (hasSupabase() && data.user && !useLocalFallbackRef.current) {
         await deleteAllLessonsSupabase(data.user.id);
         await deleteAllStudentsSupabase(data.user.id);
         setData((prev) => ({ ...prev, students: [], lessons: [] }));
@@ -445,7 +484,34 @@ export function useStore() {
 
   const importLocalData = useCallback(async (): Promise<void> => {
     const toImport = importableLocalData;
-    if (!toImport || !hasSupabase() || !data.user) return;
+    if (!toImport || !data.user) return;
+    if (useLocalFallbackRef.current || !hasSupabase()) {
+      const idMap = new Map<string, string>();
+      const newStudents: Student[] = toImport.students.map((s, i) => {
+        const id = `s_${Date.now()}_${i}`;
+        idMap.set(s.id, id);
+        return { ...s, id };
+      });
+      const newLessons: Lesson[] = toImport.lessons
+        .map((l, i) => {
+          const newStudentId = idMap.get(l.studentId);
+          if (!newStudentId) return null;
+          return { ...l, id: `l_${Date.now()}_${i}`, studentId: newStudentId };
+        })
+        .filter((l): l is Lesson => l != null);
+      setData((prev) => ({
+        ...prev,
+        students: [...prev.students, ...newStudents],
+        lessons: [...prev.lessons, ...newLessons],
+      }));
+      setImportableLocalData(null);
+      persist({
+        ...data,
+        students: [...data.students, ...newStudents],
+        lessons: [...data.lessons, ...newLessons],
+      });
+      return;
+    }
     const idMap = new Map<string, string>();
     const newStudents: Student[] = [];
     for (const s of toImport.students) {
@@ -486,7 +552,7 @@ export function useStore() {
     } catch {
       /* ignore */
     }
-  }, [importableLocalData, data.user]);
+  }, [importableLocalData, data, persist]);
 
   const clearImportableData = useCallback(() => {
     setImportableLocalData(null);
@@ -499,7 +565,7 @@ export function useStore() {
 
   const updateUserProfile = useCallback(
     async (updates: { name?: string; phone?: string }) => {
-      if (hasSupabase() && data.user) {
+      if (hasSupabase() && data.user && !useLocalFallbackRef.current) {
         try {
           await updateProfileSupabase(data.user.id, updates);
           setData((prev) => (prev.user ? { ...prev, user: { ...prev.user, ...updates } } : prev));

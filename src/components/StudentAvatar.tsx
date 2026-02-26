@@ -4,9 +4,12 @@ import type { Student } from "@/types";
 export interface StudentAvatarProps {
   student: Pick<Student, "firstName" | "lastName">;
   size?: number;
+  /** "green" = homepage/dashboard green gradient; default = purple/pink. */
+  variant?: "default" | "green";
 }
 
-export default function StudentAvatar({ student, size = 48 }: StudentAvatarProps) {
+export default function StudentAvatar({ student, size = 48, variant = "default" }: StudentAvatarProps) {
+  const background = variant === "green" ? "var(--avatar-gradient-green)" : "var(--avatar-gradient)";
   return (
     <div
       style={{
@@ -17,7 +20,7 @@ export default function StudentAvatar({ student, size = 48 }: StudentAvatarProps
         minHeight: size,
         maxHeight: size,
         borderRadius: "50%",
-        background: "var(--avatar-gradient)",
+        background,
         color: "white",
         display: "flex",
         alignItems: "center",

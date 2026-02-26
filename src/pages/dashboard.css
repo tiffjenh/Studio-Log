@@ -1,0 +1,457 @@
+/* Dashboard-only styles — scoped under .dashboard to match mocks. Do not edit global index.css. */
+
+/* 1) Transparent so global app gradient shows; full-bleed layout */
+.dashboard {
+  margin: -20px -16px -24px;
+  padding: 20px 16px 24px;
+  background: transparent;
+}
+
+/* 2) Hero Earnings Card — mock: thick dark green border around entire card, pale #e8f2f2, big number */
+.dashboard .dashboard-hero {
+  border-radius: 20px;
+  border: 3px solid #1b5e4a;
+  background: #e8f2f2;
+  padding: 20px 20px 18px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard .dashboard-hero::before {
+  content: "";
+  position: absolute;
+  top: -30%;
+  right: -15%;
+  width: 55%;
+  height: 70%;
+  background: radial-gradient(circle, rgba(180, 220, 210, 0.2) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.dashboard .dashboard-hero__title {
+  font-size: 13px;
+  color: #5a6b65;
+  font-weight: 500;
+  margin: 0 0 6px;
+  font-family: var(--font-sans);
+}
+
+.dashboard .dashboard-hero__amount-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  margin-bottom: 14px;
+}
+
+.dashboard .dashboard-hero__amount-dollar {
+  font-size: 24px;
+  font-weight: 600;
+  color: #7d8f89;
+  margin-right: 2px;
+}
+
+.dashboard .dashboard-hero__amount-main {
+  font-size: 48px;
+  font-weight: 800;
+  color: #2d3d38;
+  font-family: var(--font-sans);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.dashboard .dashboard-hero__amount-cents {
+  font-size: 20px;
+  font-weight: 600;
+  color: #7d8f89;
+  margin-left: 2px;
+}
+
+.dashboard .dashboard-hero__pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+}
+
+/* Pills — mock: same height as text, compact; background ~#DEE6E3 */
+.dashboard .dashboard-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  min-height: 0;
+  height: 1.5em;
+  line-height: 1.5;
+  border-radius: 999px;
+  background: #dee6e3;
+  font-size: 12px;
+  color: #4a5551;
+  font-family: var(--font-sans);
+  font-weight: 500;
+}
+
+.dashboard .dashboard-pill__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.dashboard .dashboard-pill__icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Date selector pill — mock: small circular white chevron buttons, label in light grey strip */
+.dashboard .dashboard-pill--nav {
+  min-width: 0;
+  padding: 4px 4px;
+  gap: 2px;
+  height: 1.5em;
+  min-height: 0;
+}
+
+.dashboard .dashboard-pill--nav .dashboard-pill__label {
+  min-width: 56px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.dashboard .dashboard-pill__nav-btn {
+  width: 1.6em;
+  height: 1.6em;
+  min-width: 1.6em;
+  min-height: 1.6em;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  font-size: 12px;
+  color: #4a5551;
+  font-family: var(--font-sans);
+  line-height: 1;
+}
+
+.dashboard .dashboard-pill__nav-btn:hover {
+  background: #f8faf9;
+}
+
+.dashboard .dashboard-pill__nav-btn:active {
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* 3) Summary cards row */
+.dashboard .dashboard-summary-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.dashboard .dashboard-summary-card {
+  border-radius: 16px;
+  padding: 14px 12px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.08);
+  background: #fefefe;
+  min-height: 72px;
+}
+
+.dashboard .dashboard-summary-card--highlight {
+  background: rgba(220, 242, 235, 0.7);
+}
+
+.dashboard .dashboard-summary-card__label {
+  font-size: 12px;
+  color: #5a6b65;
+  margin-bottom: 4px;
+  font-family: var(--font-sans);
+}
+
+.dashboard .dashboard-summary-card__value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2d3d38;
+  font-family: var(--font-sans);
+}
+
+/* 4) Lessons section */
+.dashboard .dashboard-lessons-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.dashboard .dashboard-lessons-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2d3d38;
+  margin: 0;
+  font-family: var(--font-sans);
+}
+
+.dashboard .dashboard-lessons-subtitle {
+  font-size: 13px;
+  color: #5a6b65;
+  margin: 2px 0 0;
+  font-family: var(--font-sans);
+  width: 100%;
+}
+
+.dashboard .dashboard-scheduled-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #a8d5d0 0%, #b5ddd8 50%, #9ac9c4 100%);
+  color: #2d3d38;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+}
+
+.dashboard .dashboard-lessons-container {
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  padding: 0;
+}
+
+.dashboard .dashboard-lesson-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-bottom: 1px solid rgba(180, 200, 195, 0.25);
+}
+
+.dashboard .dashboard-lesson-row:last-child {
+  border-bottom: none;
+}
+
+.dashboard .dashboard-lesson-row:hover {
+  background: rgba(240, 250, 248, 0.5);
+}
+
+.dashboard .dashboard-lesson-row--attended {
+  background: #f4fcf4;
+}
+
+.dashboard .dashboard-lesson-row--attended:hover {
+  background: #eef9ee;
+}
+
+.dashboard .dashboard-lesson-row__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard .dashboard-lesson-row__name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2d3d38;
+  font-family: var(--font-sans);
+}
+
+.dashboard .dashboard-lesson-row__meta {
+  font-size: 13px;
+  color: #5a6b65;
+  margin-top: 2px;
+  font-family: var(--font-sans);
+}
+
+.dashboard .dashboard-lesson-row__amount {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1b5e4a;
+  margin-top: 2px;
+  font-family: var(--font-sans);
+}
+
+/* Attended / Pending toggle (mock-accurate) */
+.dashboard .dashboard-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dashboard .dashboard-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.dashboard .dashboard-toggle__circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #b0b8b5;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+/* Toggle when on: gradient (light blue-green) like mock */
+.dashboard .dashboard-toggle input:checked + .dashboard-toggle__circle {
+  border-color: #8fc9c2;
+  background: linear-gradient(135deg, #9ac9c2 0%, #a8d5d0 45%, #8fc9c2 100%);
+}
+
+.dashboard .dashboard-toggle__circle svg {
+  opacity: 0;
+  color: #fff;
+}
+
+.dashboard .dashboard-toggle input:focus-visible + .dashboard-toggle__circle {
+  outline: 2px solid #8fc9c2;
+  outline-offset: 2px;
+}
+
+.dashboard .dashboard-toggle input:checked + .dashboard-toggle__circle svg {
+  opacity: 1;
+}
+
+.dashboard .dashboard-toggle__label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8a9590;
+  font-family: var(--font-sans);
+}
+
+.dashboard .dashboard-toggle input:checked ~ .dashboard-toggle__label {
+  color: #5a9b92;
+}
+
+/* 5) Toast: "Lesson marked as attended" at bottom (mock style) */
+.dashboard .dashboard-toast {
+  position: fixed;
+  bottom: calc(var(--nav-height, 56px) + var(--safe-bottom, 0px) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  color: #2d3d38;
+  z-index: 800;
+  animation: dashboardToastIn 0.25s ease-out;
+  white-space: nowrap;
+}
+
+.dashboard .dashboard-toast__icon {
+  flex-shrink: 0;
+  color: #1b5e4a;
+}
+
+@keyframes dashboardToastIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Voice FAB: mock green (same as hero border, attended) */
+.dashboard .voice-fab.ui-button,
+.dashboard .ui-button.voice-fab {
+  background: #1b5e4a !important;
+  border-color: #1b5e4a !important;
+  color: #fff !important;
+}
+
+.dashboard .voice-fab.ui-button:hover,
+.dashboard .ui-button.voice-fab:hover {
+  background: #16543f !important;
+  border-color: #16543f !important;
+}
+
+.dashboard .voice-fab[data-variant="danger"],
+.dashboard .ui-button.voice-fab[data-variant="danger"] {
+  background: #b91c1c !important;
+  border-color: #b91c1c !important;
+}
+
+/* Voice panel: Try again button — same as View Calendar (light blue → mint gradient) */
+.dashboard .voice-panel__try-again,
+.dashboard .ui-button.voice-panel__try-again {
+  background: linear-gradient(90deg, #c5dce8 0%, #b8e0d8 50%, #b0ddd4 100%) !important;
+  color: #2d3d42 !important;
+  border: none !important;
+}
+
+.dashboard .voice-panel__try-again:hover,
+.dashboard .ui-button.voice-panel__try-again:hover {
+  filter: brightness(0.98);
+}
+
+/* 6) View Calendar button — pill shape, light blue → mint gradient, dark text */
+.dashboard .dashboard-calendar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 12px 32px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  background: linear-gradient(90deg, #c5dce8 0%, #b8e0d8 50%, #b0ddd4 100%);
+  color: #2d3d42;
+  border: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  text-decoration: none;
+  transition: box-shadow 0.2s ease, transform 0.12s ease;
+}
+
+.dashboard .dashboard-calendar-btn:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.dashboard .dashboard-calendar-btn:active {
+  transform: translateY(0);
+}
+
+/* Avatar: light blue-green gradient to match mock (same as toggle when on) */
+.dashboard .dashboard-lesson-row .dashboard-avatar-wrap > div {
+  background: linear-gradient(135deg, #9ac9c2 0%, #a8d5d0 45%, #8fc9c2 100%) !important;
+}
+
+.dashboard .dashboard-lesson-row .dashboard-avatar-wrap {
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard .dashboard-lesson-row,
+  .dashboard .dashboard-toggle__circle,
+  .dashboard .dashboard-calendar-btn {
+    transition: none;
+  }
+}

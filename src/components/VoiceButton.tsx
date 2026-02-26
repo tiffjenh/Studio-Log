@@ -282,9 +282,10 @@ export default function VoiceButton({
 
   return (
     <>
-      {/* Floating mic button */}
+      {/* Floating mic button (dashboard.css can override to green when inside .dashboard) */}
       <IconButton
         type="button"
+        className="voice-fab"
         onClick={isListening ? stopListening : startListening}
         aria-label={isListening ? "Stop listening" : "Voice input"}
         variant={isListening ? "danger" : "primary"}
@@ -327,6 +328,7 @@ export default function VoiceButton({
       {/* Feedback panel (slides up from bottom) */}
       {showPanel && (
         <div
+          className="voice-panel"
           style={{
             position: "fixed",
             bottom: 0,
@@ -569,6 +571,7 @@ export default function VoiceButton({
                   type="button"
                   variant="primary"
                   size="sm"
+                  className="voice-panel__try-again"
                   onClick={() => {
                     closePanel();
                     setTimeout(startListening, 100);

@@ -1,0 +1,643 @@
+/* Insights page — UI-only styles to match mocks. No logic changes. */
+
+.insights-page {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 16px;
+  padding-bottom: 24px;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+/* ---- 1) Page header ---- */
+.insights-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.insights-header__icon {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 50%;
+  background: #26434b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.insights-header__text {
+  min-width: 0;
+}
+
+.insights-header__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.insights-header__subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+}
+
+/* ---- 2) ASK ABOUT dropdown ---- */
+.insights-askabout {
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.insights-askabout__label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: var(--font-sans);
+}
+
+.insights-askabout__trigger {
+  width: 100%;
+  padding: 16px 44px 16px 16px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  font-weight: 600;
+}
+
+.insights-askabout__trigger[data-placeholder] {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.insights-askabout__chevron {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.insights-askabout__panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 6px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--border);
+  padding: 0;
+  max-width: 100%;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.insights-askabout__option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.insights-askabout__option:last-child {
+  border-bottom: none;
+}
+
+.insights-askabout__option[aria-selected="true"] {
+  background: rgba(0, 95, 110, 0.08);
+}
+
+.insights-askabout__check {
+  color: #005f6e;
+  flex-shrink: 0;
+}
+
+/* ---- 3) Chat area ---- */
+.insights-chat {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 120px;
+}
+
+.insights-userBubble {
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 20px 20px 4px 20px;
+  background: #005f6e;
+  color: #fff;
+  font-size: 15px;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  font-weight: 600;
+  align-self: flex-end;
+}
+
+.insights-assistantCard {
+  max-width: 90%;
+  width: 100%;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 16px 20px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  align-self: flex-start;
+}
+
+.insights-assistantCard__summary {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.insights-assistantCard__meta {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+/* Metric rows / pills (pale green-neutral) */
+.insights-module {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insights-module__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(201, 221, 231, 0.4);
+  border-radius: 12px;
+  font-family: var(--font-sans);
+}
+
+.insights-module__label {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.insights-module__value {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.insights-module__value--positive {
+  color: var(--success, #16a34a);
+}
+
+.insights-module__value--negative {
+  color: #dc2626;
+}
+
+.insights-module__value--teal {
+  color: #005f6e;
+}
+
+/* List ranking rows (medals + name + amount) */
+.insights-rankingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(201, 221, 231, 0.4);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.insights-rankingRow:last-child {
+  margin-bottom: 0;
+}
+
+.insights-rankingRow__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.insights-rankingRow__name {
+  font-weight: 600;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.insights-rankingRow__sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.insights-rankingRow__amount {
+  font-weight: 700;
+  color: var(--success, #16a34a);
+  font-family: var(--font-sans);
+  flex-shrink: 0;
+}
+
+/* Rate breakdown bar row */
+.insights-rateRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(201, 221, 231, 0.4);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  font-family: var(--font-sans);
+}
+
+.insights-rateRow:last-child {
+  margin-bottom: 0;
+}
+
+.insights-rateRow__label {
+  font-weight: 600;
+  color: var(--text);
+  min-width: 64px;
+}
+
+.insights-rateRow__barWrap {
+  flex: 1;
+  min-width: 0;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.insights-rateRow__barFill {
+  height: 100%;
+  background: #005f6e;
+  border-radius: 4px;
+  min-width: 4px;
+}
+
+.insights-rateRow__count {
+  font-size: 14px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Progress bar module */
+.insights-progressWrap {
+  margin-top: 12px;
+}
+
+.insights-progressLabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  color: var(--text);
+  font-family: var(--font-sans);
+  margin-bottom: 6px;
+}
+
+.insights-progressBar {
+  height: 10px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.insights-progressBar__fill {
+  height: 100%;
+  border-radius: 6px;
+  background: #005f6e;
+}
+
+.insights-progressBar__fill--negative {
+  background: #dc2626;
+}
+
+/* ---- 4) Suggested chips row (hidden in chat input area to match mock) ---- */
+.insights-chipRow {
+  display: none;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 0 12px;
+  margin-top: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.insights-chipRow::-webkit-scrollbar {
+  display: none;
+}
+
+.insights-chip {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.insights-chip:hover:not(:disabled) {
+  background: rgba(0, 95, 110, 0.04);
+}
+
+.insights-chip:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* ---- 5) Bottom composer (transparent: no panel behind input + buttons) ---- */
+.insights-composer {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding-top: 16px;
+  padding-bottom: calc(var(--nav-height, 56px) + var(--safe-bottom, 0px) + 12px);
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  flex-shrink: 0;
+}
+
+.insights-inputPill {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 14px 12px 14px 18px;
+  min-height: 52px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.insights-inputPill textarea {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  font-family: var(--font-sans);
+  color: var(--text);
+  outline: none;
+  resize: none;
+  min-height: 22px;
+  max-height: 120px;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.insights-inputPill textarea::placeholder {
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.insights-micBtn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #a7d9d9 0%, #c8e6c9 100%);
+  color: #26434b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.insights-micBtn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.insights-micBtn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.insights-micBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.insights-actionsRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.insights-askBtn {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 20px;
+  min-height: 48px;
+  border-radius: 999px;
+  border: none;
+  background: #5a7a7e;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.insights-askBtn:hover:not(:disabled) {
+  background: #4a6a6e;
+}
+
+.insights-askBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.insights-clearBtn,
+.insights-newBtn {
+  padding: 12px 16px;
+  min-height: 48px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.insights-clearBtn:hover:not(:disabled),
+.insights-newBtn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* Category questions card (when category selected) */
+.insights-categoryQuestions {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border);
+  font-family: var(--font-sans);
+}
+
+.insights-categoryQuestions ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.insights-categoryQuestions button {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.insights-categoryQuestions button:hover:not(:disabled) {
+  background: rgba(0, 95, 110, 0.06);
+}
+
+.insights-categoryQuestions button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Empty state (pre-chat) — compact title, subtext, and thin dark-green pills per mock */
+.insights-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.insights-empty__icon {
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.insights-empty__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.insights-empty__sub {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+}
+
+/* Four recommended pills: smaller, thinner, dark green text, minimal padding */
+.insights-empty__pills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.insights-empty__pill {
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  color: #26434b;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: background 0.2s ease;
+}
+
+.insights-empty__pill:hover {
+  background: rgba(38, 67, 75, 0.06);
+}
+
+/* Error card */
+.insights-errorCard {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 16px 18px;
+  border-left: 4px solid #dc2626;
+}
+

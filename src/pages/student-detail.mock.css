@@ -1,0 +1,1048 @@
+/* Student Detail page — scoped under .studentDetailPage. UI-only to match mocks. */
+
+.studentDetailPage {
+  --mock-teal: #26434b;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  background: transparent;
+  padding: 0 16px 24px;
+  font-family: var(--font-sans);
+}
+
+/* ---- 1) Top bar ---- */
+.studentDetailPage__topBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.studentDetailPage__backCircle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 999px;
+  background: #e8f0ef;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 18px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.studentDetailPage__backCircle:hover {
+  background: #dce8e6;
+}
+
+.studentDetailPage__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studentDetailPage__editCircle {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  border-radius: 999px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.studentDetailPage__editCircle:not(.studentDetailPage__deletePill) {
+  color: var(--mock-teal);
+  background: #fff !important;
+}
+
+.studentDetailPage__editCircle:not(.studentDetailPage__deletePill) svg {
+  color: var(--mock-teal);
+}
+
+.studentDetailPage__deletePill {
+  border-radius: 999px !important;
+  padding: 8px 14px !important;
+  min-width: auto !important;
+  width: auto !important;
+  border: 2px solid #dc2626 !important;
+  background: transparent !important;
+  color: #dc2626 !important;
+}
+
+/* ---- 2) Hero card ---- */
+.studentDetailPage__hero {
+  background: linear-gradient(145deg, var(--mock-teal) 0%, #1e363d 100%);
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 24px rgba(38, 67, 75, 0.25);
+}
+
+.studentDetailPage__heroHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.studentDetailPage__heroAvatarWrap {
+  flex-shrink: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.studentDetailPage__heroHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.studentDetailPage__heroName {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.studentDetailPage__heroRate {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.studentDetailPage__heroTiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.studentDetailPage__heroTile {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.studentDetailPage__heroTileValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.studentDetailPage__heroTileLabel {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ---- 3) Float card override (Details, schedule, etc.) ---- */
+.studentDetailPage .float-card {
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+}
+
+/* ---- 3B) Details + Weekly Schedule (one card) ---- */
+.studentDetailPage__detailsAndScheduleCard {
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.studentDetailPage__detailsTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 14px;
+}
+
+.studentDetailPage__detailsRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-family: var(--font-sans);
+}
+
+.studentDetailPage__detailsRow:last-of-type {
+  border-bottom: none;
+}
+
+.studentDetailPage__detailsIcon {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  background: rgba(154, 201, 194, 0.35);
+  color: var(--mock-teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.studentDetailPage__detailsLabel {
+  flex: 1;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.studentDetailPage__detailsValue {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.studentDetailPage__detailsValue--green {
+  color: var(--success, #16a34a);
+  font-weight: 700;
+}
+
+/* Schedule section inside same card */
+.studentDetailPage__detailsAndScheduleCard .studentDetailPage__scheduleLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 14px 0 10px;
+}
+
+.studentDetailPage__schedulePill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(154, 201, 194, 0.25);
+  border-radius: 16px;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-sans);
+}
+
+.studentDetailPage__schedulePillIcon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  background: var(--mock-teal);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.studentDetailPage__schedulePillIcon svg {
+  color: #fff !important;
+}
+
+.studentDetailPage__schedulePillText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.studentDetailPage__schedulePillDay {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.studentDetailPage__schedulePillTime {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* ---- 3D) Lesson History card ---- */
+.studentDetailPage__historyCard {
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.studentDetailPage__historyCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.studentDetailPage__historyCardTitle {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+
+.studentDetailPage__historyLink {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  text-decoration: underline;
+}
+
+.studentDetailPage__historyLink:hover {
+  color: var(--mock-teal);
+}
+
+/* Year summary rows (collapsed by default) */
+.studentDetailPage__historyYearRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-family: var(--font-sans);
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+
+.studentDetailPage__historyYearRow:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.studentDetailPage__historyYearSummary {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.studentDetailPage__historyYearPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(154, 201, 194, 0.35);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.studentDetailPage__historyYearPillChevron {
+  display: inline-flex;
+  transition: transform 0.2s ease;
+}
+
+.studentDetailPage__historyYearPillChevron--open {
+  transform: rotate(180deg);
+}
+
+.studentDetailPage__historyList {
+  padding: 0;
+}
+
+.studentDetailPage__historyMonthRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-size: 15px;
+  font-family: var(--font-sans);
+  color: var(--text);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.studentDetailPage__historyMonthRow:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.studentDetailPage__historyMonthMeta {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.studentDetailPage__historyMonthContent {
+  overflow: hidden;
+}
+
+.studentDetailPage__historyMonthContent.closed {
+  display: none;
+}
+
+.studentDetailPage__historyMonthContent.open {
+  display: block;
+  padding: 8px 20px 16px;
+  background: #f8fbfb;
+}
+
+.studentDetailPage__historyRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 0;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-sans);
+}
+
+.studentDetailPage__historyRow:last-child {
+  border-bottom: none;
+}
+
+.studentDetailPage__historyDot {
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
+  border-radius: 50%;
+  background: rgba(201, 221, 231, 0.8);
+  position: relative;
+}
+
+.studentDetailPage__historyDot::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--mock-teal);
+}
+
+.studentDetailPage__historyRowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.studentDetailPage__historyRowDate {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.studentDetailPage__historyRowDuration {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.studentDetailPage__historyAmount {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--success, #16a34a);
+}
+
+/* ---- 4) Bottom actions (same line) ---- */
+.studentDetailPage .studentDetailPage__bottomActions {
+  padding-top: 16px;
+  padding-bottom: calc(var(--nav-height, 56px) + var(--safe-bottom, 0px) + 16px);
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.studentDetailPage .studentDetailPage__actionPill {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: 50%;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 2px solid;
+  background: transparent;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.studentDetailPage__actionPill--orange {
+  border-color: #ea580c;
+  color: #ea580c;
+}
+
+.studentDetailPage__actionPill--orange:hover {
+  background: rgba(234, 88, 12, 0.08);
+}
+
+.studentDetailPage__actionPill--red {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.studentDetailPage__actionPill--red:hover {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+/* ---- 5) Edit mode ---- */
+.studentDetailPage__editForm .studentDetailPage .float-card {
+  margin-bottom: 20px;
+}
+
+.studentDetailPage__editSection {
+  margin-bottom: 20px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.studentDetailPage__editSectionTitle {
+  font-weight: 700;
+  font-size: 15px;
+  margin: 0 0 12px;
+  font-family: var(--font-sans);
+}
+
+.studentDetailPage__editInput {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-family: var(--font-sans);
+  box-sizing: border-box;
+}
+
+.studentDetailPage__editAddDay {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* ---- 6) Modals (scoped) ---- */
+.studentDetailPage .studentDetailPage__modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.studentDetailPage__modalCard {
+  background: var(--card);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: var(--shadow-elevated);
+  max-width: 320px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.studentDetailPage__modalCard .studentDetailPage__rateDisplay {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+.studentDetailPage__modalCard .studentDetailPage__keypadGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.studentDetailPage__modalCard .studentDetailPage__timeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.studentDetailPage__modalCard .studentDetailPage__timeRow select {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: 18px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+}
+
+/* ---- 7) Edit Student modal (mock-exact) ---- */
+.studentDetailPage__editModalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 36px 0 36px;
+  box-sizing: border-box;
+}
+
+.studentDetailPage__editModalCard {
+  width: calc(100% - 32px);
+  max-width: 420px;
+  max-height: calc(100vh - 72px);
+  border-radius: 24px;
+  background: #eaf3fa;
+  padding: 18px 16px 16px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.studentDetailPage__editModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(38, 67, 75, 0.12);
+}
+
+.studentDetailPage__editModalTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  font-family: var(--font-sans);
+}
+
+.studentDetailPage__editModalClose {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.studentDetailPage__editModalClose:hover {
+  background: rgba(38, 67, 75, 0.08);
+}
+
+.studentDetailPage__editGrid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.studentDetailPage__editFieldLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  font-family: var(--font-sans);
+}
+
+.studentDetailPage__editFieldInput,
+.studentDetailPage__editFieldInput input,
+.studentDetailPage__editFieldInput select,
+button.studentDetailPage__editFieldInput {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(38, 67, 75, 0.12);
+  background: #fff;
+  font-size: 14px;
+  color: var(--text);
+  font-family: var(--font-sans);
+  box-sizing: border-box;
+}
+
+.studentDetailPage__editFieldInput select,
+select.studentDetailPage__editFieldInput {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2326434b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+button.studentDetailPage__editFieldInput {
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.studentDetailPage__weeklyHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0 12px;
+}
+
+.studentDetailPage__weeklyHeaderRow .studentDetailPage__editFieldLabel {
+  margin-bottom: 0;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+}
+
+.studentDetailPage__addDayBtn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(38, 67, 75, 0.2);
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mock-teal);
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.studentDetailPage__addDayBtn:hover {
+  background: #fff;
+}
+
+.studentDetailPage__scheduleCard {
+  background: #e6f1ef;
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.studentDetailPage__scheduleCard:last-of-type {
+  margin-bottom: 0;
+}
+
+.studentDetailPage__scheduleCardTopRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.studentDetailPage__scheduleDaySelect {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 14px 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(38, 67, 75, 0.12);
+  background: #fff;
+  font-size: 14px;
+  color: var(--text);
+  font-family: var(--font-sans);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2326434b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  cursor: pointer;
+}
+
+.studentDetailPage__scheduleRemoveBtn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #d94b4b;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.studentDetailPage__scheduleRemoveBtn:hover {
+  background: rgba(217, 75, 75, 0.12);
+}
+
+.studentDetailPage__scheduleRemoveBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.studentDetailPage__scheduleTwoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.studentDetailPage__primarySave {
+  width: 100%;
+  height: 46px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(145deg, var(--mock-teal) 0%, #1e363d 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+.studentDetailPage__primarySave:hover {
+  opacity: 0.95;
+}
+
+.studentDetailPage__secondaryCancel {
+  width: 100%;
+  height: 46px;
+  border: 1px solid rgba(38, 67, 75, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.studentDetailPage__secondaryCancel:hover {
+  background: #fff;
+}
+
+/* ---- Edit modal bottom rows (mock-exact) ---- */
+.studentDetailPage__editActionRow {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  margin-bottom: 12px;
+}
+
+.studentDetailPage__editActionRow .ui-button,
+.studentDetailPage__editActionRow button {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 999px;
+  min-height: 40px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.studentDetailPage__editActionRow .ui-button .ui-button__icon,
+.studentDetailPage__editActionRow .ui-button [class*="icon"] {
+  font-size: 14px;
+}
+
+/* Change Schedule pill: same green/blue gradient as View Calendar */
+.studentDetailPage__changeSchedulePill,
+.studentDetailPage__changeSchedulePill.ui-button {
+  background: linear-gradient(90deg, #c5dce8 0%, #b8e0d8 50%, #b0ddd4 100%) !important;
+  color: #2d3d42 !important;
+  border: none !important;
+}
+
+.studentDetailPage__changeSchedulePill:hover,
+.studentDetailPage__changeSchedulePill.ui-button:hover {
+  filter: brightness(0.98);
+}
+
+.studentDetailPage__editBottomRow {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.studentDetailPage__editBottomRow .studentDetailPage__secondaryCancel,
+.studentDetailPage__editBottomRow .studentDetailPage__primarySave {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* ---- Overlay modals (Change Schedule, End Lessons) ---- */
+.studentDetailPage__overlayBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+  padding: 36px 0 36px;
+  box-sizing: border-box;
+}
+
+.studentDetailPage__overlayCard {
+  width: calc(100% - 32px);
+  max-width: 420px;
+  max-height: calc(100vh - 72px);
+  border-radius: 24px;
+  background: #eaf3fa;
+  padding: 18px 16px 16px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.studentDetailPage__overlayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(38, 67, 75, 0.12);
+}
+
+.studentDetailPage__overlayTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  font-family: var(--font-sans);
+}
+
+.studentDetailPage__overlayClose {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.studentDetailPage__overlayClose:hover {
+  background: rgba(38, 67, 75, 0.08);
+}
+
+.studentDetailPage__overlayHint {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.studentDetailPage__overlayHint p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  line-height: 1.4;
+}
+
+.studentDetailPage__overlayCard .studentDetailPage__editBottomRow {
+  margin-top: 20px;
+}
+
+/* DatePicker single-field look (input + calendar icon as one control) */
+.studentDetailPage__dateFieldWrap {
+  margin-bottom: 16px;
+  width: 100%;
+}
+
+.studentDetailPage__dateFieldWrap > div {
+  display: flex !important;
+  gap: 0 !important;
+  border: 1px solid rgba(38, 67, 75, 0.12);
+  border-radius: 14px;
+  overflow: hidden;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  background: #fff;
+}
+
+.studentDetailPage__dateFieldWrap input {
+  border: none !important;
+  border-radius: 0 !important;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 42px;
+}
+
+.studentDetailPage__dateFieldWrap > div > .ui-button,
+.studentDetailPage__dateFieldWrap > div > button {
+  border: none !important;
+  border-left: 1px solid rgba(38, 67, 75, 0.12) !important;
+  border-radius: 0 !important;
+  flex-shrink: 0;
+  min-height: 42px;
+}
+
+/* End Lessons: red filled Save CTA */
+.studentDetailPage__endLessonsSave {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 46px;
+  border: none;
+  border-radius: 999px;
+  background: #d94b4b;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.studentDetailPage__endLessonsSave:hover:not(:disabled) {
+  opacity: 0.95;
+}
+
+.studentDetailPage__endLessonsSave:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

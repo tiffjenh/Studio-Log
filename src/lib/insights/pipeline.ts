@@ -7,12 +7,18 @@ import { resultToAnswer } from "./respond";
 import { runInsightsVerifier } from "./verifier";
 import { type ComputedResult, type InsightsTrace, type QueryPlan } from "./schema";
 import type { InsightsPriorContext } from "./parse";
+import { humanizeTimeRangeLabel, humanizeDateRange } from "./formatting/humanizeDateRange";
+import { formatDollars2 } from "./formatting/formatCurrency";
 
 export type InsightsMetadata = {
   /** Number of completed lessons included in the computation. */
   lesson_count: number;
-  /** Human-readable date range label (e.g. "January 2026", "2025 YTD"). */
+  /** Internal date range label (e.g. last_30_days). Do not render in UI. */
   date_range_label: string;
+  /** Human-readable label for display (e.g. "last 30 days", "this month"). */
+  date_range_label_human: string;
+  /** Full display string for narrative (e.g. "in January 2026", "in the last 30 days"). */
+  date_range_display: string;
   /** Always true — earnings use completed lessons only (amount_cents WHERE completed=true). */
   completed_only: true;
   /** Which router was used for intent classification. */
@@ -215,6 +221,15 @@ function extractMetadata(
     label = `${y} YTD`;
   }
 
+  const date_range_label_human = humanizeTimeRangeLabel(label);
+  const startDate = (out?.start_date as string | undefined) ?? plan.time_range?.start ?? null;
+  const endDate = (out?.end_date as string | undefined) ?? plan.time_range?.end ?? null;
+  const date_range_display = humanizeDateRange({
+    start_date: startDate,
+    end_date: endDate,
+    fallbackLabel: date_range_label_human,
+  });
+
   const aggregationByIntent: Record<QueryPlan["intent"], { type: string; formula: string }> = {
     student_highest_hourly_rate: { type: "argmax", formula: "max(student_hourly_rate_dollars)" },
     student_lowest_hourly_rate: { type: "argmin", formula: "min(student_hourly_rate_dollars)" },
@@ -253,6 +268,8 @@ function extractMetadata(
   return {
     lesson_count: lessonCount,
     date_range_label: label,
+    date_range_label_human,
+    date_range_display,
     completed_only: true,
     router_used: routerUsed,
     explainability: {
@@ -384,23 +401,29 @@ export async function askInsights(questionText: string, context: AskInsightsCont
       return {
         genericFallback: "No estoy segura de tener suficiente confianza para responder. ¿Te refieres a ingresos, asistencia, tarifa o pronóstico?",
         clarifyTimeframe: "¿Puedes especificar el período (por ejemplo, julio de 2024 o este año)?",
-        earningsBasedOn: (n: number, label: string) => `Basado en **${n}** clases completadas · ${label}`,
-        noLessons: (label: string) => `No se encontraron clases completadas para ese período. · ${label}`,
+        noLessons: "No se encontraron clases completadas para ese período.",
+        earningsNarrative: (range: string, amount: string, n: number) => `${range}, ganaste **${amount}** en **${n}** clases.`,
+        earningsNarrativeMoneyOnly: (range: string, amount: string) => `${range}, ganaste **${amount}**.`,
+        earningsNarrativeLessonsOnly: (range: string, n: number) => `${range}, impartiste **${n}** clases.`,
       };
     }
     if (language === "zh") {
       return {
         genericFallback: "我不太有把握回答這個問題。你是指收入、出席、費率，還是預測？",
         clarifyTimeframe: "你可以指定時間範圍嗎（例如 2024 年 7 月或今年）？",
-        earningsBasedOn: (n: number, label: string) => `根據 **${n}** 堂已完成課程 · ${label}`,
-        noLessons: (label: string) => `這個期間沒有已完成的課程。 · ${label}`,
+        noLessons: "這個期間沒有已完成的課程。",
+        earningsNarrative: (range: string, amount: string, n: number) => `在${range}，你賺了 **${amount}**，共 **${n}** 堂課。`,
+        earningsNarrativeMoneyOnly: (range: string, amount: string) => `在${range}，你賺了 **${amount}**。`,
+        earningsNarrativeLessonsOnly: (range: string, n: number) => `在${range}，你教了 **${n}** 堂課。`,
       };
     }
     return {
       genericFallback: "I’m not sure I have enough confidence to answer that. Did you mean earnings, attendance, rate, or forecast?",
       clarifyTimeframe: "Could you specify the timeframe (e.g. July 2024 or this year)?",
-      earningsBasedOn: (n: number, label: string) => `Based on **${n}** completed lessons · ${label}`,
-      noLessons: (label: string) => `No completed lessons found for that period. · ${label}`,
+      noLessons: "No completed lessons found for that period.",
+      earningsNarrative: (range: string, amount: string, n: number) => `${range}, you earned **${amount}** across **${n}** lessons.`,
+      earningsNarrativeMoneyOnly: (range: string, amount: string) => `${range}, you earned **${amount}**.`,
+      earningsNarrativeLessonsOnly: (range: string, n: number) => `${range}, you taught **${n}** lessons.`,
     };
   })();
 
@@ -439,15 +462,16 @@ export async function askInsights(questionText: string, context: AskInsightsCont
 
   const meta = extractMetadata(computed, earnings, plan, routerUsed);
 
-  // Earnings: return a concise, grounded card-style answer (localized).
+  // Earnings: narrative sentence only (human range, 2-decimal currency). No raw labels.
   if (!finalNeedsClarification && plan.intent === "earnings_in_period" && typeof out.total_dollars === "number") {
-    const label = meta.date_range_label;
     const lessonCount = meta.lesson_count;
+    const rawRange = meta.date_range_display || (meta.date_range_label_human ? `in the ${meta.date_range_label_human}` : "that period");
+    const range = rawRange ? rawRange.charAt(0).toUpperCase() + rawRange.slice(1) : "In that period";
+    const amount = formatDollars2(out.total_dollars);
     if (lessonCount <= 0) {
-      finalAnswerText = strings.noLessons(label);
+      finalAnswerText = strings.noLessons;
     } else {
-      // Keep the formatted number from the responder as the primary value.
-      finalAnswerText = `${finalAnswerText}\n${strings.earningsBasedOn(lessonCount, label)}`;
+      finalAnswerText = strings.earningsNarrative(range, amount, lessonCount);
     }
   }
 
