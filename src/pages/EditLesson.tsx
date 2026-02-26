@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { useStoreContext } from "@/context/StoreContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatCurrency, getEffectiveRateCents, getEffectiveDurationMinutes, toDateKey } from "@/utils/earnings";
+import DatePicker from "@/components/DatePicker";
 import StudentAvatar from "@/components/StudentAvatar";
 import MonthCalendarGrid from "@/components/MonthCalendarGrid";
 import type { Lesson } from "@/types";
