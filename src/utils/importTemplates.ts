@@ -27,14 +27,21 @@ function escapeCsvCell(val: string): string {
   return `"${val.replace(/"/g, '""')}"`;
 }
 
-/** Template for Import lessons (attendance matrix): date column + student name columns, Y = attended */
+/** Template for Import lessons (attendance matrix): date column + Student 1..10, one row per day (1/1/2024–3/31/2026), empty cells for Y */
 export function getMatrixTemplateCsv(): string {
-  return [
-    "date,Student One,Student Two,Student Three",
-    "1/15/2024,Y,,",
-    "1/16/2024,,Y,",
-    "1/17/2024,Y,,Y",
-  ].join("\n");
+  const studentCols = 10;
+  const header = ["date", ...Array.from({ length: studentCols }, (_, i) => `Student ${i + 1}`)].join(",");
+  const start = new Date(2024, 0, 1);
+  const end = new Date(2026, 2, 31); // March 31, 2026
+  const rows: string[] = [header];
+  const emptyCells = ",".repeat(studentCols); // 10 commas = 10 empty cells after date
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    const y = d.getFullYear();
+    rows.push(`${m}/${day}/${y}${emptyCells}`);
+  }
+  return rows.join("\n");
 }
 
 /**
