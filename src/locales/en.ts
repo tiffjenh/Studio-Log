@@ -70,6 +70,7 @@ export default {
     downloadStudentLessons: "Lessons",
     importLessons: "Import Lessons",
     downloadLessons: "Download Lessons",
+    lessonsMatrixTemplate: "Lessons matrix template",
     clearLessons: "Clear Lessons",
     deleteAllConfirmTitle: "Are you sure?",
     deleteAllConfirmMessage: "This will delete all students and all earnings. This cannot be undone.",

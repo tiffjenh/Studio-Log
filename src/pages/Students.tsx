@@ -8,7 +8,7 @@ import StudentAvatar from "@/components/StudentAvatar";
 import type { Lesson, Student } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { ChevronRightIcon, DownloadIcon } from "@/components/ui/Icons";
-import { downloadCsv, getStudentLessonsMatrixCsv, getStudentLessonsMatrixFilename } from "@/utils/importTemplates";
+import { downloadCsv, getMatrixTemplateCsv, getStudentLessonsMatrixCsv, getStudentLessonsMatrixFilename } from "@/utils/importTemplates";
 import { parseLessonMatrixCSV, type ImportResult } from "@/utils/csvImport";
 import "./students.mock.css";
 
@@ -417,6 +417,19 @@ export default function Students() {
               >
                 <DownloadIcon size={20} />
                 <span>{t("students.downloadLessons")}</span>
+              </button>
+              <div className="studentsPage__dropdownDivider" />
+              <button
+                type="button"
+                role="menuitem"
+                className="studentsPage__dropdownItem"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  downloadCsv("lessons-matrix-template.csv", getMatrixTemplateCsv());
+                }}
+              >
+                <DownloadIcon size={20} />
+                <span>{t("students.lessonsMatrixTemplate")}</span>
               </button>
             </div>
           )}

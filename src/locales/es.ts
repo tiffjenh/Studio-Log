@@ -70,6 +70,7 @@ export default {
     downloadStudentLessons: "Clases",
     importLessons: "Importar clases",
     downloadLessons: "Descargar clases",
+    lessonsMatrixTemplate: "Plantilla de matriz de clases",
     clearLessons: "Borrar clases",
     deleteAllConfirmTitle: "¿Estás seguro?",
     deleteAllConfirmMessage: "Se eliminarán todos los estudiantes y todos los ingresos. Esta acción no se puede deshacer.",

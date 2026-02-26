@@ -70,6 +70,7 @@ export default {
     downloadStudentLessons: "課程",
     importLessons: "匯入課程",
     downloadLessons: "下載課程",
+    lessonsMatrixTemplate: "課程矩陣範本",
     clearLessons: "清除課程",
     deleteAllConfirmTitle: "確定嗎？",
     deleteAllConfirmMessage: "將刪除所有學生與所有收入紀錄，且無法復原。",
