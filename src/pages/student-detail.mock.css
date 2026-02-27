@@ -468,7 +468,7 @@
 /* ---- 4) Bottom actions (same line) ---- */
 .studentDetailPage .studentDetailPage__bottomActions {
   padding-top: 16px;
-  padding-bottom: calc(var(--nav-height, 56px) + var(--safe-bottom, 0px) + 16px);
+  padding-bottom: calc(var(--nav-height, 56px) + var(--safe-bottom, 0px) + 12px);
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;

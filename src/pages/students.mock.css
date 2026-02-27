@@ -4,7 +4,7 @@
   --mock-teal: #26434B;
   /* Edge-to-edge: cancel app-shell padding so body gradient shows through; no white container */
   margin: -20px -16px calc(-1 * (var(--nav-height) + var(--safe-bottom)));
-  padding: 20px 16px calc(var(--nav-height) + var(--safe-bottom) + 24px);
+  padding: 20px 16px calc(var(--nav-height) + var(--safe-bottom) + 12px);
   background: transparent;
   font-family: var(--font-sans);
 }

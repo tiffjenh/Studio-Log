@@ -9,7 +9,7 @@
   --earnings-red-bg: #fef2f2;
   --earnings-muted: #6b7280;
   background: transparent;
-  padding: 0 16px calc(var(--nav-height, 56px) + 24px);
+  padding: 0 16px calc(var(--nav-height, 56px) + 12px);
   font-family: var(--font-sans);
   min-height: 100%;
   box-sizing: border-box;

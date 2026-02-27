@@ -2,7 +2,7 @@
 .addStudentPage {
   --mock-teal: #26434B;
   background: transparent;
-  padding-bottom: calc(var(--nav-height, 56px) + 24px);
+  padding-bottom: calc(var(--nav-height, 56px) + 12px);
   font-family: var(--font-sans);
   max-width: 100%;
 }

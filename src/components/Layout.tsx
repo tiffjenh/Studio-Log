@@ -108,7 +108,7 @@ export default function Layout() {
             flexDirection: "column",
             overflowY: "auto",
             padding: "20px 16px 24px",
-            paddingBottom: "calc(var(--nav-height) + var(--safe-bottom) + 24px)",
+            paddingBottom: "calc(var(--nav-height) + var(--safe-bottom) + 12px)",
           }}
         >
         {devLoadedAt != null && (
